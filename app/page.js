@@ -85,7 +85,7 @@ export default async function DashboardPage() {
                   <div key={hero.sfId} className="list-item">
                     <div>
                       <div className="list-item-title">
-                        {hero.rank} {hero.fullName.replace(/\s*\(.*?\)\s*/, "")}
+                        {hero.fullName.replace(/\s*\(.*?\)\s*/, "")}
                       </div>
                       <div className="list-item-sub">
                         {monthName} {day} &middot; {years} years &middot; {hero.serviceCode}

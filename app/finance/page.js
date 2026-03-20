@@ -124,7 +124,7 @@ export default async function FinancePage() {
                         {i + 1}
                       </div>
                       <div>
-                        <div className="list-item-title">{hero.rank} {cleanName}</div>
+                        <div className="list-item-title">{cleanName}</div>
                         <div className="list-item-sub">
                           {hero.serviceCode}
                           {hero.charityName && ` \u00b7 ${hero.charityName}`}

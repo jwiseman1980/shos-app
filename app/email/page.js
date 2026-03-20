@@ -141,7 +141,7 @@ export default async function EmailComposerPage() {
                   <div key={hero.sfId} className="list-item">
                     <div>
                       <div className="list-item-title">
-                        {hero.rank} {hero.fullName ? hero.fullName.replace(/\s*\(.*?\)\s*/, "") : hero.name}
+                        {hero.fullName ? hero.fullName.replace(/\s*\(.*?\)\s*/, "") : hero.name}
                       </div>
                       <div className="list-item-sub">
                         {monthName} {day} &middot; {years} years &middot; {hero.serviceCode}
@@ -175,7 +175,7 @@ export default async function EmailComposerPage() {
                   <div key={hero.sfId} className="list-item">
                     <div>
                       <div className="list-item-title">
-                        {hero.rank} {hero.fullName ? hero.fullName.replace(/\s*\(.*?\)\s*/, "") : hero.name}
+                        {hero.fullName ? hero.fullName.replace(/\s*\(.*?\)\s*/, "") : hero.name}
                       </div>
                       <div className="list-item-sub">
                         {monthName} {day} &middot; {years} years &middot; {hero.serviceCode}
@@ -207,7 +207,7 @@ export default async function EmailComposerPage() {
                   <div key={hero.sfId} className="list-item">
                     <div>
                       <div className="list-item-title">
-                        {hero.rank} {hero.fullName ? hero.fullName.replace(/\s*\(.*?\)\s*/, "") : hero.name}
+                        {hero.fullName ? hero.fullName.replace(/\s*\(.*?\)\s*/, "") : hero.name}
                       </div>
                       <div className="list-item-sub">
                         {monthName} {day} &middot; {years} years

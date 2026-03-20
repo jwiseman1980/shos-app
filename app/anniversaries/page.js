@@ -308,7 +308,7 @@ export default async function AnniversariesPage({ searchParams }) {
                           fontWeight: 500,
                         }}
                       >
-                        {hero.rank} {hero.fullName.replace(/\s*\(.*?\)\s*/, "")}
+                        {hero.fullName.replace(/\s*\(.*?\)\s*/, "")}
                       </span>
                     </td>
                     <td>{hero.serviceCode}</td>
@@ -343,7 +343,7 @@ export default async function AnniversariesPage({ searchParams }) {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-bright)", marginBottom: 4 }}>
-                      {hero.rank} {hero.fullName.replace(/\s*\(.*?\)\s*/, "")}
+                      {hero.fullName.replace(/\s*\(.*?\)\s*/, "")}
                     </div>
                     <div style={{ fontSize: 13, color: "var(--text)" }}>
                       {hero.anniversaryNotes}

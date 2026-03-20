@@ -115,7 +115,7 @@ export default async function MemorialsPage() {
                     <div key={hero.sfId} className="list-item">
                       <div style={{ flex: 1 }}>
                         <div className="list-item-title">
-                          {hero.rank} {cleanName}
+                          {cleanName}
                         </div>
                         <div className="list-item-sub">
                           {hero.serviceCode}

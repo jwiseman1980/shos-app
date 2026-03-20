@@ -166,7 +166,7 @@ export default async function ContentPage() {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                       <div>
                         <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-bright)" }}>
-                          {hero.rank} {cleanName}
+                          {cleanName}
                         </div>
                         <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
                           {monthName} {day} &middot; {years} Year Anniversary &middot; {hero.branch || hero.serviceCode}
@@ -189,10 +189,10 @@ export default async function ContentPage() {
                       }}
                     >
                       <div>
-                        Today we honor and remember {hero.rank} {cleanName}, who made the ultimate sacrifice {years} years ago on {monthName} {day}.
+                        Today we honor and remember {cleanName}, who made the ultimate sacrifice {years} years ago on {monthName} {day}.
                       </div>
                       <div style={{ marginTop: 8 }}>
-                        Every bracelet purchased in {hero.rank} {hero.lastName || cleanName.split(" ").pop()}&apos;s honor generates a $10 donation to {hero.charityName || "their designated charity"}.
+                        Every bracelet purchased in {hero.lastName || cleanName.split(" ").pop()}&apos;s honor generates a $10 donation to {hero.charityName || "their designated charity"}.
                       </div>
                       {hero.bioPage && (
                         <div style={{ marginTop: 8, fontSize: 12 }}>
