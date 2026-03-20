@@ -1,5 +1,6 @@
 const STATUS_MAP = {
   sent: "green",
+  email_sent: "green",
   complete: "green",
   completed: "green",
   active: "green",
