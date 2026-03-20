@@ -31,11 +31,20 @@ export async function middleware(request) {
   if (
     pathname === "/login" ||
     pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/sf-test") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname === "/public"
   ) {
     return NextResponse.next();
+  }
+
+  // Allow API routes with valid API key
+  if (pathname.startsWith("/api/")) {
+    const apiKey = request.headers.get("x-api-key") || request.nextUrl.searchParams.get("key");
+    if (apiKey && apiKey === process.env.SHOS_API_KEY) {
+      return NextResponse.next();
+    }
   }
 
   const session = request.cookies.get(SESSION_COOKIE);
