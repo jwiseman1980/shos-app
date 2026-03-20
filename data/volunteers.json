@@ -11,57 +11,73 @@
   {
     "name": "Chris Marti",
     "role": "Volunteer Coordinator",
-    "email": "chris@steel-hearts.org",
+    "email": "chris.marti@steel-hearts.org",
     "initials": "CM",
     "color": "#2e7d32",
     "domains": ["Memorial Ops", "Anniversary Emails"]
   },
   {
-    "name": "Kristin Kingsbury",
+    "name": "Kristin Hughes",
     "role": "Volunteer",
-    "email": "kristin@steel-hearts.org",
-    "initials": "KK",
+    "email": "kristin.hughes@steel-hearts.org",
+    "initials": "KH",
     "color": "#6a1b9a",
     "domains": ["Anniversary Emails"]
   },
   {
-    "name": "Maggie Johnston",
+    "name": "Bianca Baldwin",
     "role": "Volunteer",
-    "email": "maggie@steel-hearts.org",
-    "initials": "MJ",
+    "email": "bianca.baldwin@steel-hearts.org",
+    "initials": "BB",
     "color": "#c62828",
     "domains": ["Anniversary Emails"]
   },
   {
-    "name": "Kevin Carrick",
+    "name": "Sean Reeves",
     "role": "Volunteer",
-    "email": "kevin@steel-hearts.org",
-    "initials": "KC",
+    "email": "sean.reeves@steel-hearts.org",
+    "initials": "SR",
     "color": "#00838f",
     "domains": ["Anniversary Emails"]
   },
   {
-    "name": "Will Saetren",
+    "name": "Alex Kim",
     "role": "Volunteer",
-    "email": "will@steel-hearts.org",
-    "initials": "WS",
+    "email": "alex.kim@steel-hearts.org",
+    "initials": "AK",
     "color": "#4527a0",
     "domains": ["Anniversary Emails"]
   },
   {
-    "name": "Bert Vergara",
+    "name": "Melanie Gness",
     "role": "Volunteer",
-    "email": "bert@steel-hearts.org",
-    "initials": "BV",
+    "email": "melanie.gness@steel-hearts.org",
+    "initials": "MG",
     "color": "#e65100",
     "domains": ["Anniversary Emails"]
   },
   {
-    "name": "Jamie Arkin",
+    "name": "Ryan Santana",
     "role": "Volunteer",
-    "email": "jamie@steel-hearts.org",
-    "initials": "JA",
+    "email": "ryan.santana@steel-hearts.org",
+    "initials": "RS",
     "color": "#1565c0",
+    "domains": ["Anniversary Emails"]
+  },
+  {
+    "name": "Matt Schwartz",
+    "role": "Volunteer",
+    "email": "matthew.schwartz@steel-hearts.org",
+    "initials": "MS",
+    "color": "#ad1457",
+    "domains": ["Anniversary Emails"]
+  },
+  {
+    "name": "Crysta Gonzalez",
+    "role": "Volunteer",
+    "email": "crysta.gonzalez@steel-hearts.org",
+    "initials": "CG",
+    "color": "#00695c",
     "domains": ["Anniversary Emails"]
   },
   {
