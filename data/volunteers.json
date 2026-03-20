@@ -1,0 +1,76 @@
+[
+  {
+    "name": "Joseph Wiseman",
+    "role": "Founder / Executive Director",
+    "email": "joseph.wiseman@steel-hearts.org",
+    "initials": "JW",
+    "color": "#1e3a5f",
+    "domains": ["All"],
+    "isFounder": true
+  },
+  {
+    "name": "Chris Marti",
+    "role": "Volunteer Coordinator",
+    "email": "chris@steel-hearts.org",
+    "initials": "CM",
+    "color": "#2e7d32",
+    "domains": ["Memorial Ops", "Anniversary Emails"]
+  },
+  {
+    "name": "Kristin Kingsbury",
+    "role": "Volunteer",
+    "email": "kristin@steel-hearts.org",
+    "initials": "KK",
+    "color": "#6a1b9a",
+    "domains": ["Anniversary Emails"]
+  },
+  {
+    "name": "Maggie Johnston",
+    "role": "Volunteer",
+    "email": "maggie@steel-hearts.org",
+    "initials": "MJ",
+    "color": "#c62828",
+    "domains": ["Anniversary Emails"]
+  },
+  {
+    "name": "Kevin Carrick",
+    "role": "Volunteer",
+    "email": "kevin@steel-hearts.org",
+    "initials": "KC",
+    "color": "#00838f",
+    "domains": ["Anniversary Emails"]
+  },
+  {
+    "name": "Will Saetren",
+    "role": "Volunteer",
+    "email": "will@steel-hearts.org",
+    "initials": "WS",
+    "color": "#4527a0",
+    "domains": ["Anniversary Emails"]
+  },
+  {
+    "name": "Bert Vergara",
+    "role": "Volunteer",
+    "email": "bert@steel-hearts.org",
+    "initials": "BV",
+    "color": "#e65100",
+    "domains": ["Anniversary Emails"]
+  },
+  {
+    "name": "Jamie Arkin",
+    "role": "Volunteer",
+    "email": "jamie@steel-hearts.org",
+    "initials": "JA",
+    "color": "#1565c0",
+    "domains": ["Anniversary Emails"]
+  },
+  {
+    "name": "Sara Curran",
+    "role": "Bookkeeper",
+    "email": "sara@external.com",
+    "initials": "SC",
+    "color": "#795548",
+    "domains": ["Finance"],
+    "isExternal": true
+  }
+]

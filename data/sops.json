@@ -1,0 +1,192 @@
+[
+  {
+    "id": "SOP-001",
+    "title": "Daily Social Media Engagement",
+    "version": "v3.2",
+    "domain": "Social Media",
+    "cadence": "Daily",
+    "status": "active",
+    "owner": "Joseph Wiseman",
+    "summary": "15-20 minute daily routine: Meta inbox, comments, growth levers, story sharing"
+  },
+  {
+    "id": "SOP-002",
+    "title": "Fallen Hero Anniversary Publishing Protocol",
+    "version": "v1.0",
+    "domain": "Memorial Ops",
+    "cadence": "As needed",
+    "status": "active",
+    "owner": "Joseph Wiseman",
+    "summary": "End-to-end anniversary memorial post creation and publishing workflow"
+  },
+  {
+    "id": "SOP-003",
+    "title": "Monthly Memorial Content Planning & Scheduling",
+    "version": "v1.0",
+    "domain": "Social Media",
+    "cadence": "Monthly",
+    "status": "active",
+    "owner": "Joseph Wiseman",
+    "summary": "Plan and schedule memorial content for upcoming month"
+  },
+  {
+    "id": "SOP-004",
+    "title": "Memorial Commission Intake",
+    "version": "v2.2",
+    "domain": "Bracelet Ops",
+    "cadence": "As needed",
+    "status": "active",
+    "owner": "Joseph Wiseman",
+    "summary": "Process new bracelet commission requests from inquiry through eligibility verification"
+  },
+  {
+    "id": "SOP-015",
+    "title": "Monthly Social Media Performance Review",
+    "version": "v2.1",
+    "domain": "Social Media",
+    "cadence": "Monthly",
+    "status": "active",
+    "owner": "Joseph Wiseman",
+    "summary": "Export KPIs, analyze trends, compare to benchmarks, report to team"
+  },
+  {
+    "id": "SOP-ANN-001",
+    "title": "Anniversary Remembrance Execution",
+    "version": "v2.4",
+    "domain": "Memorial Ops",
+    "cadence": "Monthly",
+    "status": "active",
+    "owner": "Joseph Wiseman",
+    "summary": "Full anniversary remembrance cycle: assignment, drafting, review, send"
+  },
+  {
+    "id": "SOP-ANN-002",
+    "title": "Anniversary Remembrance — Volunteer Execution Guide",
+    "version": "v1.4",
+    "domain": "Memorial Ops",
+    "cadence": "Monthly",
+    "status": "active",
+    "owner": "Volunteers",
+    "summary": "Step-by-step guide for volunteers executing anniversary email sends"
+  },
+  {
+    "id": "SOP-DON-001",
+    "title": "Donated Bracelet Intake",
+    "version": "v1.4",
+    "domain": "Bracelet Ops",
+    "cadence": "As needed",
+    "status": "active",
+    "owner": "Joseph Wiseman",
+    "summary": "Process donated bracelet requests, verify eligibility, enter into pipeline"
+  },
+  {
+    "id": "SOP-FIN-001",
+    "title": "Monthly Financial Operations",
+    "version": "v2.2",
+    "domain": "Finance",
+    "cadence": "Monthly",
+    "status": "active",
+    "owner": "Sara Curran",
+    "summary": "Bookkeeper classification review, donation execution, QB reconciliation"
+  },
+  {
+    "id": "SOP-FIN-002",
+    "title": "Monthly Financial Close",
+    "version": "v1.0",
+    "domain": "Finance",
+    "cadence": "Monthly",
+    "status": "active",
+    "owner": "Sara Curran",
+    "summary": "Close monthly books by 5th, generate reports, archive statements"
+  },
+  {
+    "id": "SOP-INV-001",
+    "title": "Order Fulfillment Production",
+    "version": "v1.5",
+    "domain": "Bracelet Ops",
+    "cadence": "Weekly",
+    "status": "active",
+    "owner": "Joseph Wiseman",
+    "summary": "Bracelet production: laser engraving, packaging, shipping, tracking updates"
+  },
+  {
+    "id": "SOP-OP-001",
+    "title": "SHOS Daily & Governance Quick Reference",
+    "version": "v2.0",
+    "domain": "System Core",
+    "cadence": "Daily",
+    "status": "active",
+    "owner": "Joseph Wiseman",
+    "summary": "Master daily checklist and governance cadence reference card"
+  },
+  {
+    "id": "SOP-SYNC-001",
+    "title": "Automated Notion-SF Reconciliation",
+    "version": "v1.0",
+    "domain": "System Core",
+    "cadence": "Weekly",
+    "status": "active",
+    "owner": "Joseph Wiseman",
+    "summary": "Sync and reconcile data between Notion work surface and Salesforce"
+  },
+  {
+    "id": "FM-OPS-002",
+    "title": "Monthly Supporter Message Delivery Protocol",
+    "version": "v1.1",
+    "domain": "Family Messaging",
+    "cadence": "Monthly",
+    "status": "active",
+    "owner": "Joseph Wiseman",
+    "summary": "Package, review, and deliver supporter messages to Gold Star families"
+  },
+  {
+    "id": "FM-STD-003",
+    "title": "Supporter Message Packet Standard",
+    "version": "v1.0",
+    "domain": "Family Messaging",
+    "cadence": "Reference",
+    "status": "active",
+    "owner": "Joseph Wiseman",
+    "summary": "Standard format and quality requirements for family message packets"
+  },
+  {
+    "id": "FM-STD-004",
+    "title": "Supporter Message Text Normalization Standard",
+    "version": "v1.0",
+    "domain": "Family Messaging",
+    "cadence": "Reference",
+    "status": "active",
+    "owner": "Joseph Wiseman",
+    "summary": "Text cleanup rules for supporter messages before delivery"
+  },
+  {
+    "id": "FM-DATA-004",
+    "title": "Supporter Message Routing Schema",
+    "version": "v1.0",
+    "domain": "Family Messaging",
+    "cadence": "Reference",
+    "status": "active",
+    "owner": "Joseph Wiseman",
+    "summary": "Routing logic for how supporter messages flow from intake to family delivery"
+  },
+  {
+    "id": "GOV-013",
+    "title": "SOP Governance & Registry Enforcement Framework",
+    "version": "v1.0",
+    "domain": "Governance",
+    "cadence": "Quarterly",
+    "status": "active",
+    "owner": "Joseph Wiseman",
+    "summary": "Rules for SOP versioning, promotion, deprecation, and registry enforcement"
+  },
+  {
+    "id": "PHIL-002",
+    "title": "Message Delivery as Mission Doctrine",
+    "version": "v1.0",
+    "domain": "Governance",
+    "cadence": "Reference",
+    "status": "active",
+    "owner": "Joseph Wiseman",
+    "summary": "Founding doctrine: automation supports compassion, never replaces it"
+  }
+]
