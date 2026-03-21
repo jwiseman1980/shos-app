@@ -36,13 +36,14 @@ function statusLabel(status) {
   return labels[key] || status || "Not Assigned";
 }
 
-function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onUpdate }) {
+function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onUpdate, senderIdentity }) {
   const [status, setStatus] = useState(hero.anniversaryStatus || "Not Started");
   const [assignedTo, setAssignedTo] = useState(hero.anniversaryAssignedTo || "");
   const [notes, setNotes] = useState(hero.anniversaryNotes || "");
   const [editingNotes, setEditingNotes] = useState(false);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
+  const [draftState, setDraftState] = useState(null); // null | "creating" | "created" | "error" | "no_family"
 
   const save = useCallback(async (fields) => {
     setSaving(true);
@@ -83,6 +84,38 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
   const handleNotesSave = () => {
     setEditingNotes(false);
     save({ notes });
+  };
+
+  const handleCreateDraft = async () => {
+    if (!senderIdentity) return;
+    if (!hero.familyContactId) {
+      setDraftState("no_family");
+      setTimeout(() => setDraftState(null), 3000);
+      return;
+    }
+    setDraftState("creating");
+    try {
+      const res = await fetch("/api/anniversaries/draft-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          heroName: hero.fullName.replace(/\s*\(.*?\)\s*/, ""),
+          branch: hero.serviceCode,
+          years: hero.years,
+          memorialDate: hero.memorialDate,
+          familyEmail: hero.familyContactId, // placeholder — needs real email
+          familyName: hero.familyContactId,
+          senderEmail: senderIdentity.email,
+          senderName: senderIdentity.name,
+          sfId: hero.sfId,
+        }),
+      });
+      const data = await res.json();
+      setDraftState(data.success ? "created" : "error");
+    } catch {
+      setDraftState("error");
+    }
+    setTimeout(() => setDraftState(null), 4000);
   };
 
   const normStatus = normalizeStatus(status);
@@ -252,9 +285,43 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
           </span>
         )}
       </td>
+
+      {/* Draft Email */}
+      <td>
+        {draftState === "creating" ? (
+          <span style={{ fontSize: 10, color: "var(--gold)" }}>creating...</span>
+        ) : draftState === "created" ? (
+          <span style={{ fontSize: 10, color: "var(--status-green)" }}>draft created</span>
+        ) : draftState === "no_family" ? (
+          <span style={{ fontSize: 10, color: "var(--status-red)" }}>no family contact</span>
+        ) : draftState === "error" ? (
+          <span style={{ fontSize: 10, color: "var(--status-red)" }}>failed</span>
+        ) : (
+          <button
+            onClick={handleCreateDraft}
+            disabled={!senderIdentity}
+            style={{
+              background: senderIdentity ? "var(--gold)" : "var(--card-border)",
+              color: senderIdentity ? "#000" : "var(--text-dim)",
+              border: "none",
+              borderRadius: "var(--radius-sm)",
+              padding: "3px 8px",
+              fontSize: 10,
+              fontWeight: 600,
+              cursor: senderIdentity ? "pointer" : "not-allowed",
+              whiteSpace: "nowrap",
+            }}
+            title={senderIdentity ? `Create draft in ${senderIdentity.email}` : "Select your identity first"}
+          >
+            Create Draft
+          </button>
+        )}
+      </td>
     </tr>
   );
 }
+
+const SENDER_KEY = "shos_anniversary_sender";
 
 export default function AnniversaryTracker({
   heroes,
@@ -264,6 +331,30 @@ export default function AnniversaryTracker({
   today,
 }) {
   const [heroData, setHeroData] = useState(heroes);
+  const [senderIdentity, setSenderIdentity] = useState(null);
+
+  // Load saved sender from localStorage on mount
+  useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(SENDER_KEY);
+      if (saved) {
+        try { setSenderIdentity(JSON.parse(saved)); } catch {}
+      }
+    }
+  });
+
+  const handleSenderChange = (e) => {
+    const email = e.target.value;
+    if (!email) {
+      setSenderIdentity(null);
+      localStorage.removeItem(SENDER_KEY);
+      return;
+    }
+    const vol = volunteers.find((v) => v.email === email);
+    const identity = { email, name: vol?.name || email.split("@")[0] };
+    setSenderIdentity(identity);
+    localStorage.setItem(SENDER_KEY, JSON.stringify(identity));
+  };
 
   // Track updates for local state (optimistic UI)
   const handleUpdate = useCallback((sfId, fields) => {
@@ -289,6 +380,37 @@ export default function AnniversaryTracker({
 
   return (
     <div style={{ overflowX: "auto" }}>
+      {/* Sender Identity Picker */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, padding: "8px 0" }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          Sending as:
+        </span>
+        <select
+          value={senderIdentity?.email || ""}
+          onChange={handleSenderChange}
+          style={{
+            background: "var(--bg)",
+            color: senderIdentity ? "var(--text-bright)" : "var(--text-dim)",
+            border: "1px solid var(--card-border)",
+            borderRadius: "var(--radius-sm)",
+            padding: "4px 8px",
+            fontSize: 12,
+          }}
+        >
+          <option value="">Select your identity...</option>
+          {volunteers.map((v) => (
+            <option key={v.email} value={v.email}>
+              {v.name} ({v.email})
+            </option>
+          ))}
+        </select>
+        {senderIdentity && (
+          <span style={{ fontSize: 11, color: "var(--status-green)" }}>
+            Drafts will be created in {senderIdentity.email}
+          </span>
+        )}
+      </div>
+
       <table className="data-table">
         <thead>
           <tr>
@@ -299,6 +421,7 @@ export default function AnniversaryTracker({
             <th>Assigned To</th>
             <th>Status</th>
             <th>Notes</th>
+            <th>Email</th>
           </tr>
         </thead>
         <tbody>
@@ -318,6 +441,7 @@ export default function AnniversaryTracker({
                 monthName={monthName}
                 volunteers={volunteers}
                 onUpdate={handleUpdate}
+                senderIdentity={senderIdentity}
               />
             );
           })}

@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import PageShell from "@/components/PageShell";
 import DataCard from "@/components/DataCard";
 import StatBlock from "@/components/StatBlock";
