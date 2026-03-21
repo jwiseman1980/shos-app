@@ -1,7 +1,7 @@
 import PageShell from "@/components/PageShell";
 import DataCard from "@/components/DataCard";
 import StatBlock from "@/components/StatBlock";
-import StatusBadge from "@/components/StatusBadge";
+import AnniversaryTracker from "@/components/AnniversaryTracker";
 import { getAnniversariesByMonth } from "@/lib/data/heroes";
 import { getVolunteers } from "@/lib/data/volunteers";
 import { getMonthName, getCurrentMonth, getCurrentYear, getDayOfMonth, yearsSince } from "@/lib/dates";
@@ -22,23 +22,9 @@ const MONTH_OPTIONS = [
   { value: 12, label: "December" },
 ];
 
-// Normalize status strings for comparison and StatusBadge mapping
 function normalizeStatus(status) {
-  if (!status) return "not_started";
+  if (!status) return "not_assigned";
   return status.toLowerCase().replace(/\s+/g, "_");
-}
-
-function statusLabel(status) {
-  const key = normalizeStatus(status);
-  const labels = {
-    not_started: "Not Started",
-    in_progress: "In Progress",
-    email_sent: "Email Sent",
-    complete: "Complete",
-    completed: "Complete",
-    blocked: "Blocked",
-  };
-  return labels[key] || status || "Not Started";
 }
 
 export default async function AnniversariesPage({ searchParams }) {
@@ -56,6 +42,11 @@ export default async function AnniversariesPage({ searchParams }) {
   const allHeroes = await getAnniversariesByMonth(selectedMonth);
   const volunteers = await getVolunteers();
 
+  // Email-team volunteers (those with Anniversary Emails domain)
+  const emailVolunteers = volunteers.filter(
+    (v) => v.domains.includes("Anniversary Emails") || v.domains.includes("All")
+  );
+
   // Collect unique assigned volunteers from the data
   const assignedVolunteers = [
     ...new Set(allHeroes.map((h) => h.anniversaryAssignedTo).filter(Boolean)),
@@ -70,24 +61,34 @@ export default async function AnniversariesPage({ searchParams }) {
     heroes = heroes.filter((h) => h.anniversaryAssignedTo === volunteerFilter);
   }
 
-  // Sort by day of month
-  const sorted = [...heroes].sort((a, b) => {
-    return (getDayOfMonth(a.memorialDate) || a.anniversaryDay || 0) - (getDayOfMonth(b.memorialDate) || b.anniversaryDay || 0);
-  });
+  // Sort by day of month and add computed fields for client
+  const sorted = [...heroes]
+    .sort((a, b) => {
+      return (getDayOfMonth(a.memorialDate) || a.anniversaryDay || 0) -
+        (getDayOfMonth(b.memorialDate) || b.anniversaryDay || 0);
+    })
+    .map((hero) => ({
+      ...hero,
+      dayOfMonth: getDayOfMonth(hero.memorialDate) || hero.anniversaryDay || 0,
+      years: yearsSince(hero.memorialDate),
+    }));
 
   // Compute stats from ALL heroes this month (before filtering)
   const totalThisMonth = allHeroes.length;
   const completedCount = allHeroes.filter((h) => {
     const s = normalizeStatus(h.anniversaryStatus);
-    return s === "complete" || s === "completed" || s === "email_sent";
+    return s === "complete" || s === "completed" || s === "sent";
   }).length;
-  const inProgressCount = allHeroes.filter(
-    (h) => normalizeStatus(h.anniversaryStatus) === "in_progress"
-  ).length;
-  const blockedCount = allHeroes.filter(
-    (h) => normalizeStatus(h.anniversaryStatus) === "blocked"
-  ).length;
-  const notStartedCount = totalThisMonth - completedCount - inProgressCount - blockedCount;
+  const inProgressCount = allHeroes.filter((h) => {
+    const s = normalizeStatus(h.anniversaryStatus);
+    return s === "in_progress" || s === "assigned";
+  }).length;
+  const escalatedCount = allHeroes.filter((h) => {
+    const s = normalizeStatus(h.anniversaryStatus);
+    return s === "escalated" || s === "skipped";
+  }).length;
+  const notStartedCount = totalThisMonth - completedCount - inProgressCount - escalatedCount;
+  const assignedCount = allHeroes.filter((h) => h.anniversaryAssignedTo).length;
 
   const today = new Date().getDate();
 
@@ -97,7 +98,6 @@ export default async function AnniversariesPage({ searchParams }) {
     if (statusFilter) p.status = statusFilter;
     if (volunteerFilter) p.volunteer = volunteerFilter;
     Object.assign(p, overrides);
-    // Remove null/undefined values
     Object.keys(p).forEach((k) => {
       if (p[k] === null || p[k] === undefined || p[k] === "") delete p[k];
     });
@@ -138,7 +138,7 @@ export default async function AnniversariesPage({ searchParams }) {
         <StatBlock
           label="Completed"
           value={completedCount}
-          note={totalThisMonth > 0 ? `${Math.round((completedCount / totalThisMonth) * 100)}% done` : "—"}
+          note={totalThisMonth > 0 ? `${Math.round((completedCount / totalThisMonth) * 100)}% done` : "--"}
           accent="var(--status-green)"
         />
         <StatBlock
@@ -147,14 +147,20 @@ export default async function AnniversariesPage({ searchParams }) {
           accent="var(--status-blue)"
         />
         <StatBlock
+          label="Assigned"
+          value={assignedCount}
+          note={`${totalThisMonth - assignedCount} unassigned`}
+          accent="var(--status-purple)"
+        />
+        <StatBlock
           label="Not Started"
           value={notStartedCount}
           accent="var(--status-gray)"
         />
-        {blockedCount > 0 && (
+        {escalatedCount > 0 && (
           <StatBlock
-            label="Blocked"
-            value={blockedCount}
+            label="Escalated"
+            value={escalatedCount}
             accent="var(--status-red)"
           />
         )}
@@ -194,11 +200,12 @@ export default async function AnniversariesPage({ searchParams }) {
             All
           </Link>
           {[
-            { key: "not_started", label: "Not Started" },
+            { key: "not_assigned", label: "Not Assigned" },
+            { key: "assigned", label: "Assigned" },
             { key: "in_progress", label: "In Progress" },
-            { key: "email_sent", label: "Email Sent" },
+            { key: "sent", label: "Sent" },
             { key: "complete", label: "Complete" },
-            { key: "blocked", label: "Blocked" },
+            { key: "escalated", label: "Escalated" },
           ].map((s) => (
             <Link
               key={s.key}
@@ -252,112 +259,76 @@ export default async function AnniversariesPage({ searchParams }) {
         </div>
       )}
 
-      {/* Hero Table */}
+      {/* Interactive Hero Table */}
       <DataCard title={`${monthName} Anniversary Calendar — ${sorted.length} ${sorted.length === 1 ? "hero" : "heroes"}`}>
-        {sorted.length === 0 ? (
+        {totalThisMonth === 0 ? (
           <p style={{ color: "var(--text-dim)", fontSize: 13, padding: "20px 0", textAlign: "center" }}>
-            {totalThisMonth === 0
-              ? `No heroes with anniversaries in ${monthName}.`
-              : "No heroes match the current filters."}
+            No heroes with anniversaries in {monthName}.
           </p>
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Day</th>
-                <th>Hero</th>
-                <th>Branch</th>
-                <th>Years</th>
-                <th>Assigned To</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((hero) => {
-                const day = hero.anniversaryDay || getDayOfMonth(hero.memorialDate);
-                const years = yearsSince(hero.memorialDate);
-                const isPast = isCurrentMonth && day < today;
-                const isToday = isCurrentMonth && day === today;
-                const status = normalizeStatus(hero.anniversaryStatus);
-
-                return (
-                  <tr key={hero.sfId}>
-                    <td
-                      style={{
-                        fontWeight: isToday ? 700 : 400,
-                        color: isToday
-                          ? "var(--gold)"
-                          : isPast
-                          ? "var(--text-dim)"
-                          : "var(--text)",
-                      }}
-                    >
-                      {monthName.slice(0, 3)} {day}
-                      {isToday && (
-                        <span style={{ fontSize: 10, marginLeft: 6, color: "var(--gold)", fontWeight: 600 }}>
-                          TODAY
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      <span
-                        style={{
-                          color: isPast && status !== "not_started"
-                            ? "var(--text-dim)"
-                            : "var(--text-bright)",
-                          fontWeight: 500,
-                        }}
-                      >
-                        {hero.fullName.replace(/\s*\(.*?\)\s*/, "")}
-                      </span>
-                    </td>
-                    <td>{hero.serviceCode}</td>
-                    <td>{years}</td>
-                    <td style={{ fontSize: 12 }}>
-                      {hero.anniversaryAssignedTo || (
-                        <span style={{ color: "var(--text-dim)" }}>Unassigned</span>
-                      )}
-                    </td>
-                    <td>
-                      <StatusBadge
-                        status={status}
-                        label={statusLabel(hero.anniversaryStatus)}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <AnniversaryTracker
+            heroes={sorted}
+            monthName={monthName}
+            isCurrentMonth={isCurrentMonth}
+            volunteers={emailVolunteers}
+            today={today}
+          />
         )}
       </DataCard>
 
-      {/* Notes section — show heroes with notes */}
-      {sorted.some((h) => h.anniversaryNotes) && (
-        <div className="section" style={{ marginTop: 24 }}>
-          <div className="section-title">Anniversary Notes</div>
-          {sorted
-            .filter((h) => h.anniversaryNotes)
-            .map((hero) => (
-              <DataCard key={hero.sfId + "-note"}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-bright)", marginBottom: 4 }}>
-                      {hero.fullName.replace(/\s*\(.*?\)\s*/, "")}
-                    </div>
-                    <div style={{ fontSize: 13, color: "var(--text)" }}>
-                      {hero.anniversaryNotes}
-                    </div>
-                  </div>
-                  <StatusBadge
-                    status={normalizeStatus(hero.anniversaryStatus)}
-                    label={statusLabel(hero.anniversaryStatus)}
-                  />
-                </div>
-              </DataCard>
-            ))}
+      {/* Bulk Actions Card */}
+      <DataCard title="Quick Actions">
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div
+            style={{
+              padding: "12px 16px",
+              background: "var(--bg)",
+              border: "1px solid var(--card-border)",
+              borderRadius: "var(--radius-md)",
+              flex: "1 1 200px",
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-bright)", marginBottom: 4 }}>
+              Status Updates
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
+              Use the dropdown in each row to change status. Changes save to Salesforce immediately.
+            </div>
+          </div>
+          <div
+            style={{
+              padding: "12px 16px",
+              background: "var(--bg)",
+              border: "1px solid var(--card-border)",
+              borderRadius: "var(--radius-md)",
+              flex: "1 1 200px",
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-bright)", marginBottom: 4 }}>
+              Volunteer Assignment
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
+              Assign team members from the dropdown. Each volunteer can filter to see only their heroes.
+            </div>
+          </div>
+          <div
+            style={{
+              padding: "12px 16px",
+              background: "var(--bg)",
+              border: "1px solid var(--card-border)",
+              borderRadius: "var(--radius-md)",
+              flex: "1 1 200px",
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-bright)", marginBottom: 4 }}>
+              Notes
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
+              Click "add note" in any row to leave notes. Press Enter or click Save. Saves to Salesforce.
+            </div>
+          </div>
         </div>
-      )}
+      </DataCard>
     </PageShell>
   );
 }

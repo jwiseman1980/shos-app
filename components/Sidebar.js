@@ -23,6 +23,12 @@ const NAV_GROUPS = [
     label: "Fulfillment",
     items: [
       { href: "/bracelets", icon: "\u25CB", label: "Bracelet Pipeline" },
+    ],
+  },
+  {
+    label: "Engagement",
+    items: [
+      { href: "/donors", icon: "\u2665", label: "Donor Engagement" },
       { href: "/email", icon: "\u2709", label: "Email Composer" },
     ],
   },

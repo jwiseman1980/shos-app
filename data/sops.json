@@ -7,7 +7,47 @@
     "cadence": "Daily",
     "status": "active",
     "owner": "Joseph Wiseman",
-    "summary": "15-20 minute daily routine: Meta inbox, comments, growth levers, story sharing"
+    "type": "procedure",
+    "timeBox": "15-20 minutes",
+    "summary": "15-20 minute daily routine: Meta inbox, comments, growth levers, story sharing",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Open Meta Business Suite → Inbox",
+        "detail": "Navigate to the Meta Business Suite inbox to begin the daily engagement session.",
+        "who": "volunteer"
+      },
+      {
+        "step": 2,
+        "title": "Respond to new DMs",
+        "detail": "Reply to all new direct messages. Mark Done when resolved. Leave unread or label if follow-up is required.",
+        "who": "volunteer"
+      },
+      {
+        "step": 3,
+        "title": "Review new comments",
+        "detail": "Like genuine comments. Reply when appropriate. Hide (do not delete) coordinated negative, spam, or extremist comments. Block users with hateful or bot-pattern activity.",
+        "who": "volunteer"
+      },
+      {
+        "step": 4,
+        "title": "Growth Lever Execution",
+        "detail": "Love visible shared posts. Invite reactors to follow page (≤50 reactions: invite all; >50: invite first 50). Prioritize Heart and Cry reactions over Like when capacity is limited.",
+        "who": "volunteer"
+      },
+      {
+        "step": 5,
+        "title": "Share to Stories",
+        "detail": "Share the latest post (or a relevant recent post) to both Facebook Story and Instagram Story. One share per platform per session.",
+        "who": "volunteer"
+      },
+      {
+        "step": 6,
+        "title": "Post completion to Slack",
+        "detail": "Post to #social-media-ops: \"SOP-001 complete — DMs: [clear/responded], Comments: [reviewed], Invites: [sent], Stories: [shared]. [date]\"",
+        "who": "volunteer"
+      }
+    ]
   },
   {
     "id": "SOP-002",
@@ -17,7 +57,46 @@
     "cadence": "As needed",
     "status": "active",
     "owner": "Joseph Wiseman",
-    "summary": "End-to-end anniversary memorial post creation and publishing workflow"
+    "type": "procedure",
+    "summary": "End-to-end anniversary memorial post creation and publishing workflow",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Pull hero data from registry",
+        "detail": "Retrieve the hero's full name, rank, branch, memorial date, and bio page URL from the Memorial Bracelet Registry.",
+        "who": "operator"
+      },
+      {
+        "step": 2,
+        "title": "Select or create memorial image",
+        "detail": "Use existing hero photo or Canva template. Ensure image includes name, rank, branch, and memorial date.",
+        "who": "joseph"
+      },
+      {
+        "step": 3,
+        "title": "Draft memorial post copy",
+        "detail": "Write the memorial post using the approved template. Include hero info, anniversary year count, charity name, and bio page link.",
+        "who": "operator"
+      },
+      {
+        "step": 4,
+        "title": "Add hashtags",
+        "detail": "Include core hashtags (#SteelHearts, #NeverForget, #GoldStarFamily, #HonorTheFallen) plus branch-specific tags.",
+        "who": "operator"
+      },
+      {
+        "step": 5,
+        "title": "Review and approve",
+        "detail": "Joseph reviews the complete post (image + copy + hashtags) for accuracy and tone.",
+        "who": "joseph"
+      },
+      {
+        "step": 6,
+        "title": "Publish or schedule",
+        "detail": "Publish immediately if on the anniversary date, or schedule via Meta Business Suite for the correct date at optimal time.",
+        "who": "joseph"
+      }
+    ]
   },
   {
     "id": "SOP-003",
@@ -27,7 +106,40 @@
     "cadence": "Monthly",
     "status": "active",
     "owner": "Joseph Wiseman",
-    "summary": "Plan and schedule memorial content for upcoming month"
+    "type": "procedure",
+    "summary": "Plan and schedule memorial content for upcoming month",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Pull next month's anniversary list",
+        "detail": "Query the Memorial Bracelet Registry for all heroes with memorial dates in the upcoming month. Sort by date.",
+        "who": "operator"
+      },
+      {
+        "step": 2,
+        "title": "Build content calendar",
+        "detail": "Map each hero to their memorial date. Identify clusters (multiple heroes same week) and plan spacing.",
+        "who": "operator"
+      },
+      {
+        "step": 3,
+        "title": "Prepare post templates",
+        "detail": "Generate draft posts for each hero using the Content Generator. Include copy, hashtags, and image notes.",
+        "who": "operator"
+      },
+      {
+        "step": 4,
+        "title": "Review and assign",
+        "detail": "Joseph reviews the calendar and assigns any posts to volunteers if applicable.",
+        "who": "joseph"
+      },
+      {
+        "step": 5,
+        "title": "Schedule posts in Meta Business Suite",
+        "detail": "Schedule approved posts for their target dates. Confirm all are queued correctly.",
+        "who": "joseph"
+      }
+    ]
   },
   {
     "id": "SOP-004",
@@ -37,7 +149,46 @@
     "cadence": "As needed",
     "status": "active",
     "owner": "Joseph Wiseman",
-    "summary": "Process new bracelet commission requests from inquiry through eligibility verification"
+    "type": "procedure",
+    "summary": "Process new bracelet commission requests from inquiry through eligibility verification",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Initial Response & Hub Task Creation",
+        "detail": "Acknowledge receipt within 24 hours with empathy. Confirm key details (hero name, branch, date of passing, relationship, memorial type). Check Accounts & Contacts for existing records. Create Commission Pipeline record and hub task in Steel Hearts Tasks.",
+        "who": "operator"
+      },
+      {
+        "step": 2,
+        "title": "Eligibility Screening",
+        "detail": "Cross-check against GOV-001 eligibility criteria. Confirm eligibility category (KIA, line of duty, etc.). If unclear, escalate to Joseph. Update status to Eligibility Confirmed or Escalated.",
+        "who": "operator"
+      },
+      {
+        "step": 3,
+        "title": "Salesforce Record Creation",
+        "detail": "Search for existing Contact. Create or update Contact and Opportunity (Stage: Intake). Attach all intake correspondence to the Opportunity.",
+        "who": "operator"
+      },
+      {
+        "step": 4,
+        "title": "Scope & Pricing Confirmation",
+        "detail": "Define commission scope (type, customization, quantity, special requests). Confirm pricing tier. Send scope and pricing summary to requester.",
+        "who": "joseph"
+      },
+      {
+        "step": 5,
+        "title": "Deposit & Formal Acceptance",
+        "detail": "Send payment instructions. Upon deposit: update SF Opportunity to Accepted, send confirmation email with timeline estimate, store proof of payment.",
+        "who": "joseph"
+      },
+      {
+        "step": 6,
+        "title": "Handoff to Production",
+        "detail": "Confirm all assets received (photos, correct spelling, design references). Create Order Queue record. Move SF Opportunity to Production-Active. Update hub task. SOP-INV-001 takes over.",
+        "who": "operator"
+      }
+    ]
   },
   {
     "id": "SOP-015",
@@ -47,7 +198,40 @@
     "cadence": "Monthly",
     "status": "active",
     "owner": "Joseph Wiseman",
-    "summary": "Export KPIs, analyze trends, compare to benchmarks, report to team"
+    "type": "procedure",
+    "summary": "Export KPIs, analyze trends, compare to benchmarks, report to team",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Export Meta Business Suite KPIs",
+        "detail": "Pull 30-day metrics: reach, engagement, follower growth, post performance, story views.",
+        "who": "operator"
+      },
+      {
+        "step": 2,
+        "title": "Analyze trends",
+        "detail": "Compare current month to previous months. Identify top-performing posts and content types.",
+        "who": "operator"
+      },
+      {
+        "step": 3,
+        "title": "Compare to benchmarks",
+        "detail": "Check metrics against established KPI targets. Flag any metrics below threshold.",
+        "who": "operator"
+      },
+      {
+        "step": 4,
+        "title": "Generate performance report",
+        "detail": "Create summary report with key metrics, trends, top posts, and recommendations.",
+        "who": "operator"
+      },
+      {
+        "step": 5,
+        "title": "Report to team",
+        "detail": "Share report in #social-media-ops Slack channel. Include in board meeting materials if applicable.",
+        "who": "joseph"
+      }
+    ]
   },
   {
     "id": "SOP-ANN-001",
@@ -57,7 +241,58 @@
     "cadence": "Monthly",
     "status": "active",
     "owner": "Joseph Wiseman",
-    "summary": "Full anniversary remembrance cycle: assignment, drafting, review, send"
+    "type": "procedure",
+    "summary": "Full anniversary remembrance cycle: assignment, drafting, review, send",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Automated Registry Refresh (1st of month)",
+        "detail": "anniversary-registry-refresh task runs at 9 AM ET. Refreshes Memorial Bracelet Registry from Salesforce. Review count and validation notes.",
+        "who": "automated"
+      },
+      {
+        "step": 2,
+        "title": "Automated Cycle Generation (2nd of month)",
+        "detail": "anniversary-cycle-generation creates the monthly work surface. Verify parent task exists in Steel Hearts Tasks. Review generated cycle.",
+        "who": "automated"
+      },
+      {
+        "step": 3,
+        "title": "Data Verification (Days 1-3)",
+        "detail": "Chris reviews hero names, ranks, memorial dates, family contact emails. Flag missing data. Confirm record count matches SF report. Update tracker view filter to current month.",
+        "who": "chris"
+      },
+      {
+        "step": 4,
+        "title": "Volunteer Assignment (Days 3-5)",
+        "detail": "Chris assigns volunteers in Notion (set Assigned To, Status → Assigned). Balance workload. Post assignment summary in Slack #anniversary-cycle. Tag volunteers.",
+        "who": "chris"
+      },
+      {
+        "step": 5,
+        "title": "Email Execution (Throughout Month)",
+        "detail": "Volunteers execute emails through the Operator. Operator drafts in Gmail using Template A (on-date) or B (catch-up). Volunteer reviews and sends. Tracker updated in real time.",
+        "who": "volunteer"
+      },
+      {
+        "step": 6,
+        "title": "Day 15 Checkpoint",
+        "detail": "90% target. If behind, post nudge in Slack and email stragglers. Handle any escalations within 48 hours.",
+        "who": "chris"
+      },
+      {
+        "step": 7,
+        "title": "Board Meeting Prep (Week Before)",
+        "detail": "Generate two slides: (1) Current Month Recap — completion rate, families reached, escalations. (2) Upcoming Month Preview — assignments, volunteer availability, special cases.",
+        "who": "chris"
+      },
+      {
+        "step": 8,
+        "title": "Month-End Close",
+        "detail": "All emails should be complete. 1st-of-month task handles sync-back. Mark parent task in Steel Hearts Tasks as Complete with final completion rate.",
+        "who": "operator"
+      }
+    ]
   },
   {
     "id": "SOP-ANN-002",
@@ -67,7 +302,58 @@
     "cadence": "Monthly",
     "status": "active",
     "owner": "Volunteers",
-    "summary": "Step-by-step guide for volunteers executing anniversary email sends"
+    "type": "procedure",
+    "summary": "Step-by-step guide for volunteers executing anniversary email sends",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Connect to the Operator",
+        "detail": "Open Claude and connect to the SHOS project. Tell the Operator you're ready to send anniversary emails.",
+        "who": "volunteer"
+      },
+      {
+        "step": 2,
+        "title": "Review your assignments",
+        "detail": "Operator fetches your personal filtered view from the Anniversary Tracker. Confirm the count matches expectations.",
+        "who": "volunteer"
+      },
+      {
+        "step": 3,
+        "title": "Verify Gmail account",
+        "detail": "Confirm you're logged into your @steel-hearts.org account (not personal Gmail). Check the profile icon in top-right.",
+        "who": "volunteer"
+      },
+      {
+        "step": 4,
+        "title": "Draft email for each hero",
+        "detail": "Operator drafts using Template A (on-date) or Template B (catch-up) with all placeholders replaced. Review names, rank, and email address.",
+        "who": "operator"
+      },
+      {
+        "step": 5,
+        "title": "Review and personalize",
+        "detail": "Check all details are correct. Add any personal touch. You have final say — Operator never sends without approval.",
+        "who": "volunteer"
+      },
+      {
+        "step": 6,
+        "title": "Send or schedule",
+        "detail": "If on-date and >24hrs away: Schedule Send for 9 AM ET on anniversary. If within 24hrs or catch-up: send immediately.",
+        "who": "volunteer"
+      },
+      {
+        "step": 7,
+        "title": "Check for additional contacts",
+        "detail": "If the hero has an additional family contact, the Operator will ask if you want to send to them too. Repeat if yes.",
+        "who": "volunteer"
+      },
+      {
+        "step": 8,
+        "title": "Move to next assignment",
+        "detail": "Repeat for all assignments. Operator posts completion summary to Slack #anniversary-cycle when done.",
+        "who": "operator"
+      }
+    ]
   },
   {
     "id": "SOP-DON-001",
@@ -77,7 +363,34 @@
     "cadence": "As needed",
     "status": "active",
     "owner": "Joseph Wiseman",
-    "summary": "Process donated bracelet requests, verify eligibility, enter into pipeline"
+    "type": "procedure",
+    "summary": "Process donated bracelet requests, verify eligibility, enter into pipeline",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Intake & Acknowledgment",
+        "detail": "Email router classifies as DONATED BRACELET REQUEST. Check Accounts & Contacts for existing recipient. Create Contact if needed. Draft compassionate acknowledgment. Create Order Queue record (DON-YYYY-NNN) and hub task in Steel Hearts Tasks.",
+        "who": "operator"
+      },
+      {
+        "step": 2,
+        "title": "Joseph reviews and sends acknowledgment",
+        "detail": "Review the drafted response during email triage. Approve and send.",
+        "who": "joseph"
+      },
+      {
+        "step": 3,
+        "title": "Size Confirmation (if needed)",
+        "detail": "If sizes not specified, draft follow-up email asking for 6-inch vs 7-inch split. Joseph reviews and sends. Update Order Queue when recipient responds.",
+        "who": "operator"
+      },
+      {
+        "step": 4,
+        "title": "Production Handoff",
+        "detail": "DON-SF-SYNC zap creates SF Order automatically. Order Queue record progresses through SOP-INV-001: triage → production → Ready to Ship → 3-zap shipping loop.",
+        "who": "automated"
+      }
+    ]
   },
   {
     "id": "SOP-FIN-001",
@@ -87,7 +400,58 @@
     "cadence": "Monthly",
     "status": "active",
     "owner": "Sara Curran",
-    "summary": "Bookkeeper classification review, donation execution, QB reconciliation"
+    "type": "procedure",
+    "summary": "Bookkeeper classification review, donation execution, QB reconciliation",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Export Squarespace Orders (Part A)",
+        "detail": "Log into Squarespace Commerce → Orders. Set date filter to full prior month. Export CSV. Save as orders_YYYY-MM.csv. (Automated via bookkeeper-classification-report task on 3rd.)",
+        "who": "automated"
+      },
+      {
+        "step": 2,
+        "title": "Run Classification",
+        "detail": "Load exported CSV and SKU Master. Apply CSV handling rules (forward-fill, Eastern timezone, count units not rows, exclude tests). Classify each bracelet's $10 obligation as Restricted, Unrestricted, or Pending. Identify D-variant orders.",
+        "who": "operator"
+      },
+      {
+        "step": 3,
+        "title": "Generate Excel Report",
+        "detail": "Create workbook with Bookkeeper Summary and Bookkeeper Detail sheets. Color code restricted (amber) and unrestricted (blue). Save as SH_Monthly_Financial_Report_[Month]_[Year].xlsx.",
+        "who": "operator"
+      },
+      {
+        "step": 4,
+        "title": "Review & Send to Sara",
+        "detail": "Joseph reviews report — verify total units match Squarespace dashboard. Cross-check restricted totals. Draft email to sara.curran@outlook.com. Joseph reviews and sends.",
+        "who": "joseph"
+      },
+      {
+        "step": 5,
+        "title": "Identify Heroes Due for Donation (Part B)",
+        "detail": "Filter heroes whose Memorial Date month = prior month. This is the annual cycle completion list. VERIFICATION GATE: hero count must match SF memorial date filter.",
+        "who": "operator"
+      },
+      {
+        "step": 6,
+        "title": "Calculate Annual Donations",
+        "detail": "For each hero, count all bracelet sales from 12-month cycle. Multiply units × $10. Group by designated charity. Classify as External, Direct to Family, Internal, Zero Sales, or Pending.",
+        "who": "operator"
+      },
+      {
+        "step": 7,
+        "title": "Execute Donations",
+        "detail": "For each external charity: navigate to donation page, make donation, note \"In honor of [Hero Names] — Steel Hearts.\" Tell Operator when each is done. Joseph executes payments manually.",
+        "who": "joseph"
+      },
+      {
+        "step": 8,
+        "title": "Capture Receipts",
+        "detail": "Operator searches Gmail for confirmation emails. Logs each to SHOS Closeout Queue. Architect batch-attaches to SF Account records and updates Memorial_Bracelet and Account donation fields.",
+        "who": "operator"
+      }
+    ]
   },
   {
     "id": "SOP-FIN-002",
@@ -97,7 +461,40 @@
     "cadence": "Monthly",
     "status": "active",
     "owner": "Sara Curran",
-    "summary": "Close monthly books by 5th, generate reports, archive statements"
+    "type": "procedure",
+    "summary": "Close monthly books by 5th, generate reports, archive statements",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Receive classification report from Joseph",
+        "detail": "Sara receives the monthly Squarespace Order Classifications report email from Joseph (Part A of SOP-FIN-001).",
+        "who": "sara"
+      },
+      {
+        "step": 2,
+        "title": "Post QuickBooks journal entries",
+        "detail": "Post restricted obligations to Restricted account. Post unrestricted obligations + D-variant donations to Unrestricted account. One aggregate entry per month each.",
+        "who": "sara"
+      },
+      {
+        "step": 3,
+        "title": "Bank reconciliation",
+        "detail": "Reconcile bank accounts in QuickBooks. Ensure all transactions for the month are accounted for.",
+        "who": "sara"
+      },
+      {
+        "step": 4,
+        "title": "Generate monthly reports",
+        "detail": "Generate P&L, Balance Sheet, and any other required reports. Archive in QuickBooks and shared drive.",
+        "who": "sara"
+      },
+      {
+        "step": 5,
+        "title": "Confirm close to Joseph",
+        "detail": "Email Joseph confirming the monthly books are closed. Note any issues or discrepancies found.",
+        "who": "sara"
+      }
+    ]
   },
   {
     "id": "SOP-INV-001",
@@ -107,7 +504,46 @@
     "cadence": "Weekly",
     "status": "active",
     "owner": "Joseph Wiseman",
-    "summary": "Bracelet production: laser engraving, packaging, shipping, tracking updates"
+    "type": "procedure",
+    "summary": "Bracelet production: laser engraving, packaging, shipping, tracking updates",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Triage New Orders",
+        "detail": "Open Order Queue → Active Work Items view. For each order: identify hero and size variant, check pre-made inventory in Salesforce.",
+        "who": "operator"
+      },
+      {
+        "step": 2,
+        "title": "Route by Fulfillment Method",
+        "detail": "Pre-made in stock → Pre-Made Pull, set Ready to Ship. No stock but design exists → Laser Production, set Ready to Laser. No stock and no design → Design + Laser, set Design Needed.",
+        "who": "operator"
+      },
+      {
+        "step": 3,
+        "title": "Create Graphic Design Request (if needed)",
+        "detail": "Create entry in Graphic Design Tracker with hero details. Assign to designer. Wait for completed file to be attached to SF Memorial_Bracelet record.",
+        "who": "operator"
+      },
+      {
+        "step": 4,
+        "title": "Laser Production",
+        "detail": "Pull blank bracelet in correct size. Open design file from SF. Laser engrave. Update Order Queue to Produced or Ready to Ship.",
+        "who": "joseph"
+      },
+      {
+        "step": 5,
+        "title": "Ready to Ship → Automation",
+        "detail": "Setting Ready to Ship triggers Zap 1 (Notion→ShipStation). Kristin prints labels, packages, ships. Zap 2 updates tracking. Zap 3 syncs to Salesforce.",
+        "who": "automated"
+      },
+      {
+        "step": 6,
+        "title": "Verify completion",
+        "detail": "Confirm Order Queue shows Synced to Salesforce. Check SF order shows Fulfilled. Mark weekly hub task complete when all orders in batch are done.",
+        "who": "operator"
+      }
+    ]
   },
   {
     "id": "SOP-OP-001",
@@ -117,7 +553,40 @@
     "cadence": "Daily",
     "status": "active",
     "owner": "Joseph Wiseman",
-    "summary": "Master daily checklist and governance cadence reference card"
+    "type": "procedure",
+    "summary": "Master daily checklist and governance cadence reference card",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Open SHOS Hub / Active Work Surface",
+        "detail": "Open the SHOS Team Hub and active Notion work surface. Review assigned views, queues, and memorial cycle work.",
+        "who": "joseph"
+      },
+      {
+        "step": 2,
+        "title": "Execute required SOPs",
+        "detail": "Run SOP-001 (Daily Social Media). Check Order Queue for new orders (SOP-INV-001). Check email for new requests.",
+        "who": "joseph"
+      },
+      {
+        "step": 3,
+        "title": "Log structural friction",
+        "detail": "If any process friction observed, log it as a deviation or improvement note for the next governance review.",
+        "who": "joseph"
+      },
+      {
+        "step": 4,
+        "title": "Weekly: Review Backlog & Promotion Briefs",
+        "detail": "Review backlog items. Review any Promotion Briefs. Optionally run SOP-014 (weekly amplification).",
+        "who": "joseph"
+      },
+      {
+        "step": 5,
+        "title": "Monthly: Export KPIs & Run SOP-015",
+        "detail": "Export Tier 1 KPIs. Run SOP-015 (Monthly Social Media Performance Review). Document Monthly Review Note.",
+        "who": "joseph"
+      }
+    ]
   },
   {
     "id": "SOP-SYNC-001",
@@ -127,7 +596,28 @@
     "cadence": "Weekly",
     "status": "active",
     "owner": "Joseph Wiseman",
-    "summary": "Sync and reconcile data between Notion work surface and Salesforce"
+    "type": "procedure",
+    "summary": "Sync and reconcile data between Notion work surface and Salesforce",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Review sync status",
+        "detail": "Check that Notion↔SF sync zaps ran successfully this week. Review any error notifications.",
+        "who": "operator"
+      },
+      {
+        "step": 2,
+        "title": "Compare record counts",
+        "detail": "Compare key record counts between Notion and Salesforce (heroes, orders, contacts). Flag discrepancies.",
+        "who": "operator"
+      },
+      {
+        "step": 3,
+        "title": "Resolve discrepancies",
+        "detail": "For any mismatches, determine which system is authoritative and correct the other. Log resolutions.",
+        "who": "joseph"
+      }
+    ]
   },
   {
     "id": "FM-OPS-002",
@@ -137,7 +627,46 @@
     "cadence": "Monthly",
     "status": "active",
     "owner": "Joseph Wiseman",
-    "summary": "Package, review, and deliver supporter messages to Gold Star families"
+    "type": "procedure",
+    "summary": "Package, review, and deliver supporter messages to Gold Star families",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Pull undelivered messages from Salesforce",
+        "detail": "Query Family_Message__c for messages with Status = New or Ready for Delivery. Group by hero/family.",
+        "who": "operator"
+      },
+      {
+        "step": 2,
+        "title": "Apply text normalization",
+        "detail": "Clean message text per FM-STD-004 standards. Fix formatting, remove duplicates, standardize punctuation.",
+        "who": "operator"
+      },
+      {
+        "step": 3,
+        "title": "Build message packets",
+        "detail": "Package messages per FM-STD-003 format. One packet per family, grouped by hero. Include sender info and message content.",
+        "who": "operator"
+      },
+      {
+        "step": 4,
+        "title": "Review packets for quality",
+        "detail": "Joseph reviews each packet for accuracy, tone, and completeness. Flag any messages that need attention.",
+        "who": "joseph"
+      },
+      {
+        "step": 5,
+        "title": "Deliver to families",
+        "detail": "Send message packets to family contacts via email. Use compassionate, personal tone. Update Status to Delivered in Salesforce.",
+        "who": "joseph"
+      },
+      {
+        "step": 6,
+        "title": "Log delivery",
+        "detail": "Update all Family_Message__c records to Delivered with delivery date. Note any bounces or issues.",
+        "who": "operator"
+      }
+    ]
   },
   {
     "id": "FM-STD-003",
@@ -147,6 +676,7 @@
     "cadence": "Reference",
     "status": "active",
     "owner": "Joseph Wiseman",
+    "type": "reference",
     "summary": "Standard format and quality requirements for family message packets"
   },
   {
@@ -157,6 +687,7 @@
     "cadence": "Reference",
     "status": "active",
     "owner": "Joseph Wiseman",
+    "type": "reference",
     "summary": "Text cleanup rules for supporter messages before delivery"
   },
   {
@@ -167,6 +698,7 @@
     "cadence": "Reference",
     "status": "active",
     "owner": "Joseph Wiseman",
+    "type": "reference",
     "summary": "Routing logic for how supporter messages flow from intake to family delivery"
   },
   {
@@ -177,6 +709,7 @@
     "cadence": "Quarterly",
     "status": "active",
     "owner": "Joseph Wiseman",
+    "type": "reference",
     "summary": "Rules for SOP versioning, promotion, deprecation, and registry enforcement"
   },
   {
@@ -187,6 +720,63 @@
     "cadence": "Reference",
     "status": "active",
     "owner": "Joseph Wiseman",
+    "type": "reference",
     "summary": "Founding doctrine: automation supports compassion, never replaces it"
+  },
+  {
+    "id": "SOP-DON-002",
+    "title": "Donor Stewardship Execution",
+    "version": "v1.0",
+    "domain": "Donor Engagement",
+    "cadence": "Weekly",
+    "status": "active",
+    "owner": "Joseph Wiseman",
+    "type": "procedure",
+    "timeBox": "15-20 minutes",
+    "summary": "Weekly donor thank-you workflow: review new donations, compose personalized emails, track stewardship status",
+    "steps": [
+      {
+        "step": 1,
+        "title": "Open SHOS Donor Engagement Page",
+        "detail": "Navigate to SHOS → Donor Engagement. The page loads all donations from Salesforce Donation__c in real time.",
+        "who": "volunteer"
+      },
+      {
+        "step": 2,
+        "title": "Filter to Donors Needing Thanks",
+        "detail": "Click 'Needs Thanks' in the Status filter. Optionally narrow by 'Last 30 Days' to focus on recent donations. Note the count — this is your working list.",
+        "who": "volunteer"
+      },
+      {
+        "step": 3,
+        "title": "Review Each Donor",
+        "detail": "For each donor: note their name, email, amount, date, and whether they're a repeat donor. If no email is on file, flag for Joseph to investigate the Salesforce Contact record.",
+        "who": "volunteer"
+      },
+      {
+        "step": 4,
+        "title": "Compose Thank-You Email",
+        "detail": "Click 'compose email' on the donor's row to open a pre-filled template in your mail client. Personalize: acknowledge repeat donors, reference large gift impact ($100+ ≈ 10 bracelets), welcome first-time donors. Send from @steel-hearts.org account.",
+        "who": "volunteer"
+      },
+      {
+        "step": 5,
+        "title": "Send and Mark as Thanked",
+        "detail": "Send the email. Then click 'Send Thanks' in SHOS — button changes to 'Thanked' (green). Repeat for all donors in the queue.",
+        "who": "volunteer"
+      },
+      {
+        "step": 6,
+        "title": "Handle Escalations",
+        "detail": "Large donations ($500+): Joseph sends personally. No email on file: flag for Joseph. Bounced email: update SF record. Donor questions: forward to joseph@steel-hearts.org.",
+        "who": "volunteer"
+      },
+      {
+        "step": 7,
+        "title": "Post Completion to Slack",
+        "detail": "Post to #ops-hub: 'SOP-DON-002 complete — [X] donor thank-yous sent. [date]'",
+        "who": "volunteer"
+      }
+    ]
   }
 ]
