@@ -86,12 +86,8 @@ export async function POST(request) {
     emailBody += `Steel Hearts 501(c)(3)\n`;
     if (senderEmail === "joseph.wiseman@steel-hearts.org") {
       emailBody += `Executive Director/Co-Founder\n`;
-      emailBody += `USMA '08\n`;
     }
-    emailBody += `www.steel-hearts.org\n`;
-    if (senderEmail === "joseph.wiseman@steel-hearts.org") {
-      emailBody += `408.569.8449`;
-    }
+    emailBody += `www.steel-hearts.org`;
 
     const subject = "Thank you for your donation to Steel Hearts";
 
