@@ -22,6 +22,8 @@ const NAV_GROUPS = [
   {
     label: "Fulfillment",
     items: [
+      { href: "/orders", icon: "\u2692", label: "Order Queue" },
+      { href: "/designs", icon: "\u270E", label: "Design Queue" },
       { href: "/bracelets", icon: "\u25CB", label: "Bracelet Pipeline" },
     ],
   },
