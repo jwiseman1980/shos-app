@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import StatusBadge from "@/components/StatusBadge";
 
 const STATUS_OPTIONS = [
@@ -111,7 +111,14 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
         }),
       });
       const data = await res.json();
-      setDraftState(data.success ? "created" : "error");
+      if (data.success) {
+        setDraftState("created");
+        // Auto-update status to "In Progress"
+        setStatus("In Progress");
+        save({ status: "In Progress", heroName: hero.fullName.replace(/\s*\(.*?\)\s*/, "") });
+      } else {
+        setDraftState("error");
+      }
     } catch {
       setDraftState("error");
     }
@@ -333,15 +340,20 @@ export default function AnniversaryTracker({
   const [heroData, setHeroData] = useState(heroes);
   const [senderIdentity, setSenderIdentity] = useState(null);
 
+  // Sync heroData when heroes prop changes (e.g. month switch)
+  useEffect(() => {
+    setHeroData(heroes);
+  }, [heroes]);
+
   // Load saved sender from localStorage on mount
-  useState(() => {
+  useEffect(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(SENDER_KEY);
       if (saved) {
         try { setSenderIdentity(JSON.parse(saved)); } catch {}
       }
     }
-  });
+  }, []);
 
   const handleSenderChange = (e) => {
     const email = e.target.value;
