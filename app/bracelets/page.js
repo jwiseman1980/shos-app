@@ -114,6 +114,80 @@ export default async function BraceletPipelinePage() {
         </DataCard>
       </div>
 
+      {/* Research Queue — Active heroes missing family contacts */}
+      {pipeline.researchQueue && pipeline.researchQueue.length > 0 && (
+        <div className="section">
+          <DataCard
+            title={`Family Contact Research (${pipeline.stats.needsResearch || 0} heroes)`}
+          >
+            <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 16 }}>
+              Active bracelets missing family contacts — grouped by anniversary month.
+              Research these to enable anniversary outreach or recommend sunset.
+            </div>
+            {Object.entries(pipeline.researchByMonth || {}).map(
+              ([month, heroes]) => (
+                <div key={month} style={{ marginBottom: 20 }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "var(--text-bright)",
+                      marginBottom: 8,
+                      paddingBottom: 4,
+                      borderBottom: "1px solid var(--card-border)",
+                    }}
+                  >
+                    {month} ({heroes.length})
+                  </div>
+                  {heroes.map((h) => (
+                    <div
+                      key={h.id}
+                      className="list-item"
+                      style={{ padding: "6px 0" }}
+                    >
+                      <div>
+                        <div className="list-item-title">
+                          {h.rank ? `${h.rank} ` : ""}
+                          {h.name}
+                        </div>
+                        <div className="list-item-sub">
+                          {h.sku || "\u2014"}
+                          {h.incident ? ` \u00b7 ${h.incident}` : ""}
+                          {h.memorialDate
+                            ? ` \u00b7 ${h.memorialDate}`
+                            : ""}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        {h.bioPage ? (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              color: "var(--status-green)",
+                            }}
+                          >
+                            Has bio page
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              color: "var(--status-orange)",
+                            }}
+                          >
+                            No bio page
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+          </DataCard>
+        </div>
+      )}
+
       {/* Design Pipeline Bar */}
       <div className="section">
         <DataCard title="Design Pipeline">
