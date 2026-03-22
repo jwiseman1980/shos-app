@@ -96,9 +96,84 @@ export default async function BraceletPipelinePage() {
         />
       </div>
 
+      {/* New Intake — active onboarding */}
+      {pipeline.newIntake && pipeline.newIntake.length > 0 && (
+        <div className="section">
+          <DataCard title={`New Intake (${pipeline.stats.newIntakeCount || 0} heroes being onboarded)`}>
+            <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 16 }}>
+              Active requests — someone is waiting on us. These need family contact,
+              design, and listing before going live.
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid var(--card-border)", textAlign: "left" }}>
+                    <th style={thStyle}>Hero</th>
+                    <th style={thStyle}>SKU</th>
+                    <th style={thStyle}>Branch</th>
+                    <th style={thStyle}>Family Contact</th>
+                    <th style={thStyle}>Next Step</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pipeline.newIntake.map((h) => (
+                    <tr key={h.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
+                      <td style={tdStyle}>
+                        <div style={{ fontWeight: 500, color: "var(--text-bright)" }}>
+                          {h.name}
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
+                          {h.incident || ""}
+                        </div>
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--text-dim)" }}>
+                          {h.sku || "\u2014"}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
+                          {h.branch || "\u2014"}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>
+                        {h.hasFamilyContact ? (
+                          <span style={{ color: "var(--status-green)" }}>{"\u2713"} Connected</span>
+                        ) : (
+                          <span style={{ color: "var(--status-orange)" }}>Needed</span>
+                        )}
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{
+                          display: "inline-block",
+                          padding: "2px 8px",
+                          borderRadius: 12,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          background: h.stage === "Intake" ? "#6b728022" :
+                            h.stage === "Family Outreach" ? "#8b5cf622" :
+                            h.stage === "Charity Designation" ? "#3b82f622" :
+                            h.stage === "Design" ? "#f59e0b22" : "#6b728022",
+                          color: h.stage === "Intake" ? "#6b7280" :
+                            h.stage === "Family Outreach" ? "#8b5cf6" :
+                            h.stage === "Charity Designation" ? "#3b82f6" :
+                            h.stage === "Design" ? "#f59e0b" : "#6b7280",
+                        }}>
+                          {h.stage}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </DataCard>
+        </div>
+      )}
+
       {/* Memorial Pipeline Tracker */}
       <div className="section">
-        <DataCard title={`Memorial Pipeline (${pipeline.stats.inPipeline || 0} in progress)`}>
+        <DataCard title={`Full Pipeline (${pipeline.stats.inPipeline || 0} in progress)`}>
           {pipeline.heroes.length > 0 ? (
             <PipelineTracker
               heroes={pipeline.heroes}
@@ -121,8 +196,9 @@ export default async function BraceletPipelinePage() {
             title={`Family Contact Research (${pipeline.stats.needsResearch || 0} heroes)`}
           >
             <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 16 }}>
-              Active bracelets missing family contacts — grouped by anniversary month.
-              Research these to enable anniversary outreach or recommend sunset.
+              Legacy bracelets missing family contacts — grouped by anniversary month.
+              Research to find families, confirm they exist, or recommend sunset.
+              Goal: resolve all by end of 2026. No new bracelets added without family contact.
             </div>
             {Object.entries(pipeline.researchByMonth || {}).map(
               ([month, heroes]) => (

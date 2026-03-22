@@ -68,14 +68,10 @@ export async function POST(request) {
     emailBody += `On behalf of everyone at Steel Hearts, we wanted to reach out to you on the ${ordinal} anniversary of ${heroName}'s passing. We want you to know that ${heroName} is not forgotten, and that their sacrifice continues to be honored.\n\n`;
     emailBody += `Steel Hearts was founded to ensure that the memory of our fallen heroes lives on. Through our memorial bracelet program, supporters across the country carry ${heroName}'s name with them every day.\n\n`;
     emailBody += `We are thinking of you and your family during this time. If there is anything we can do, or if you would like to share any memories or updates, please don't hesitate to reach out.\n\n`;
-    emailBody += `With deepest respect,\n\n`;
-    emailBody += `${senderName || "The Steel Hearts Team"}\n`;
-    if (senderEmail === "joseph.wiseman@steel-hearts.org") {
-      emailBody += `Executive Director/Co-Founder\n`;
-    }
-    emailBody += `Steel Hearts 501(c)(3)\n`;
-    emailBody += `www.steel-hearts.org\n`;
-    emailBody += `408.569.8449`;
+    emailBody += `With deepest respect,\n`;
+
+    const { buildEmailSignature } = await import("@/lib/email-signature");
+    emailBody += buildEmailSignature(senderName, senderEmail);
 
     const subject = `Remembering ${heroName} — Steel Hearts`;
 
@@ -86,6 +82,18 @@ export async function POST(request) {
       subject,
       body: emailBody,
     });
+
+    // Auto-update Anniversary_Status__c to "In Progress" in Salesforce
+    if (sfId && process.env.SF_LIVE === "true") {
+      try {
+        const { sfUpdate } = await import("@/lib/salesforce");
+        await sfUpdate("Memorial_Bracelet__c", sfId, {
+          Anniversary_Status__c: "In Progress",
+        });
+      } catch (sfErr) {
+        console.warn("SF status update failed:", sfErr.message);
+      }
+    }
 
     return NextResponse.json({
       success: true,

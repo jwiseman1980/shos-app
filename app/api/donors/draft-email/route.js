@@ -80,15 +80,10 @@ export async function POST(request) {
     }
 
     emailBody += `Every dollar raised goes toward designing, producing, and donating memorial bracelets that keep the memory of our fallen service members alive.\n\n`;
-    emailBody += `We are deeply grateful for your support.\n\n`;
-    emailBody += `Best,\n\n`;
-    emailBody += `${senderName || "The Steel Hearts Team"}\n`;
-    if (senderEmail === "joseph.wiseman@steel-hearts.org") {
-      emailBody += `Executive Director/Co-Founder\n`;
-    }
-    emailBody += `Steel Hearts 501(c)(3)\n`;
-    emailBody += `www.steel-hearts.org\n`;
-    emailBody += `408.569.8449`;
+    emailBody += `We are deeply grateful for your support.\n`;
+
+    const { buildEmailSignature } = await import("@/lib/email-signature");
+    emailBody += buildEmailSignature(senderName, senderEmail);
 
     const subject = "Thank you for your donation to Steel Hearts";
 

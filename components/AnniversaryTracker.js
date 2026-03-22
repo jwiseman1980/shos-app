@@ -103,8 +103,8 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
           branch: hero.serviceCode,
           years: hero.years,
           memorialDate: hero.memorialDate,
-          familyEmail: hero.familyContactId, // placeholder — needs real email
-          familyName: hero.familyContactId,
+          familyEmail: hero.familyContactEmail,
+          familyName: hero.familyContactName,
           senderEmail: senderIdentity.email,
           senderName: senderIdentity.name,
           sfId: hero.sfId,
