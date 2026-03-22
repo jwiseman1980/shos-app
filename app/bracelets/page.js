@@ -2,12 +2,14 @@ import PageShell from "@/components/PageShell";
 import StatBlock from "@/components/StatBlock";
 import DataCard from "@/components/DataCard";
 import StatusBadge from "@/components/StatusBadge";
+import PipelineTracker from "@/components/PipelineTracker";
 import {
   getBraceletStats,
   getBraceletsByDesignStage,
   getLowStockBracelets,
   getInventoryOverview,
 } from "@/lib/data/bracelets";
+import { getPipelineHeroes } from "@/lib/data/pipeline";
 
 const STAGE_ORDER = ["Draft", "Review", "Approved", "In Production", "Complete"];
 const STAGE_COLORS = {
@@ -39,6 +41,7 @@ export default async function BraceletPipelinePage() {
   const stageGroups = await getBraceletsByDesignStage();
   const lowStock = await getLowStockBracelets();
   const inventory = await getInventoryOverview();
+  const pipeline = await getPipelineHeroes();
 
   // Pipeline bar widths (percentage of total)
   const pipelineStages = STAGE_ORDER.map((stage) => ({
@@ -91,6 +94,24 @@ export default async function BraceletPipelinePage() {
           note="Raised through bracelet sales"
           accent="var(--status-green)"
         />
+      </div>
+
+      {/* Memorial Pipeline Tracker */}
+      <div className="section">
+        <DataCard title={`Memorial Pipeline (${pipeline.stats.inPipeline || 0} in progress)`}>
+          {pipeline.heroes.length > 0 ? (
+            <PipelineTracker
+              heroes={pipeline.heroes}
+              inProgress={pipeline.inProgress || []}
+              stageCounts={pipeline.stageCounts || {}}
+              stats={pipeline.stats || {}}
+            />
+          ) : (
+            <div style={{ padding: "16px 0", color: "var(--text-dim)", fontSize: 13 }}>
+              Connect Salesforce (SF_LIVE=true) for pipeline tracking.
+            </div>
+          )}
+        </DataCard>
       </div>
 
       {/* Design Pipeline Bar */}
