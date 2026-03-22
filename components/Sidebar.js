@@ -25,6 +25,7 @@ const NAV_GROUPS = [
       { href: "/orders", icon: "\u2692", label: "Order Queue" },
       { href: "/designs", icon: "\u270E", label: "Design Queue" },
       { href: "/bracelets", icon: "\u25CB", label: "Bracelet Pipeline" },
+      { href: "/laser", icon: "\u2604", label: "Laser Production" },
     ],
   },
   {
