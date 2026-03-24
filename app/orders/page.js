@@ -50,6 +50,7 @@ function OrderItemTable({ items }) {
             <th style={thStyle}>Size</th>
             <th style={thStyle}>Status</th>
             <th style={thStyle}>Method</th>
+            <th style={thStyle}>Design</th>
             <th style={thStyle}>Customer</th>
             <th style={thStyle}>Order</th>
           </tr>
@@ -77,6 +78,17 @@ function OrderItemTable({ items }) {
               <td style={tdStyle}><StatusBadge status={item.productionStatus} /></td>
               <td style={{ ...tdStyle, fontSize: 11, color: "var(--text-dim)" }}>
                 {item.fulfillmentMethod || "\u2014"}
+              </td>
+              <td style={{ ...tdStyle, textAlign: "center" }}>
+                {item.hasDesign ? (
+                  item.designUrl ? (
+                    <a href={item.designUrl} target="_blank" rel="noopener" style={{ color: "var(--status-green)", textDecoration: "none", fontSize: 12 }}>{"\u2713"} SVG</a>
+                  ) : (
+                    <span style={{ color: "var(--status-green)", fontSize: 12 }}>{"\u2713"}</span>
+                  )
+                ) : (
+                  <span style={{ color: "var(--status-orange)", fontSize: 11 }}>Needed</span>
+                )}
               </td>
               <td style={tdStyle}>
                 <div style={{ fontSize: 12, color: "var(--text-bright)" }}>{item.customerName}</div>
