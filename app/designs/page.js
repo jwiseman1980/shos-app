@@ -4,6 +4,7 @@ import PageShell from "@/components/PageShell";
 import DataCard from "@/components/DataCard";
 import StatBlock from "@/components/StatBlock";
 import { getDesignQueue, getNeedsDesign, getDesignStats } from "@/lib/data/designs";
+import DesignUploader from "@/components/DesignUploader";
 
 const tdStyle = { padding: "8px 12px", fontSize: 13, verticalAlign: "top" };
 const thStyle = {
@@ -171,31 +172,15 @@ export default async function DesignsPage() {
         />
       </div>
 
-      {/* Active Design Queue */}
+      {/* Interactive Design Queue + Upload */}
       <div className="section">
-        <DataCard title={`Active Design Tasks (${totalActive})`}>
+        <DataCard title={`Design Tasks (${totalActive} active)`}>
           <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
-            These heroes have design requests in progress. Assigned to Ryan Santana.
+            Drag & drop SVG files onto a task to upload. Click status buttons to advance the workflow.
           </div>
-          <DesignTable items={queue} showBrief={true} />
+          <DesignUploader queue={queue} needsDesign={needsDesign} />
         </DataCard>
       </div>
-
-      {/* Needs Design — not yet queued */}
-      {needsDesign.length > 0 && (
-        <div className="section">
-          <DataCard title={`Needs Design (${needsDesign.length})`}>
-            <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
-              Inactive heroes without a bracelet design. Queue these when ready to send to Ryan.
-            </div>
-            <DesignTable
-              items={needsDesign}
-              showStatus={false}
-              showPriority={false}
-            />
-          </DataCard>
-        </div>
-      )}
 
       {/* How it works */}
       <div className="section">

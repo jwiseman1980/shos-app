@@ -1,6 +1,9 @@
+export const dynamic = "force-dynamic";
+
 import PageShell from "@/components/PageShell";
 import DataCard from "@/components/DataCard";
 import StatBlock from "@/components/StatBlock";
+import { getItemsByStatus } from "@/lib/data/orders";
 
 const PRODUCTION_PRESETS = [
   { name: "Green/Teal", color: "#5fb89a", hex: "#5fb89a", power: 15, speed: 200, freq: 65, source: "D1.1", desc: "Mint/seafoam green" },
@@ -47,10 +50,23 @@ const KEY_FINDINGS = [
   "All presets pending tumble validation on non-brushed finish",
 ];
 
-const tdStyle = { padding: "8px 12px", fontSize: 13 };
-const thStyle = { padding: "8px 12px", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-dim)" };
+const tdStyle = { padding: "8px 12px", fontSize: 13, verticalAlign: "top" };
+const thStyle = { padding: "8px 12px", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-dim)", textAlign: "left" };
 
-export default function LaserPage() {
+export default async function LaserPage() {
+  let readyToLaser = [];
+  let inProduction = [];
+  try {
+    [readyToLaser, inProduction] = await Promise.all([
+      getItemsByStatus("Ready to Laser"),
+      getItemsByStatus("In Production"),
+    ]);
+  } catch (err) {
+    console.error("Laser queue load error:", err.message);
+  }
+
+  const laserQueue = [...readyToLaser, ...inProduction];
+
   return (
     <PageShell title="Laser Production" subtitle="xTool F2 Ultra — settings, color catalog, and bed positions">
       {/* KPIs */}
@@ -60,6 +76,67 @@ export default function LaserPage() {
         <StatBlock label="Bracelets Tested" value={20} note="Physical reference samples" accent="var(--status-green)" />
         <StatBlock label="Tumble Validated" value="Pending" note="Need tumbled finish tests" accent="var(--status-orange)" />
       </div>
+
+      {/* Production Queue */}
+      {laserQueue.length > 0 && (
+        <div className="section">
+          <DataCard title={`Laser Queue (${laserQueue.length} items)`}>
+            <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
+              Items ready to burn. Max 3 per run. Download SVG, load in xTool Creative Studio, apply Success 6 settings.
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid var(--card-border)" }}>
+                    <th style={thStyle}>Item</th>
+                    <th style={thStyle}>SKU</th>
+                    <th style={thStyle}>Qty</th>
+                    <th style={thStyle}>Size</th>
+                    <th style={thStyle}>Design</th>
+                    <th style={thStyle}>Customer</th>
+                    <th style={thStyle}>Order</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {laserQueue.map((item) => (
+                    <tr key={item.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
+                      <td style={tdStyle}>
+                        <div style={{ fontWeight: 500, color: "var(--text-bright)" }}>{item.name}</div>
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--text-dim)" }}>
+                          {item.sku || "\u2014"}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, textAlign: "center", color: "var(--text-bright)" }}>{item.quantity}</td>
+                      <td style={{ ...tdStyle, fontSize: 12, color: "var(--text-dim)" }}>
+                        {item.size === "Regular-7in" ? '7"' : item.size === "Small-6in" ? '6"' : item.size || "\u2014"}
+                      </td>
+                      <td style={tdStyle}>
+                        {item.hasDesign && item.designUrl ? (
+                          <a href={item.designUrl} target="_blank" rel="noopener"
+                            style={{ color: "var(--status-green)", textDecoration: "none", fontSize: 12, fontWeight: 600 }}>
+                            {"\u2B07"} Download SVG
+                          </a>
+                        ) : item.hasDesign ? (
+                          <span style={{ color: "var(--status-green)", fontSize: 12 }}>{"\u2713"} Has design</span>
+                        ) : (
+                          <span style={{ color: "var(--status-orange)", fontSize: 12 }}>No design</span>
+                        )}
+                      </td>
+                      <td style={tdStyle}>
+                        <div style={{ fontSize: 12, color: "var(--text-bright)" }}>{item.customerName}</div>
+                        {item.shipTo && <div style={{ fontSize: 11, color: "var(--text-dim)" }}>{item.shipTo}</div>}
+                      </td>
+                      <td style={{ ...tdStyle, fontSize: 11, color: "var(--text-dim)" }}>{item.orderName}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </DataCard>
+        </div>
+      )}
 
       {/* Color Palette */}
       <div className="section">
