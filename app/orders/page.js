@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import PageShell from "@/components/PageShell";
 import DataCard from "@/components/DataCard";
 import StatBlock from "@/components/StatBlock";
-import { getActiveOrderItems, getOrderStats } from "@/lib/data/orders";
+import { getActiveOrderItems, getOrderStats, reconcileWithShipStation } from "@/lib/data/orders";
 import { getAwaitingShipment, getRecentlyShipped } from "@/lib/shipstation";
 
 const tdStyle = { padding: "8px 12px", fontSize: 13, verticalAlign: "top" };
@@ -150,7 +150,14 @@ function ShipStationTable({ orders }) {
 }
 
 export default async function OrdersPage() {
-  let sfItems = [], sfStats = {}, ssAwaiting = [], ssRecent = [], ssError = null;
+  let sfItems = [], sfStats = {}, ssAwaiting = [], ssRecent = [], ssError = null, reconciled = null;
+
+  // Auto-reconcile shipped orders on page load
+  try {
+    reconciled = await reconcileWithShipStation();
+  } catch (err) {
+    console.warn("Reconciliation skipped:", err.message);
+  }
 
   try {
     [sfItems, sfStats] = await Promise.all([
@@ -219,6 +226,16 @@ export default async function OrdersPage() {
           accent="var(--gold)"
         />
       </div>
+
+      {reconciled && reconciled.updated > 0 && (
+        <div className="section">
+          <DataCard title="Auto-Reconciliation">
+            <div style={{ fontSize: 13, color: "var(--status-green)" }}>
+              {"\u2705"} Synced {reconciled.updated} items with ShipStation — marked as shipped.
+            </div>
+          </DataCard>
+        </div>
+      )}
 
       {ssError && (
         <div className="section">

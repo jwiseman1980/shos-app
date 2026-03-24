@@ -1,39 +1,63 @@
 import { NextResponse } from "next/server";
-import { createDesignTask, updateDesignStatus } from "@/lib/data/designs";
+import { sfUpdate, sfQuery } from "@/lib/salesforce";
+
+const SF_LIVE = process.env.SF_LIVE === "true";
 
 /**
- * POST /api/designs — Create a new design task
- * Body: { heroName, rank, branch, classYear, customText, notes, relatedOrderId }
+ * GET /api/designs — Get design queue data
+ */
+export async function GET() {
+  if (!SF_LIVE) {
+    return NextResponse.json({ success: false, mock: true, items: [] });
+  }
+  try {
+    const items = await sfQuery(
+      `SELECT Id, Name, Rank__c, Lineitem_sku__c,
+              Design_Status__c, Design_Priority__c, Design_Brief__c, Design_Due_Date__c,
+              Service_Academy_or_Branch__c, Incident__c
+       FROM Memorial_Bracelet__c
+       WHERE Design_Status__c IN ('Queued', 'In Progress', 'Submitted')
+       ORDER BY CreatedDate DESC`
+    );
+    return NextResponse.json({ success: true, items });
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST /api/designs — Queue a hero for design
+ * Body: { heroId, priority, brief, dueDate }
  */
 export async function POST(request) {
+  if (!SF_LIVE) {
+    return NextResponse.json({ success: false, mock: true, message: "SF not configured" });
+  }
   try {
-    const body = await request.json();
-    const { heroName } = body;
+    const { heroId, priority, brief, dueDate } = await request.json();
 
-    if (!heroName) {
-      return NextResponse.json(
-        { error: "heroName is required" },
-        { status: 400 }
-      );
+    if (!heroId) {
+      return NextResponse.json({ error: "heroId is required" }, { status: 400 });
     }
 
-    if (!process.env.NOTION_API_KEY) {
-      return NextResponse.json({
-        success: false,
-        mock: true,
-        message: "Notion not configured — design task not created",
-      });
-    }
+    const updateData = {
+      Design_Status__c: "Queued",
+    };
+    if (priority) updateData.Design_Priority__c = priority;
+    if (brief) updateData.Design_Brief__c = brief;
+    if (dueDate) updateData.Design_Due_Date__c = dueDate;
 
-    const page = await createDesignTask(body);
+    await sfUpdate("Memorial_Bracelet__c", heroId, updateData);
 
     return NextResponse.json({
       success: true,
-      taskId: page.id,
-      message: `Design task created for ${heroName}`,
+      message: "Design task queued",
     });
   } catch (error) {
-    console.error("Failed to create design task:", error.message);
+    console.error("Failed to queue design:", error.message);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -43,35 +67,39 @@ export async function POST(request) {
 
 /**
  * PATCH /api/designs — Update a design task's status
- * Body: { pageId, status }
+ * Body: { heroId, status, brief }
  */
 export async function PATCH(request) {
+  if (!SF_LIVE) {
+    return NextResponse.json({ success: false, mock: true, message: "SF not configured" });
+  }
   try {
-    const { pageId, status } = await request.json();
+    const { heroId, status, brief } = await request.json();
 
-    if (!pageId || !status) {
+    if (!heroId || !status) {
       return NextResponse.json(
-        { error: "pageId and status are required" },
+        { error: "heroId and status are required" },
         { status: 400 }
       );
     }
 
-    if (!process.env.NOTION_API_KEY) {
-      return NextResponse.json({
-        success: false,
-        mock: true,
-        message: "Notion not configured — status not saved",
-      });
+    const updateData = { Design_Status__c: status };
+    if (brief) updateData.Design_Brief__c = brief;
+
+    // If completing, also mark design as created
+    if (status === "Complete") {
+      updateData.Bracelet_Design_Created__c = true;
+      updateData.Has_Graphic_Design__c = true;
     }
 
-    await updateDesignStatus(pageId, status);
+    await sfUpdate("Memorial_Bracelet__c", heroId, updateData);
 
     return NextResponse.json({
       success: true,
-      message: `Design task status updated to "${status}"`,
+      message: `Design status updated to "${status}"`,
     });
   } catch (error) {
-    console.error("Failed to update design task:", error.message);
+    console.error("Failed to update design:", error.message);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
