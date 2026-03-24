@@ -162,16 +162,18 @@ export default async function OrdersPage() {
   }
 
   try {
-    const awaiting = await getAwaitingShipment();
-    ssAwaiting = awaiting.map((o) => ({
+    const awaitingRes = await getAwaitingShipment();
+    const awaitingOrders = awaitingRes?.orders || awaitingRes || [];
+    ssAwaiting = (Array.isArray(awaitingOrders) ? awaitingOrders : []).map((o) => ({
       orderNumber: o.orderNumber,
       orderDate: o.orderDate,
       orderTotal: o.orderTotal,
       shipTo: o.shipTo,
       items: o.items,
     }));
-    const recent = await getRecentlyShipped(5);
-    ssRecent = recent.map((o) => ({
+    const recentRes = await getRecentlyShipped(5);
+    const recentOrders = recentRes?.orders || recentRes || [];
+    ssRecent = (Array.isArray(recentOrders) ? recentOrders : []).map((o) => ({
       orderNumber: o.orderNumber,
       shipDate: o.shipDate,
       shipTo: o.shipTo,
