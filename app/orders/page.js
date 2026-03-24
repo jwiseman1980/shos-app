@@ -3,244 +3,306 @@ export const dynamic = "force-dynamic";
 import PageShell from "@/components/PageShell";
 import DataCard from "@/components/DataCard";
 import StatBlock from "@/components/StatBlock";
-import { getOrderStats } from "@/lib/shipstation";
+import { getActiveOrderItems, getOrderStats } from "@/lib/data/orders";
+import { getAwaitingShipment, getRecentlyShipped } from "@/lib/shipstation";
 
 const tdStyle = { padding: "8px 12px", fontSize: 13, verticalAlign: "top" };
 const thStyle = {
-  padding: "8px 12px",
-  fontSize: 11,
-  fontWeight: 600,
-  textTransform: "uppercase",
-  letterSpacing: "0.05em",
-  color: "var(--text-dim)",
-  textAlign: "left",
+  padding: "8px 12px", fontSize: 11, fontWeight: 600,
+  textTransform: "uppercase", letterSpacing: "0.05em",
+  color: "var(--text-dim)", textAlign: "left",
 };
 
-function AgeBadge({ days }) {
-  const color =
-    days >= 7
-      ? "var(--status-red)"
-      : days >= 3
-      ? "var(--status-orange)"
-      : "var(--status-green)";
+const statusColors = {
+  "Needs Decision": { bg: "#ef444422", text: "#ef4444" },
+  "Design Needed": { bg: "#f59e0b22", text: "#f59e0b" },
+  "Design In Progress": { bg: "#8b5cf622", text: "#8b5cf6" },
+  "Ready to Laser": { bg: "#3b82f622", text: "#3b82f6" },
+  "In Production": { bg: "#06b6d422", text: "#06b6d4" },
+  "Ready to Ship": { bg: "#22c55e22", text: "#22c55e" },
+  "Shipped": { bg: "#6b728022", text: "#6b7280" },
+};
+
+function StatusBadge({ status }) {
+  const c = statusColors[status] || { bg: "#6b728022", text: "#6b7280" };
   return (
-    <span
-      style={{
-        display: "inline-block",
-        padding: "2px 8px",
-        borderRadius: 12,
-        fontSize: 11,
-        fontWeight: 600,
-        background: color + "22",
-        color: color,
-      }}
-    >
-      {days === 0 ? "Today" : days === 1 ? "1 day" : `${days} days`}
+    <span style={{
+      display: "inline-block", padding: "2px 8px", borderRadius: 12,
+      fontSize: 11, fontWeight: 600, background: c.bg, color: c.text,
+    }}>
+      {status}
     </span>
   );
 }
 
+function OrderItemTable({ items }) {
+  if (items.length === 0) {
+    return <div style={{ padding: "16px 0", color: "var(--text-dim)", fontSize: 13 }}>No items.</div>;
+  }
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr style={{ borderBottom: "1px solid var(--card-border)" }}>
+            <th style={thStyle}>Item</th>
+            <th style={thStyle}>SKU</th>
+            <th style={thStyle}>Qty</th>
+            <th style={thStyle}>Size</th>
+            <th style={thStyle}>Status</th>
+            <th style={thStyle}>Method</th>
+            <th style={thStyle}>Customer</th>
+            <th style={thStyle}>Order</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <tr key={item.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
+              <td style={tdStyle}>
+                <div style={{ fontWeight: 500, color: "var(--text-bright)" }}>{item.name}</div>
+                {item.productTitle && (
+                  <div style={{ fontSize: 11, color: "var(--text-dim)" }}>{item.productTitle}</div>
+                )}
+              </td>
+              <td style={tdStyle}>
+                <span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--text-dim)" }}>
+                  {item.sku || "\u2014"}
+                </span>
+              </td>
+              <td style={{ ...tdStyle, textAlign: "center", color: "var(--text-bright)" }}>
+                {item.quantity}
+              </td>
+              <td style={{ ...tdStyle, fontSize: 12, color: "var(--text-dim)" }}>
+                {item.size === "Regular-7in" ? '7"' : item.size === "Small-6in" ? '6"' : item.size || "\u2014"}
+              </td>
+              <td style={tdStyle}><StatusBadge status={item.productionStatus} /></td>
+              <td style={{ ...tdStyle, fontSize: 11, color: "var(--text-dim)" }}>
+                {item.fulfillmentMethod || "\u2014"}
+              </td>
+              <td style={tdStyle}>
+                <div style={{ fontSize: 12, color: "var(--text-bright)" }}>{item.customerName}</div>
+                {item.shipTo && (
+                  <div style={{ fontSize: 11, color: "var(--text-dim)" }}>{item.shipTo}</div>
+                )}
+              </td>
+              <td style={tdStyle}>
+                <div style={{ fontSize: 11, color: "var(--text-dim)" }}>{item.orderName}</div>
+                <div style={{ fontSize: 10, color: item.orderType === "Donated" ? "var(--gold)" : "var(--text-dim)" }}>
+                  {item.orderType}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ShipStationTable({ orders }) {
+  if (!orders || orders.length === 0) {
+    return <div style={{ padding: "16px 0", color: "var(--text-dim)", fontSize: 13 }}>No orders.</div>;
+  }
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr style={{ borderBottom: "1px solid var(--card-border)" }}>
+            <th style={thStyle}>Order #</th>
+            <th style={thStyle}>Items</th>
+            <th style={thStyle}>Ship To</th>
+            <th style={thStyle}>Age</th>
+            <th style={thStyle}>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map((o) => (
+            <tr key={o.orderNumber} style={{ borderBottom: "1px solid var(--card-border)" }}>
+              <td style={{ ...tdStyle, fontWeight: 500, color: "var(--text-bright)" }}>{o.orderNumber}</td>
+              <td style={tdStyle}>
+                {o.items && o.items.map((item, i) => (
+                  <div key={i} style={{ fontSize: 11, color: "var(--text-dim)" }}>
+                    {item.sku || item.name} x{item.quantity}
+                  </div>
+                ))}
+              </td>
+              <td style={tdStyle}>
+                <div style={{ fontSize: 12, color: "var(--text-bright)" }}>{o.shipTo?.name}</div>
+                <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
+                  {[o.shipTo?.city, o.shipTo?.state].filter(Boolean).join(", ")}
+                </div>
+              </td>
+              <td style={tdStyle}>
+                {(() => {
+                  const days = o.orderDate ? Math.floor((Date.now() - new Date(o.orderDate)) / 86400000) : 0;
+                  const color = days >= 7 ? "#ef4444" : days >= 3 ? "#f59e0b" : "#22c55e";
+                  return <span style={{ fontWeight: 600, color }}>{days}d</span>;
+                })()}
+              </td>
+              <td style={{ ...tdStyle, color: "var(--text-bright)" }}>
+                {o.orderTotal ? `$${o.orderTotal.toFixed(2)}` : "\u2014"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default async function OrdersPage() {
-  let stats = { awaitingCount: 0, awaitingOrders: [], recentShipped: [], error: null };
+  let sfItems = [], sfStats = {}, ssAwaiting = [], ssRecent = [], ssError = null;
 
   try {
-    stats = await getOrderStats();
+    [sfItems, sfStats] = await Promise.all([
+      getActiveOrderItems(),
+      getOrderStats(),
+    ]);
   } catch (err) {
-    stats.error = err.message;
+    console.error("SF order load error:", err.message);
   }
 
+  try {
+    const awaiting = await getAwaitingShipment();
+    ssAwaiting = awaiting.map((o) => ({
+      orderNumber: o.orderNumber,
+      orderDate: o.orderDate,
+      orderTotal: o.orderTotal,
+      shipTo: o.shipTo,
+      items: o.items,
+    }));
+    const recent = await getRecentlyShipped(5);
+    ssRecent = recent.map((o) => ({
+      orderNumber: o.orderNumber,
+      shipDate: o.shipDate,
+      shipTo: o.shipTo,
+      trackingNumber: o.shipments?.[0]?.trackingNumber || "",
+      orderTotal: o.orderTotal,
+    }));
+  } catch (err) {
+    ssError = err.message;
+  }
+
+  const needsDecision = sfItems.filter((i) => i.productionStatus === "Needs Decision");
+  const designNeeded = sfItems.filter((i) => i.productionStatus === "Design Needed");
+  const designInProgress = sfItems.filter((i) => i.productionStatus === "Design In Progress");
+  const readyToLaser = sfItems.filter((i) => i.productionStatus === "Ready to Laser");
+  const inProduction = sfItems.filter((i) => i.productionStatus === "In Production");
+  const readyToShip = sfItems.filter((i) => i.productionStatus === "Ready to Ship");
+
   return (
-    <PageShell
-      title="Order Queue"
-      subtitle="Fulfillment pipeline — live from ShipStation"
-    >
-      {/* KPIs */}
+    <PageShell title="Order Queue" subtitle="Fulfillment pipeline \u2014 Salesforce + ShipStation">
       <div className="stat-grid">
         <StatBlock
-          label="Awaiting Shipment"
-          value={stats.awaitingCount}
-          note="Orders ready to ship"
-          accent={stats.awaitingCount > 0 ? "var(--status-orange)" : "var(--status-green)"}
+          label="Needs Decision"
+          value={sfStats.needsDecision || 0}
+          note="Awaiting triage"
+          accent="var(--status-red)"
         />
         <StatBlock
-          label="Recently Shipped"
-          value={stats.recentShipped.length}
-          note="Last 5 shipments"
+          label="In Production"
+          value={(sfStats.readyToLaser || 0) + (sfStats.inProduction || 0)}
+          note={`${sfStats.readyToLaser || 0} laser \u00b7 ${sfStats.inProduction || 0} active`}
           accent="var(--status-blue)"
         />
         <StatBlock
-          label="Oldest Order"
-          value={
-            stats.awaitingOrders.length > 0
-              ? `${Math.max(...stats.awaitingOrders.map((o) => o.age))}d`
-              : "\u2014"
-          }
-          note={stats.awaitingOrders.length > 0 ? "Days waiting" : "All clear"}
-          accent={
-            stats.awaitingOrders.some((o) => o.age >= 7)
-              ? "var(--status-red)"
-              : "var(--status-green)"
-          }
+          label="Ready to Ship"
+          value={(sfStats.readyToShip || 0) + ssAwaiting.length}
+          note={`${sfStats.readyToShip || 0} SF \u00b7 ${ssAwaiting.length} ShipStation`}
+          accent="var(--status-green)"
         />
         <StatBlock
-          label="Source"
-          value="Live"
-          note="ShipStation API"
+          label="Total Orders"
+          value={(sfStats.totalPaid || 0) + (sfStats.totalDonated || 0)}
+          note={`${sfStats.totalPaid || 0} paid \u00b7 ${sfStats.totalDonated || 0} donated`}
           accent="var(--gold)"
         />
       </div>
 
-      {/* Error State */}
-      {stats.error && (
+      {ssError && (
         <div className="section">
-          <DataCard title="Connection Error">
-            <div style={{ color: "var(--status-red)", fontSize: 13, padding: "8px 0" }}>
-              {stats.error}
+          <DataCard title="ShipStation Connection">
+            <div style={{ color: "var(--status-red)", fontSize: 13 }}>
+              ShipStation error: {ssError}
             </div>
-            <div style={{ color: "var(--text-dim)", fontSize: 12 }}>
+            <div style={{ color: "var(--text-dim)", fontSize: 12, marginTop: 4 }}>
               Check SHIPSTATION_API_KEY and SHIPSTATION_API_SECRET in environment variables.
             </div>
           </DataCard>
         </div>
       )}
 
-      {/* Awaiting Shipment */}
+      {needsDecision.length > 0 && (
+        <div className="section">
+          <DataCard title={`Needs Decision (${needsDecision.length})`}>
+            <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
+              New orders awaiting triage. Decide: pre-made pull, laser production, or design needed.
+            </div>
+            <OrderItemTable items={needsDecision} />
+          </DataCard>
+        </div>
+      )}
+
+      {(designNeeded.length > 0 || designInProgress.length > 0) && (
+        <div className="section">
+          <DataCard title={`Design Pipeline (${designNeeded.length + designInProgress.length})`}>
+            <OrderItemTable items={[...designNeeded, ...designInProgress]} />
+          </DataCard>
+        </div>
+      )}
+
+      {(readyToLaser.length > 0 || inProduction.length > 0) && (
+        <div className="section">
+          <DataCard title={`Laser Production (${readyToLaser.length + inProduction.length})`}>
+            <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
+              Ready to burn or actively in production. Max 3 per run.
+            </div>
+            <OrderItemTable items={[...readyToLaser, ...inProduction]} />
+          </DataCard>
+        </div>
+      )}
+
+      {readyToShip.length > 0 && (
+        <div className="section">
+          <DataCard title={`Ready to Ship \u2014 SF (${readyToShip.length})`}>
+            <OrderItemTable items={readyToShip} />
+          </DataCard>
+        </div>
+      )}
+
       <div className="section">
-        <DataCard title={`Awaiting Shipment (${stats.awaitingCount})`}>
-          {stats.awaitingOrders.length > 0 ? (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ borderBottom: "1px solid var(--card-border)" }}>
-                    <th style={thStyle}>Order</th>
-                    <th style={thStyle}>Age</th>
-                    <th style={thStyle}>Items</th>
-                    <th style={thStyle}>Ship To</th>
-                    <th style={thStyle}>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.awaitingOrders.map((order) => (
-                    <tr
-                      key={order.orderId}
-                      style={{ borderBottom: "1px solid var(--card-border)" }}
-                    >
-                      <td style={tdStyle}>
-                        <div style={{ fontWeight: 500, color: "var(--text-bright)" }}>
-                          #{order.orderNumber}
-                        </div>
-                        <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
-                          {new Date(order.orderDate).toLocaleDateString()}
-                        </div>
-                      </td>
-                      <td style={tdStyle}>
-                        <AgeBadge days={order.age} />
-                      </td>
-                      <td style={tdStyle}>
-                        {order.items.map((item, i) => (
-                          <div key={i} style={{ marginBottom: 2 }}>
-                            <span
-                              style={{
-                                fontSize: 11,
-                                fontFamily: "monospace",
-                                color: "var(--text-dim)",
-                                marginRight: 6,
-                              }}
-                            >
-                              {item.sku || "\u2014"}
-                            </span>
-                            <span style={{ color: "var(--text-bright)", fontSize: 12 }}>
-                              {item.name}
-                            </span>
-                            {item.quantity > 1 && (
-                              <span
-                                style={{
-                                  marginLeft: 4,
-                                  fontSize: 11,
-                                  color: "var(--status-blue)",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                \u00d7{item.quantity}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </td>
-                      <td style={{ ...tdStyle, color: "var(--text-bright)" }}>
-                        {order.shipTo}
-                      </td>
-                      <td style={{ ...tdStyle, color: "var(--text-bright)", fontWeight: 500 }}>
-                        {order.orderTotal > 0
-                          ? `$${order.orderTotal.toFixed(2)}`
-                          : "Donated"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div style={{ padding: "16px 0", color: "var(--text-dim)", fontSize: 13 }}>
-              {stats.error
-                ? "Unable to fetch orders \u2014 check connection."
-                : "All orders shipped! \ud83c\udf89"}
-            </div>
-          )}
+        <DataCard title={`Awaiting Shipment \u2014 ShipStation (${ssAwaiting.length})`}>
+          <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
+            Live from ShipStation. Print labels, pack, and ship.
+          </div>
+          <ShipStationTable orders={ssAwaiting} />
         </DataCard>
       </div>
 
-      {/* Recently Shipped */}
       <div className="section">
-        <DataCard title="Recently Shipped">
-          {stats.recentShipped.length > 0 ? (
+        <DataCard title={`Recently Shipped (${ssRecent.length})`}>
+          {ssRecent.length > 0 ? (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--card-border)" }}>
-                    <th style={thStyle}>Order</th>
-                    <th style={thStyle}>Ship Date</th>
+                    <th style={thStyle}>Order #</th>
                     <th style={thStyle}>Ship To</th>
                     <th style={thStyle}>Tracking</th>
                     <th style={thStyle}>Total</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {stats.recentShipped.map((order) => (
-                    <tr
-                      key={order.orderId}
-                      style={{ borderBottom: "1px solid var(--card-border)" }}
-                    >
-                      <td style={{ ...tdStyle, fontWeight: 500, color: "var(--text-bright)" }}>
-                        #{order.orderNumber}
+                  {ssRecent.map((o) => (
+                    <tr key={o.orderNumber} style={{ borderBottom: "1px solid var(--card-border)" }}>
+                      <td style={{ ...tdStyle, fontWeight: 500, color: "var(--text-bright)" }}>{o.orderNumber}</td>
+                      <td style={tdStyle}>
+                        <div style={{ fontSize: 12, color: "var(--text-bright)" }}>{o.shipTo?.name}</div>
                       </td>
-                      <td style={{ ...tdStyle, color: "var(--text-dim)" }}>
-                        {order.shipDate
-                          ? new Date(order.shipDate).toLocaleDateString()
-                          : "\u2014"}
+                      <td style={{ ...tdStyle, fontSize: 11, fontFamily: "monospace", color: "var(--text-dim)" }}>
+                        {o.trackingNumber || "\u2014"}
                       </td>
                       <td style={{ ...tdStyle, color: "var(--text-bright)" }}>
-                        {order.shipTo}
-                      </td>
-                      <td style={tdStyle}>
-                        {order.trackingNumber ? (
-                          <span
-                            style={{
-                              fontSize: 11,
-                              fontFamily: "monospace",
-                              color: "var(--status-blue)",
-                            }}
-                          >
-                            {order.trackingNumber}
-                          </span>
-                        ) : (
-                          <span style={{ color: "var(--text-dim)", fontSize: 11 }}>\u2014</span>
-                        )}
-                      </td>
-                      <td style={{ ...tdStyle, color: "var(--text-bright)", fontWeight: 500 }}>
-                        {order.orderTotal > 0
-                          ? `$${order.orderTotal.toFixed(2)}`
-                          : "Donated"}
+                        {o.orderTotal ? `$${o.orderTotal.toFixed(2)}` : "\u2014"}
                       </td>
                     </tr>
                   ))}
@@ -248,35 +310,20 @@ export default async function OrdersPage() {
               </table>
             </div>
           ) : (
-            <div style={{ padding: "16px 0", color: "var(--text-dim)", fontSize: 13 }}>
-              No recent shipments.
-            </div>
+            <div style={{ padding: "16px 0", color: "var(--text-dim)", fontSize: 13 }}>No recent shipments.</div>
           )}
         </DataCard>
       </div>
 
-      {/* Daily Checklist */}
       <div className="section">
         <DataCard title="Daily Fulfillment Checklist">
           <ol style={{ margin: 0, padding: "0 0 0 20px", fontSize: 13, lineHeight: 2 }}>
-            <li style={{ color: "var(--text-bright)" }}>
-              Check awaiting shipment orders above \u2014 anything over 3 days needs attention
-            </li>
-            <li style={{ color: "var(--text-bright)" }}>
-              Check for new donated requests (email, IG, referrals)
-            </li>
-            <li style={{ color: "var(--text-bright)" }}>
-              Orders needing design \u2192 assign to Ryan in Design Queue
-            </li>
-            <li style={{ color: "var(--text-bright)" }}>
-              Orders ready to laser \u2192 batch for production (max 3 per run)
-            </li>
-            <li style={{ color: "var(--text-bright)" }}>
-              Ready to ship \u2192 print labels in ShipStation, pack and ship
-            </li>
-            <li style={{ color: "var(--text-bright)" }}>
-              Update SF fulfillment status for shipped orders
-            </li>
+            <li style={{ color: "var(--text-bright)" }}>Check <b>Needs Decision</b> above \u2014 triage new orders (pre-made pull, laser, or design needed)</li>
+            <li style={{ color: "var(--text-bright)" }}>Check for new donated requests (email, IG, referrals)</li>
+            <li style={{ color: "var(--text-bright)" }}>Orders needing design \u2192 assign to Ryan in Design Queue</li>
+            <li style={{ color: "var(--text-bright)" }}>Orders ready to laser \u2192 batch for production (max 3 per run)</li>
+            <li style={{ color: "var(--text-bright)" }}>Ready to ship \u2192 create ShipStation order, print labels, pack & ship</li>
+            <li style={{ color: "var(--text-bright)" }}>Update SF fulfillment status for shipped orders</li>
           </ol>
         </DataCard>
       </div>
