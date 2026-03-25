@@ -2,22 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 
-const THANK_YOU_KEY = "shos_donor_thankyou";
 const SENDER_KEY = "shos_donor_sender";
-
-function loadThankYouMap() {
-  if (typeof window === "undefined") return {};
-  try {
-    return JSON.parse(localStorage.getItem(THANK_YOU_KEY) || "{}");
-  } catch {
-    return {};
-  }
-}
-
-function saveThankYouMap(map) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(THANK_YOU_KEY, JSON.stringify(map));
-}
 
 function loadSender() {
   if (typeof window === "undefined") return null;
@@ -59,11 +44,38 @@ function extractName(donation) {
   return "Anonymous";
 }
 
-function DonorRow({ donation, isThankYouSent, onToggleThankYou, onCreateDraft, draftState, repeatDonorEmails }) {
+const SEGMENT_COLORS = {
+  "Major ($500+)": { bg: "rgba(212, 175, 55, 0.15)", color: "var(--gold)", label: "MAJOR" },
+  Recurring: { bg: "rgba(59, 130, 246, 0.15)", color: "var(--status-blue)", label: "RECURRING" },
+  Regular: { bg: "rgba(34, 197, 94, 0.15)", color: "var(--status-green)", label: "REGULAR" },
+  "First-Time": { bg: "rgba(156, 163, 175, 0.15)", color: "var(--text-dim)", label: "NEW" },
+  Lapsed: { bg: "rgba(239, 68, 68, 0.15)", color: "var(--status-red)", label: "LAPSED" },
+};
+
+function DonorRow({
+  donation,
+  onToggleThankYou,
+  onCreateDraft,
+  draftState,
+  saveState,
+  repeatDonorEmails,
+}) {
   const name = extractName(donation);
   const email = donation.donorEmail;
   const isRepeat = email && repeatDonorEmails.has(email);
   const state = draftState[donation.sfId];
+  const saving = saveState[donation.sfId];
+  const seg = donation.donorSegment ? SEGMENT_COLORS[donation.donorSegment] : null;
+
+  // Day 30 impact update indicator
+  const daysSinceDonation = donation.donationDate
+    ? Math.floor((new Date() - new Date(donation.donationDate)) / (1000 * 60 * 60 * 24))
+    : null;
+  const impactDue =
+    donation.thankYouSent &&
+    !donation.impactUpdateSent &&
+    daysSinceDonation >= 25 &&
+    daysSinceDonation <= 45;
 
   return (
     <tr>
@@ -74,10 +86,25 @@ function DonorRow({ donation, isThankYouSent, onToggleThankYou, onCreateDraft, d
 
       {/* Donor */}
       <td>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ fontWeight: 500, color: "var(--text-bright)", fontSize: 13 }}>
-            {name}
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          {email ? (
+            <a
+              href={`/donors/${encodeURIComponent(email)}`}
+              style={{
+                fontWeight: 500,
+                color: "var(--text-bright)",
+                fontSize: 13,
+                textDecoration: "none",
+                borderBottom: "1px dashed var(--card-border)",
+              }}
+            >
+              {name}
+            </a>
+          ) : (
+            <div style={{ fontWeight: 500, color: "var(--text-bright)", fontSize: 13 }}>
+              {name}
+            </div>
+          )}
           {isRepeat && (
             <span
               style={{
@@ -90,6 +117,34 @@ function DonorRow({ donation, isThankYouSent, onToggleThankYou, onCreateDraft, d
               }}
             >
               REPEAT
+            </span>
+          )}
+          {seg && (
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                background: seg.bg,
+                color: seg.color,
+                padding: "1px 5px",
+                borderRadius: 8,
+              }}
+            >
+              {seg.label}
+            </span>
+          )}
+          {impactDue && (
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                background: "rgba(251, 146, 60, 0.15)",
+                color: "var(--status-orange)",
+                padding: "1px 5px",
+                borderRadius: 8,
+              }}
+            >
+              IMPACT DUE
             </span>
           )}
         </div>
@@ -109,36 +164,56 @@ function DonorRow({ donation, isThankYouSent, onToggleThankYou, onCreateDraft, d
         {formatAmount(donation.amount)}
       </td>
 
-      {/* Source */}
+      {/* Source / Campaign */}
       <td style={{ fontSize: 11, color: "var(--text-dim)" }}>
-        {donation.source || "--"}
+        <div>{donation.source || "--"}</div>
+        {donation.campaign && (
+          <div style={{ fontSize: 10, color: "var(--status-blue)" }}>
+            {donation.campaign}
+          </div>
+        )}
       </td>
 
       {/* Thank You Status */}
       <td>
         <button
-          onClick={() => onToggleThankYou(donation.sfId)}
+          onClick={() => onToggleThankYou(donation)}
+          disabled={saving === "saving"}
           style={{
             display: "flex",
             alignItems: "center",
             gap: 6,
-            background: isThankYouSent
+            background: donation.thankYouSent
               ? "rgba(34, 197, 94, 0.1)"
               : "rgba(212, 175, 55, 0.1)",
-            color: isThankYouSent ? "var(--status-green)" : "var(--gold)",
+            color: donation.thankYouSent ? "var(--status-green)" : "var(--gold)",
             border: `1px solid ${
-              isThankYouSent ? "var(--status-green)" : "var(--gold)"
+              donation.thankYouSent ? "var(--status-green)" : "var(--gold)"
             }`,
             borderRadius: "var(--radius-sm)",
             padding: "4px 10px",
             fontSize: 11,
             fontWeight: 600,
-            cursor: "pointer",
+            cursor: saving === "saving" ? "wait" : "pointer",
+            opacity: saving === "saving" ? 0.6 : 1,
             transition: "all 0.2s ease",
           }}
         >
-          {isThankYouSent ? "Thanked" : "Send Thanks"}
+          {saving === "saving"
+            ? "saving..."
+            : saving === "saved"
+            ? "saved"
+            : saving === "error"
+            ? "error"
+            : donation.thankYouSent
+            ? "Thanked"
+            : "Send Thanks"}
         </button>
+        {donation.thankYouSent && donation.thankYouBy && (
+          <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>
+            by {donation.thankYouBy}
+          </div>
+        )}
       </td>
 
       {/* Email Action */}
@@ -151,9 +226,20 @@ function DonorRow({ donation, isThankYouSent, onToggleThankYou, onCreateDraft, d
               style={{
                 fontSize: 11,
                 fontWeight: 600,
-                color: state === "created" ? "var(--status-green)" : state === "error" ? "var(--status-red)" : "var(--gold)",
+                color:
+                  state === "created"
+                    ? "var(--status-green)"
+                    : state === "error"
+                    ? "var(--status-red)"
+                    : "var(--gold)",
                 background: "transparent",
-                border: `1px dashed ${state === "created" ? "var(--status-green)" : state === "error" ? "var(--status-red)" : "var(--gold)"}`,
+                border: `1px dashed ${
+                  state === "created"
+                    ? "var(--status-green)"
+                    : state === "error"
+                    ? "var(--status-red)"
+                    : "var(--gold)"
+                }`,
                 borderRadius: "var(--radius-sm)",
                 padding: "3px 8px",
                 cursor: state === "creating" ? "wait" : "pointer",
@@ -165,7 +251,7 @@ function DonorRow({ donation, isThankYouSent, onToggleThankYou, onCreateDraft, d
                 : state === "created"
                 ? "draft created"
                 : state === "error"
-                ? "failed — retry"
+                ? "failed \u2014 retry"
                 : "create draft"}
             </button>
             <a
@@ -173,7 +259,7 @@ function DonorRow({ donation, isThankYouSent, onToggleThankYou, onCreateDraft, d
                 name
               )}%2C%0A%0AThank%20you%20so%20much%20for%20your%20generous%20donation%20of%20${encodeURIComponent(
                 formatAmount(donation.amount)
-              )}%20to%20Steel%20Hearts.%20Your%20support%20helps%20us%20honor%20our%20fallen%20heroes%20and%20support%20their%20families.%0A%0AWarm%20regards%2C%0ASteel%20Hearts%20Team`}
+              )}%20to%20Steel%20Hearts.%0A%0AWarm%20regards%2C%0ASteel%20Hearts%20Team`}
               style={{
                 fontSize: 10,
                 color: "var(--text-dim)",
@@ -186,9 +272,7 @@ function DonorRow({ donation, isThankYouSent, onToggleThankYou, onCreateDraft, d
             </a>
           </div>
         ) : (
-          <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
-            no email
-          </span>
+          <span style={{ fontSize: 11, color: "var(--text-dim)" }}>no email</span>
         )}
       </td>
     </tr>
@@ -196,103 +280,165 @@ function DonorRow({ donation, isThankYouSent, onToggleThankYou, onCreateDraft, d
 }
 
 export default function DonorTracker({ donations, stats, volunteers }) {
-  const [thankYouMap, setThankYouMap] = useState({});
+  const [donationData, setDonationData] = useState(donations);
   const [filter, setFilter] = useState("all");
   const [timeRange, setTimeRange] = useState("all");
-  const [draftState, setDraftState] = useState({}); // sfId -> "creating" | "created" | "error"
+  const [segmentFilter, setSegmentFilter] = useState("all");
+  const [draftState, setDraftState] = useState({});
+  const [saveState, setSaveState] = useState({});
   const [sender, setSender] = useState(null);
   const [showSenderPicker, setShowSenderPicker] = useState(false);
 
-  // Load state from localStorage on mount
   useEffect(() => {
-    setThankYouMap(loadThankYouMap());
     setSender(loadSender());
   }, []);
 
   // Compute repeat donor emails
   const repeatDonorEmails = useMemo(() => {
     const counts = {};
-    for (const d of donations) {
+    for (const d of donationData) {
       if (d.donorEmail) {
         counts[d.donorEmail] = (counts[d.donorEmail] || 0) + 1;
       }
     }
-    return new Set(Object.entries(counts).filter(([, c]) => c > 1).map(([e]) => e));
-  }, [donations]);
+    return new Set(
+      Object.entries(counts)
+        .filter(([, c]) => c > 1)
+        .map(([e]) => e)
+    );
+  }, [donationData]);
 
-  const toggleThankYou = (sfId) => {
-    setThankYouMap((prev) => {
-      const updated = { ...prev };
-      if (updated[sfId]) {
-        delete updated[sfId];
-      } else {
-        updated[sfId] = new Date().toISOString();
+  // Save thank-you status to Salesforce
+  const toggleThankYou = useCallback(
+    async (donation) => {
+      const newValue = !donation.thankYouSent;
+      const senderName = sender?.name || "Unknown";
+
+      // Optimistic update
+      setDonationData((prev) =>
+        prev.map((d) =>
+          d.sfId === donation.sfId
+            ? {
+                ...d,
+                thankYouSent: newValue,
+                thankYouBy: newValue ? senderName : null,
+                thankYouDate: newValue
+                  ? new Date().toISOString().split("T")[0]
+                  : null,
+              }
+            : d
+        )
+      );
+
+      setSaveState((prev) => ({ ...prev, [donation.sfId]: "saving" }));
+
+      try {
+        const res = await fetch("/api/donors/update", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sfId: donation.sfId,
+            thankYouSent: newValue,
+            thankYouBy: newValue ? senderName : null,
+          }),
+        });
+        const data = await res.json();
+        if (data.success || data.mock) {
+          setSaveState((prev) => ({ ...prev, [donation.sfId]: "saved" }));
+        } else {
+          setSaveState((prev) => ({ ...prev, [donation.sfId]: "error" }));
+          // Revert optimistic update
+          setDonationData((prev) =>
+            prev.map((d) =>
+              d.sfId === donation.sfId
+                ? { ...d, thankYouSent: !newValue, thankYouBy: donation.thankYouBy }
+                : d
+            )
+          );
+        }
+      } catch {
+        setSaveState((prev) => ({ ...prev, [donation.sfId]: "error" }));
+        setDonationData((prev) =>
+          prev.map((d) =>
+            d.sfId === donation.sfId
+              ? { ...d, thankYouSent: !newValue, thankYouBy: donation.thankYouBy }
+              : d
+          )
+        );
       }
-      saveThankYouMap(updated);
-      return updated;
-    });
-  };
+
+      setTimeout(() => {
+        setSaveState((prev) => {
+          const next = { ...prev };
+          delete next[donation.sfId];
+          return next;
+        });
+      }, 2000);
+    },
+    [sender]
+  );
 
   const handleSenderSelect = (vol) => {
-    const s = {
-      email: vol.email,
-      name: vol.name,
-    };
+    const s = { email: vol.email, name: vol.name };
     setSender(s);
     saveSender(s);
     setShowSenderPicker(false);
   };
 
-  const createDraft = useCallback(async (donation, isRepeat) => {
-    if (!sender) {
-      setShowSenderPicker(true);
-      return;
-    }
-
-    setDraftState((prev) => ({ ...prev, [donation.sfId]: "creating" }));
-
-    try {
-      const res = await fetch("/api/donors/draft-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          donorName: extractName(donation),
-          donorEmail: donation.donorEmail,
-          amount: donation.amount,
-          donationDate: donation.donationDate,
-          isRepeatDonor: isRepeat,
-          senderEmail: sender.email,
-          senderName: sender.name,
-          sfId: donation.sfId,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        setDraftState((prev) => ({ ...prev, [donation.sfId]: "created" }));
-        // Auto-clear after 5 seconds
-        setTimeout(() => {
-          setDraftState((prev) => {
-            const next = { ...prev };
-            if (next[donation.sfId] === "created") delete next[donation.sfId];
-            return next;
-          });
-        }, 5000);
-      } else {
-        setDraftState((prev) => ({ ...prev, [donation.sfId]: "error" }));
-        if (data.mock) {
-          alert("Gmail service account not configured yet. Use the 'mailto' fallback for now.");
-        }
+  const createDraft = useCallback(
+    async (donation, isRepeat) => {
+      if (!sender) {
+        setShowSenderPicker(true);
+        return;
       }
-    } catch {
-      setDraftState((prev) => ({ ...prev, [donation.sfId]: "error" }));
-    }
-  }, [sender]);
+
+      setDraftState((prev) => ({ ...prev, [donation.sfId]: "creating" }));
+
+      try {
+        const res = await fetch("/api/donors/draft-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            donorName: extractName(donation),
+            donorEmail: donation.donorEmail,
+            amount: donation.amount,
+            donationDate: donation.donationDate,
+            isRepeatDonor: isRepeat,
+            senderEmail: sender.email,
+            senderName: sender.name,
+            sfId: donation.sfId,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+          setDraftState((prev) => ({ ...prev, [donation.sfId]: "created" }));
+          setTimeout(() => {
+            setDraftState((prev) => {
+              const next = { ...prev };
+              if (next[donation.sfId] === "created") delete next[donation.sfId];
+              return next;
+            });
+          }, 5000);
+        } else {
+          setDraftState((prev) => ({ ...prev, [donation.sfId]: "error" }));
+          if (data.mock) {
+            alert(
+              "Gmail service account not configured yet. Use the 'mailto' fallback for now."
+            );
+          }
+        }
+      } catch {
+        setDraftState((prev) => ({ ...prev, [donation.sfId]: "error" }));
+      }
+    },
+    [sender]
+  );
 
   // Filter and sort donations
   const filtered = useMemo(() => {
-    let result = [...donations];
+    let result = [...donationData];
 
     if (timeRange !== "all") {
       const now = new Date();
@@ -314,22 +460,57 @@ export default function DonorTracker({ donations, stats, volunteers }) {
     }
 
     if (filter === "needs_thanks") {
-      result = result.filter((d) => d.donorEmail && !thankYouMap[d.sfId]);
+      result = result.filter((d) => d.donorEmail && !d.thankYouSent);
     } else if (filter === "thanked") {
-      result = result.filter((d) => thankYouMap[d.sfId]);
+      result = result.filter((d) => d.thankYouSent);
     } else if (filter === "no_email") {
       result = result.filter((d) => !d.donorEmail);
+    } else if (filter === "impact_due") {
+      const now = new Date();
+      result = result.filter((d) => {
+        if (!d.thankYouSent || d.impactUpdateSent || !d.donorEmail) return false;
+        if (!d.donationDate) return false;
+        const days = Math.floor(
+          (now - new Date(d.donationDate)) / (1000 * 60 * 60 * 24)
+        );
+        return days >= 25 && days <= 45;
+      });
+    }
+
+    if (segmentFilter !== "all") {
+      result = result.filter((d) => d.donorSegment === segmentFilter);
     }
 
     return result;
-  }, [donations, filter, timeRange, thankYouMap]);
+  }, [donationData, filter, timeRange, segmentFilter]);
 
-  const totalDonors = donations.filter((d) => d.donorEmail).length;
-  const thankedCount = donations.filter((d) => thankYouMap[d.sfId]).length;
-  const needsThankCount = donations.filter(
-    (d) => d.donorEmail && !thankYouMap[d.sfId]
+  const totalDonors = donationData.filter((d) => d.donorEmail).length;
+  const thankedCount = donationData.filter((d) => d.thankYouSent).length;
+  const needsThankCount = donationData.filter(
+    (d) => d.donorEmail && !d.thankYouSent
   ).length;
-  const noEmailCount = donations.filter((d) => !d.donorEmail).length;
+  const noEmailCount = donationData.filter((d) => !d.donorEmail).length;
+  const impactDueCount = donationData.filter((d) => {
+    if (!d.thankYouSent || d.impactUpdateSent || !d.donorEmail || !d.donationDate)
+      return false;
+    const days = Math.floor(
+      (new Date() - new Date(d.donationDate)) / (1000 * 60 * 60 * 24)
+    );
+    return days >= 25 && days <= 45;
+  }).length;
+
+  // Segment counts for filter badges
+  const segmentCounts = useMemo(() => {
+    const counts = {};
+    for (const d of donationData) {
+      if (d.donorSegment) {
+        counts[d.donorSegment] = (counts[d.donorSegment] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [donationData]);
+
+  const hasSegments = Object.keys(segmentCounts).length > 0;
 
   return (
     <div>
@@ -341,17 +522,33 @@ export default function DonorTracker({ donations, stats, volunteers }) {
           gap: 10,
           marginBottom: 16,
           padding: "10px 14px",
-          background: sender ? "rgba(34, 197, 94, 0.06)" : "rgba(212, 175, 55, 0.08)",
+          background: sender
+            ? "rgba(34, 197, 94, 0.06)"
+            : "rgba(212, 175, 55, 0.08)",
           border: `1px solid ${sender ? "var(--status-green)" : "var(--gold)"}`,
           borderRadius: "var(--radius-md)",
         }}
       >
-        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: "var(--text-dim)",
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+          }}
+        >
           Sending as:
         </span>
         {sender ? (
           <>
-            <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-bright)" }}>
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 500,
+                color: "var(--text-bright)",
+              }}
+            >
               {sender.name}
             </span>
             <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
@@ -401,7 +598,14 @@ export default function DonorTracker({ donations, stats, volunteers }) {
             borderRadius: "var(--radius-md)",
           }}
         >
-          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-bright)", marginBottom: 10 }}>
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--text-bright)",
+              marginBottom: 10,
+            }}
+          >
             Who are you? Select your @steel-hearts.org account:
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -416,8 +620,15 @@ export default function DonorTracker({ donations, stats, volunteers }) {
                     alignItems: "center",
                     gap: 8,
                     padding: "8px 14px",
-                    background: sender?.email === v.email ? "rgba(212, 175, 55, 0.15)" : "var(--bg)",
-                    border: `1px solid ${sender?.email === v.email ? "var(--gold)" : "var(--card-border)"}`,
+                    background:
+                      sender?.email === v.email
+                        ? "rgba(212, 175, 55, 0.15)"
+                        : "var(--bg)",
+                    border: `1px solid ${
+                      sender?.email === v.email
+                        ? "var(--gold)"
+                        : "var(--card-border)"
+                    }`,
                     borderRadius: "var(--radius-sm)",
                     cursor: "pointer",
                     transition: "all 0.15s ease",
@@ -441,7 +652,13 @@ export default function DonorTracker({ donations, stats, volunteers }) {
                     {v.initials}
                   </div>
                   <div style={{ textAlign: "left" }}>
-                    <div style={{ fontSize: 12, fontWeight: 500, color: "var(--text-bright)" }}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 500,
+                        color: "var(--text-bright)",
+                      }}
+                    >
                       {v.name}
                     </div>
                     <div style={{ fontSize: 10, color: "var(--text-dim)" }}>
@@ -477,88 +694,54 @@ export default function DonorTracker({ donations, stats, volunteers }) {
           flexWrap: "wrap",
         }}
       >
-        <div
-          style={{
-            flex: "1 1 140px",
-            padding: "12px 16px",
-            background: "var(--bg)",
-            border: "1px solid var(--card-border)",
-            borderRadius: "var(--radius-md)",
-            textAlign: "center",
-          }}
-        >
-          <div style={{ fontSize: 24, fontWeight: 700, color: "var(--gold)" }}>
-            {needsThankCount}
-          </div>
-          <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            Need Thank You
-          </div>
-        </div>
-        <div
-          style={{
-            flex: "1 1 140px",
-            padding: "12px 16px",
-            background: "var(--bg)",
-            border: "1px solid var(--card-border)",
-            borderRadius: "var(--radius-md)",
-            textAlign: "center",
-          }}
-        >
-          <div style={{ fontSize: 24, fontWeight: 700, color: "var(--status-green)" }}>
-            {thankedCount}
-          </div>
-          <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            Thanked
-          </div>
-        </div>
-        <div
-          style={{
-            flex: "1 1 140px",
-            padding: "12px 16px",
-            background: "var(--bg)",
-            border: "1px solid var(--card-border)",
-            borderRadius: "var(--radius-md)",
-            textAlign: "center",
-          }}
-        >
+        {[
+          { value: needsThankCount, label: "Need Thank You", color: "var(--gold)" },
+          { value: thankedCount, label: "Thanked", color: "var(--status-green)" },
+          {
+            value:
+              totalDonors > 0
+                ? `${Math.round((thankedCount / totalDonors) * 100)}%`
+                : "--",
+            label: "Completion Rate",
+            color: totalDonors > 0 ? "var(--status-blue)" : "var(--text-dim)",
+          },
+          {
+            value: impactDueCount,
+            label: "Impact Updates Due",
+            color: impactDueCount > 0 ? "var(--status-orange)" : "var(--text-dim)",
+          },
+          {
+            value: noEmailCount,
+            label: "No Email on File",
+            color: noEmailCount > 0 ? "var(--status-orange)" : "var(--text-dim)",
+          },
+        ].map((stat) => (
           <div
+            key={stat.label}
             style={{
-              fontSize: 24,
-              fontWeight: 700,
-              color: totalDonors > 0 ? "var(--status-blue)" : "var(--text-dim)",
+              flex: "1 1 120px",
+              padding: "12px 16px",
+              background: "var(--bg)",
+              border: "1px solid var(--card-border)",
+              borderRadius: "var(--radius-md)",
+              textAlign: "center",
             }}
           >
-            {totalDonors > 0
-              ? `${Math.round((thankedCount / totalDonors) * 100)}%`
-              : "--"}
+            <div style={{ fontSize: 24, fontWeight: 700, color: stat.color }}>
+              {stat.value}
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--text-dim)",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+              }}
+            >
+              {stat.label}
+            </div>
           </div>
-          <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            Completion Rate
-          </div>
-        </div>
-        <div
-          style={{
-            flex: "1 1 140px",
-            padding: "12px 16px",
-            background: "var(--bg)",
-            border: "1px solid var(--card-border)",
-            borderRadius: "var(--radius-md)",
-            textAlign: "center",
-          }}
-        >
-          <div
-            style={{
-              fontSize: 24,
-              fontWeight: 700,
-              color: noEmailCount > 0 ? "var(--status-orange)" : "var(--text-dim)",
-            }}
-          >
-            {noEmailCount}
-          </div>
-          <div style={{ fontSize: 11, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            No Email on File
-          </div>
-        </div>
+        ))}
       </div>
 
       {/* Filters */}
@@ -572,13 +755,22 @@ export default function DonorTracker({ donations, stats, volunteers }) {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: "var(--text-dim)",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+            }}
+          >
             Status:
           </span>
           {[
             { key: "all", label: "All" },
-            { key: "needs_thanks", label: "Needs Thanks" },
+            { key: "needs_thanks", label: "Needs Thanks", badge: needsThankCount },
             { key: "thanked", label: "Thanked" },
+            { key: "impact_due", label: "Impact Due", badge: impactDueCount },
             { key: "no_email", label: "No Email" },
           ].map((f) => (
             <button
@@ -588,7 +780,7 @@ export default function DonorTracker({ donations, stats, volunteers }) {
               style={{ padding: "3px 8px", fontSize: 11 }}
             >
               {f.label}
-              {f.key === "needs_thanks" && needsThankCount > 0 && (
+              {f.badge > 0 && (
                 <span
                   style={{
                     marginLeft: 4,
@@ -600,7 +792,7 @@ export default function DonorTracker({ donations, stats, volunteers }) {
                     fontWeight: 700,
                   }}
                 >
-                  {needsThankCount}
+                  {f.badge}
                 </span>
               )}
             </button>
@@ -608,7 +800,15 @@ export default function DonorTracker({ donations, stats, volunteers }) {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: "var(--text-dim)",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+            }}
+          >
             Time:
           </span>
           {[
@@ -627,11 +827,58 @@ export default function DonorTracker({ donations, stats, volunteers }) {
             </button>
           ))}
         </div>
+
+        {/* Segment filter (only show if segments exist) */}
+        {hasSegments && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: "var(--text-dim)",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+              }}
+            >
+              Segment:
+            </span>
+            <button
+              onClick={() => setSegmentFilter("all")}
+              className={
+                segmentFilter === "all" ? "btn btn-primary" : "btn btn-ghost"
+              }
+              style={{ padding: "3px 8px", fontSize: 11 }}
+            >
+              All
+            </button>
+            {Object.entries(segmentCounts).map(([seg, count]) => (
+              <button
+                key={seg}
+                onClick={() => setSegmentFilter(seg)}
+                className={
+                  segmentFilter === seg ? "btn btn-primary" : "btn btn-ghost"
+                }
+                style={{ padding: "3px 8px", fontSize: 11 }}
+              >
+                {SEGMENT_COLORS[seg]?.label || seg}
+                <span
+                  style={{
+                    marginLeft: 3,
+                    fontSize: 9,
+                    color: "var(--text-dim)",
+                  }}
+                >
+                  {count}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Results count */}
       <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
-        Showing {filtered.length} of {donations.length} donations
+        Showing {filtered.length} of {donationData.length} donations
       </div>
 
       {/* Donor Table */}
@@ -644,7 +891,7 @@ export default function DonorTracker({ donations, stats, volunteers }) {
             textAlign: "center",
           }}
         >
-          {donations.length === 0
+          {donationData.length === 0
             ? "No donation data available. Connect Salesforce (SF_LIVE=true) to see donations."
             : "No donations match the current filters."}
         </p>
@@ -666,10 +913,10 @@ export default function DonorTracker({ donations, stats, volunteers }) {
                 <DonorRow
                   key={donation.sfId}
                   donation={donation}
-                  isThankYouSent={!!thankYouMap[donation.sfId]}
                   onToggleThankYou={toggleThankYou}
                   onCreateDraft={createDraft}
                   draftState={draftState}
+                  saveState={saveState}
                   repeatDonorEmails={repeatDonorEmails}
                 />
               ))}
@@ -691,9 +938,9 @@ export default function DonorTracker({ donations, stats, volunteers }) {
           lineHeight: 1.5,
         }}
       >
-        &quot;Create draft&quot; places a ready-to-send email in your @steel-hearts.org Gmail Drafts folder.
-        Review, personalize if needed, then hit Send in Gmail.
-        Thank-you tracking is stored locally in this browser until the Salesforce Thank_You_Sent__c field is configured.
+        Thank-you status is saved to Salesforce and visible to all team members.
+        &quot;Create draft&quot; places a ready-to-send email in your @steel-hearts.org
+        Gmail Drafts folder. Review, personalize if needed, then hit Send in Gmail.
       </div>
     </div>
   );

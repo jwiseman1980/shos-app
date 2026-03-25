@@ -61,7 +61,7 @@ export default function Sidebar({ user }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <div className="sidebar-brand-icon">SH</div>
+        <img src="/brand/steel-hearts-logo-gold.svg" alt="Steel Hearts" style={{ width: 36, height: 36, flexShrink: 0 }} />
         <div>
           <div className="sidebar-brand-text">Steel Hearts</div>
           <div className="sidebar-brand-sub">Operating System</div>

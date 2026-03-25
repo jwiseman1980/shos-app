@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
+import { sfQuery, sfUpdate } from "@/lib/salesforce";
 import bcrypt from "bcryptjs";
-import fs from "fs";
-import path from "path";
 
 export async function POST(request) {
   try {
@@ -21,29 +20,30 @@ export async function POST(request) {
       return NextResponse.json({ error: "New password must be at least 8 characters" }, { status: 400 });
     }
 
-    // Read volunteers file
-    const filePath = path.join(process.cwd(), "data", "volunteers.json");
-    const volunteers = JSON.parse(fs.readFileSync(filePath, "utf8"));
-
-    const volunteer = volunteers.find(
-      (v) => v.email.toLowerCase() === user.email.toLowerCase()
+    // Get current hash from SF
+    const contacts = await sfQuery(
+      `SELECT Id, App_Password_Hash__c FROM Contact WHERE Email = '${user.email.replace(/'/g, "\\'")}' LIMIT 1`
     );
-    if (!volunteer) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+    if (contacts.length === 0) {
+      return NextResponse.json({ error: "User not found in Salesforce" }, { status: 404 });
     }
 
+    const contact = contacts[0];
+
     // Verify current password
-    const match = await bcrypt.compare(currentPassword, volunteer.passwordHash);
+    if (!contact.App_Password_Hash__c) {
+      return NextResponse.json({ error: "No password set — contact admin" }, { status: 400 });
+    }
+
+    const match = await bcrypt.compare(currentPassword, contact.App_Password_Hash__c);
     if (!match) {
       return NextResponse.json({ error: "Current password is incorrect" }, { status: 401 });
     }
 
-    // Hash new password and update
+    // Hash new password and update SF
     const newHash = await bcrypt.hash(newPassword, 10);
-    volunteer.passwordHash = newHash;
-
-    // Write back
-    fs.writeFileSync(filePath, JSON.stringify(volunteers, null, 2));
+    await sfUpdate("Contact", contact.Id, { App_Password_Hash__c: newHash });
 
     return NextResponse.json({ success: true, message: "Password updated" });
   } catch (error) {

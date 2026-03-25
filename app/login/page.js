@@ -39,6 +39,7 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <form className="login-box" onSubmit={handleSubmit}>
+        <img src="/brand/steel-hearts-logo-gold.svg" alt="Steel Hearts" style={{ width: 64, height: 64, margin: "0 auto 12px", display: "block" }} />
         <h1>SHOS</h1>
         <p className="login-subtitle">Steel Hearts Operating System</p>
         {error && <p className="login-error">{error}</p>}

@@ -7,6 +7,7 @@ import AnniversaryTracker from "@/components/AnniversaryTracker";
 import { getAnniversariesByMonth } from "@/lib/data/heroes";
 import { getVolunteers } from "@/lib/data/volunteers";
 import { getMonthName, getCurrentMonth, getCurrentYear, getDayOfMonth, yearsSince } from "@/lib/dates";
+import { getSessionUser } from "@/lib/auth";
 import Link from "next/link";
 
 const MONTH_OPTIONS = [
@@ -43,6 +44,7 @@ export default async function AnniversariesPage({ searchParams }) {
   // Load data
   const allHeroes = await getAnniversariesByMonth(selectedMonth);
   const volunteers = await getVolunteers();
+  const currentUser = await getSessionUser();
 
   // Email-team volunteers (those with Anniversary Emails domain)
   const emailVolunteers = volunteers.filter(
@@ -64,33 +66,49 @@ export default async function AnniversariesPage({ searchParams }) {
   }
 
   // Sort by day of month and add computed fields for client
+  // Heroes with no family contact are flagged as "Research" tasks for Joseph
   const sorted = [...heroes]
     .sort((a, b) => {
       return (getDayOfMonth(a.memorialDate) || a.anniversaryDay || 0) -
         (getDayOfMonth(b.memorialDate) || b.anniversaryDay || 0);
     })
-    .map((hero) => ({
-      ...hero,
-      dayOfMonth: getDayOfMonth(hero.memorialDate) || hero.anniversaryDay || 0,
-      years: yearsSince(hero.memorialDate),
-    }));
+    .map((hero) => {
+      const needsResearch = !hero.familyContactId;
+      const currentStatus = normalizeStatus(hero.anniversaryStatus);
+      const isActionable = currentStatus === "not_assigned" || currentStatus === "not_started" || currentStatus === "escalated";
+      return {
+        ...hero,
+        dayOfMonth: getDayOfMonth(hero.memorialDate) || hero.anniversaryDay || 0,
+        years: yearsSince(hero.memorialDate),
+        // Auto-flag as research if no family contact and not in a completed/sent/skipped status
+        ...(needsResearch && isActionable ? {
+          anniversaryStatus: "Research",
+          anniversaryAssignedTo: hero.anniversaryAssignedTo || "Joseph Wiseman",
+          anniversaryNotes: hero.anniversaryNotes || "No family contact data — research needed",
+        } : {}),
+      };
+    });
 
-  // Compute stats from ALL heroes this month (before filtering)
-  const totalThisMonth = allHeroes.length;
-  const completedCount = allHeroes.filter((h) => {
+  // Compute stats from sorted heroes (which includes research flagging)
+  const totalThisMonth = sorted.length;
+  const completedCount = sorted.filter((h) => {
     const s = normalizeStatus(h.anniversaryStatus);
     return s === "complete" || s === "completed" || s === "sent";
   }).length;
-  const inProgressCount = allHeroes.filter((h) => {
+  const inProgressCount = sorted.filter((h) => {
     const s = normalizeStatus(h.anniversaryStatus);
     return s === "in_progress" || s === "assigned";
   }).length;
-  const escalatedCount = allHeroes.filter((h) => {
+  const researchCount = sorted.filter((h) => {
+    const s = normalizeStatus(h.anniversaryStatus);
+    return s === "research";
+  }).length;
+  const escalatedCount = sorted.filter((h) => {
     const s = normalizeStatus(h.anniversaryStatus);
     return s === "escalated" || s === "skipped";
   }).length;
-  const notStartedCount = totalThisMonth - completedCount - inProgressCount - escalatedCount;
-  const assignedCount = allHeroes.filter((h) => h.anniversaryAssignedTo).length;
+  const notStartedCount = totalThisMonth - completedCount - inProgressCount - researchCount - escalatedCount;
+  const assignedCount = sorted.filter((h) => h.anniversaryAssignedTo).length;
 
   const today = new Date().getDate();
 
@@ -159,6 +177,14 @@ export default async function AnniversariesPage({ searchParams }) {
           value={notStartedCount}
           accent="var(--status-gray)"
         />
+        {researchCount > 0 && (
+          <StatBlock
+            label="Research"
+            value={researchCount}
+            note="No family contact"
+            accent="var(--status-orange)"
+          />
+        )}
         {escalatedCount > 0 && (
           <StatBlock
             label="Escalated"
@@ -207,6 +233,7 @@ export default async function AnniversariesPage({ searchParams }) {
             { key: "in_progress", label: "In Progress" },
             { key: "sent", label: "Sent" },
             { key: "complete", label: "Complete" },
+            { key: "research", label: "Research" },
             { key: "escalated", label: "Escalated" },
           ].map((s) => (
             <Link
@@ -274,6 +301,7 @@ export default async function AnniversariesPage({ searchParams }) {
             isCurrentMonth={isCurrentMonth}
             volunteers={emailVolunteers}
             today={today}
+            currentUser={currentUser}
           />
         )}
       </DataCard>

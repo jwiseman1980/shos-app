@@ -9,6 +9,7 @@ const STATUS_OPTIONS = [
   { value: "In Progress", label: "In Progress", key: "in_progress" },
   { value: "Sent", label: "Sent", key: "sent" },
   { value: "Complete", label: "Complete", key: "complete" },
+  { value: "Research", label: "Research", key: "research" },
   { value: "Escalated", label: "Escalated", key: "escalated" },
   { value: "Skipped", label: "Skipped", key: "skipped" },
 ];
@@ -29,6 +30,7 @@ function statusLabel(status) {
     email_sent: "Sent",
     complete: "Complete",
     completed: "Complete",
+    research: "Research",
     escalated: "Escalated",
     skipped: "Skipped",
     blocked: "Escalated",
@@ -295,12 +297,25 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
 
       {/* Draft Email */}
       <td>
-        {draftState === "creating" ? (
+        {!hero.familyContactId ? (
+          <span
+            style={{
+              fontSize: 10,
+              color: "var(--status-orange)",
+              fontWeight: 600,
+              padding: "3px 8px",
+              background: "rgba(245, 158, 11, 0.1)",
+              borderRadius: "var(--radius-sm)",
+              whiteSpace: "nowrap",
+            }}
+            title="No family contact — research task for Joseph"
+          >
+            Research Needed
+          </span>
+        ) : draftState === "creating" ? (
           <span style={{ fontSize: 10, color: "var(--gold)" }}>creating...</span>
         ) : draftState === "created" ? (
           <span style={{ fontSize: 10, color: "var(--status-green)" }}>draft created</span>
-        ) : draftState === "no_family" ? (
-          <span style={{ fontSize: 10, color: "var(--status-red)" }}>no family contact</span>
         ) : draftState === "error" ? (
           <span style={{ fontSize: 10, color: "var(--status-red)" }}>failed</span>
         ) : (
@@ -318,7 +333,7 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
               cursor: senderIdentity ? "pointer" : "not-allowed",
               whiteSpace: "nowrap",
             }}
-            title={senderIdentity ? `Create draft in ${senderIdentity.email}` : "Select your identity first"}
+            title={senderIdentity ? `Create draft in ${senderIdentity.email}` : "Not logged in"}
           >
             Create Draft
           </button>
@@ -328,45 +343,25 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
   );
 }
 
-const SENDER_KEY = "shos_anniversary_sender";
-
 export default function AnniversaryTracker({
   heroes,
   monthName,
   isCurrentMonth,
   volunteers,
   today,
+  currentUser,
 }) {
   const [heroData, setHeroData] = useState(heroes);
-  const [senderIdentity, setSenderIdentity] = useState(null);
+
+  // Derive sender identity from the logged-in user
+  const senderIdentity = currentUser?.email
+    ? { email: currentUser.email, name: currentUser.name || currentUser.email.split("@")[0] }
+    : null;
 
   // Sync heroData when heroes prop changes (e.g. month switch)
   useEffect(() => {
     setHeroData(heroes);
   }, [heroes]);
-
-  // Load saved sender from localStorage on mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(SENDER_KEY);
-      if (saved) {
-        try { setSenderIdentity(JSON.parse(saved)); } catch {}
-      }
-    }
-  }, []);
-
-  const handleSenderChange = (e) => {
-    const email = e.target.value;
-    if (!email) {
-      setSenderIdentity(null);
-      localStorage.removeItem(SENDER_KEY);
-      return;
-    }
-    const vol = volunteers.find((v) => v.email === email);
-    const identity = { email, name: vol?.name || email.split("@")[0] };
-    setSenderIdentity(identity);
-    localStorage.setItem(SENDER_KEY, JSON.stringify(identity));
-  };
 
   // Track updates for local state (optimistic UI)
   const handleUpdate = useCallback((sfId, fields) => {
@@ -392,33 +387,18 @@ export default function AnniversaryTracker({
 
   return (
     <div style={{ overflowX: "auto" }}>
-      {/* Sender Identity Picker */}
+      {/* Logged-in user indicator */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, padding: "8px 0" }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
           Sending as:
         </span>
-        <select
-          value={senderIdentity?.email || ""}
-          onChange={handleSenderChange}
-          style={{
-            background: "var(--bg)",
-            color: senderIdentity ? "var(--text-bright)" : "var(--text-dim)",
-            border: "1px solid var(--card-border)",
-            borderRadius: "var(--radius-sm)",
-            padding: "4px 8px",
-            fontSize: 12,
-          }}
-        >
-          <option value="">Select your identity...</option>
-          {volunteers.map((v) => (
-            <option key={v.email} value={v.email}>
-              {v.name} ({v.email})
-            </option>
-          ))}
-        </select>
-        {senderIdentity && (
-          <span style={{ fontSize: 11, color: "var(--status-green)" }}>
-            Drafts will be created in {senderIdentity.email}
+        {senderIdentity ? (
+          <span style={{ fontSize: 12, color: "var(--status-green)" }}>
+            {senderIdentity.name} ({senderIdentity.email})
+          </span>
+        ) : (
+          <span style={{ fontSize: 12, color: "var(--status-red)" }}>
+            Not logged in
           </span>
         )}
       </div>
