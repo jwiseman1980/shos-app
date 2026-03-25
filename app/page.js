@@ -23,6 +23,22 @@ export default async function DashboardPage() {
     ]);
 
   // Try to load optional data (may fail if SF not connected)
+  // Get today's completed tasks from SF
+  let todayCompletedSops = [];
+  try {
+    if (process.env.SF_LIVE === "true") {
+      const { sfQuery } = await import("@/lib/salesforce");
+      const today = new Date().toISOString().split("T")[0];
+      const runs = await sfQuery(
+        `SELECT Task_Reference__c FROM Task_Log__c WHERE Task_Type__c = 'SOP Run' AND DAY_ONLY(Completed_At__c) = ${today}`
+      );
+      todayCompletedSops = runs.map((r) => {
+        const match = r.Task_Reference__c?.match(/^(SOP[^:]+)/);
+        return match ? match[1].trim() : "";
+      }).filter(Boolean);
+    }
+  } catch {}
+
   let donationStats = null;
   let recentDonations = [];
   let designStats = null;
@@ -74,6 +90,7 @@ export default async function DashboardPage() {
         designQueue={designQueue}
         orderStats={orderStats}
         orderItems={orderItems}
+        todayCompletedSops={todayCompletedSops}
         monthName={monthName}
       />
     </PageShell>

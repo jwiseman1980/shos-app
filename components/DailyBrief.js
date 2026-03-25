@@ -87,15 +87,18 @@ export default function DailyBrief({
   designQueue = [],
   orderStats,
   orderItems = [],
+  todayCompletedSops = [],
   monthName,
 }) {
   const isAdmin = user?.isFounder || user?.domains?.includes("All");
   const userName = user?.name?.split(" ")[0] || "there";
 
-  // Track which SOPs were completed today
-  const [completedSopIds, setCompletedSopIds] = useState([]);
+  // Track which SOPs were completed today — SF data + localStorage fallback
+  const [completedSopIds, setCompletedSopIds] = useState(todayCompletedSops);
   useEffect(() => {
-    setCompletedSopIds(getTodayCompletedSops());
+    // Merge localStorage completions with SF data
+    const local = getTodayCompletedSops();
+    setCompletedSopIds((prev) => [...new Set([...prev, ...local])]);
   }, []);
 
   // Filter anniversary heroes assigned to this user
