@@ -164,12 +164,7 @@ function ShipStationTable({ orders }) {
 export default async function OrdersPage() {
   let sfItems = [], sfStats = {}, ssAwaiting = [], ssRecent = [], ssError = null, reconciled = null;
 
-  // Auto-reconcile shipped orders on page load
-  try {
-    reconciled = await reconcileWithShipStation();
-  } catch (err) {
-    console.warn("Reconciliation skipped:", err.message);
-  }
+  // Reconciliation removed from page load — too slow. Use /api/orders/reconcile instead.
 
   try {
     [sfItems, sfStats] = await Promise.all([
