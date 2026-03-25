@@ -546,49 +546,6 @@
     ]
   },
   {
-    "id": "SOP-OP-001",
-    "title": "SHOS Daily & Governance Quick Reference",
-    "version": "v2.0",
-    "domain": "System Core",
-    "cadence": "Daily",
-    "status": "active",
-    "owner": "Joseph Wiseman",
-    "type": "procedure",
-    "summary": "Master daily checklist and governance cadence reference card",
-    "steps": [
-      {
-        "step": 1,
-        "title": "Open SHOS Hub / Active Work Surface",
-        "detail": "Open the SHOS Team Hub and active Notion work surface. Review assigned views, queues, and memorial cycle work.",
-        "who": "joseph"
-      },
-      {
-        "step": 2,
-        "title": "Execute required SOPs",
-        "detail": "Run SOP-001 (Daily Social Media). Check Order Queue for new orders (SOP-INV-001). Check email for new requests.",
-        "who": "joseph"
-      },
-      {
-        "step": 3,
-        "title": "Log structural friction",
-        "detail": "If any process friction observed, log it as a deviation or improvement note for the next governance review.",
-        "who": "joseph"
-      },
-      {
-        "step": 4,
-        "title": "Weekly: Review Backlog & Promotion Briefs",
-        "detail": "Review backlog items. Review any Promotion Briefs. Optionally run SOP-014 (weekly amplification).",
-        "who": "joseph"
-      },
-      {
-        "step": 5,
-        "title": "Monthly: Export KPIs & Run SOP-015",
-        "detail": "Export Tier 1 KPIs. Run SOP-015 (Monthly Social Media Performance Review). Document Monthly Review Note.",
-        "who": "joseph"
-      }
-    ]
-  },
-  {
     "id": "SOP-SYNC-001",
     "title": "Automated Notion-SF Reconciliation",
     "version": "v1.0",
