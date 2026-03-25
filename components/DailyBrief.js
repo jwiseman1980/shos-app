@@ -245,8 +245,10 @@ export default function DailyBrief({
     });
   }
 
-  // Sort by priority
+  // Sort by priority, cap at 20 items
   actionItems.sort((a, b) => a.priority - b.priority);
+  const visibleItems = actionItems.slice(0, 20);
+  const hiddenCount = actionItems.length - visibleItems.length;
 
   // Team progress for admin
   const teamProgress = isAdmin
@@ -326,13 +328,21 @@ export default function DailyBrief({
       {/* Action Items */}
       <div className="section">
         <DataCard title={`Action Items (${actionItems.length})`}>
-          {actionItems.length > 0 ? (
+          {visibleItems.length > 0 ? (
             <div>
-              {actionItems.map((item, i) => (
+              {visibleItems.map((item, i) => (
                 <ActionRow key={i} icon={item.icon} label={item.label} source={item.source} href={item.href}>
                   {item.detail}
                 </ActionRow>
               ))}
+              {hiddenCount > 0 && (
+                <div style={{ padding: "12px 0", textAlign: "center", fontSize: 12, color: "var(--text-dim)" }}>
+                  + {hiddenCount} more items across{" "}
+                  <Link href="/anniversaries" style={{ color: "var(--gold)" }}>Anniversaries</Link>,{" "}
+                  <Link href="/orders" style={{ color: "var(--gold)" }}>Orders</Link>,{" "}
+                  <Link href="/donors" style={{ color: "var(--gold)" }}>Donors</Link>
+                </div>
+              )}
             </div>
           ) : (
             <div style={{ padding: "24px 0", textAlign: "center", color: "var(--status-green)", fontSize: 14 }}>
