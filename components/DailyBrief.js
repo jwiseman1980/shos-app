@@ -274,10 +274,12 @@ export default function DailyBrief({
     });
   }
 
-  // Sort by priority, cap at 20 items
+  // Split into active and completed, sort by priority
   actionItems.sort((a, b) => a.priority - b.priority);
-  const visibleItems = actionItems.slice(0, 20);
-  const hiddenCount = actionItems.length - visibleItems.length;
+  const completedItems = actionItems.filter((i) => i.isDone);
+  const activeItems = actionItems.filter((i) => !i.isDone);
+  const visibleItems = activeItems.slice(0, 20);
+  const hiddenCount = activeItems.length - visibleItems.length;
 
   // Team progress for admin
   const teamProgress = isAdmin
@@ -356,11 +358,11 @@ export default function DailyBrief({
 
       {/* Action Items */}
       <div className="section">
-        <DataCard title={`Action Items (${actionItems.length})`}>
+        <DataCard title={`Action Items (${activeItems.length})`}>
           {visibleItems.length > 0 ? (
             <div>
               {visibleItems.map((item, i) => (
-                <ActionRow key={i} icon={item.icon} label={item.label} source={item.source} href={item.href} isDone={item.isDone}>
+                <ActionRow key={i} icon={item.icon} label={item.label} source={item.source} href={item.href}>
                   {item.detail}
                 </ActionRow>
               ))}
@@ -380,6 +382,21 @@ export default function DailyBrief({
           )}
         </DataCard>
       </div>
+
+      {/* Completed Today */}
+      {completedItems.length > 0 && (
+        <div className="section">
+          <DataCard title={`Completed Today (${completedItems.length})`}>
+            <div>
+              {completedItems.map((item, i) => (
+                <ActionRow key={i} icon={item.icon} label={item.label} source={item.source} href={item.href} isDone={true}>
+                  {item.detail}
+                </ActionRow>
+              ))}
+            </div>
+          </DataCard>
+        </div>
+      )}
 
       {/* Anniversary Progress */}
       {thisMonthHeroes.length > 0 && (
