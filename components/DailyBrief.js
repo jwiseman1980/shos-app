@@ -66,7 +66,9 @@ export default function DailyBrief({
   donationStats,
   recentDonations = [],
   designStats,
+  designQueue = [],
   orderStats,
+  orderItems = [],
   monthName,
 }) {
   const isAdmin = user?.isFounder || user?.domains?.includes("All");
@@ -91,58 +93,156 @@ export default function DailyBrief({
   // Unthank'd donations (last 7 days)
   const unthankedDonations = recentDonations.filter((d) => !d.thankYouSent);
 
-  // Build action items
+  // Order items breakdown
+  const needsDecision = orderItems.filter((o) => o.productionStatus === "Needs Decision");
+  const designNeeded = orderItems.filter((o) => o.productionStatus === "Design Needed" || o.productionStatus === "Design In Progress");
+  const readyToLaser = orderItems.filter((o) => o.productionStatus === "Ready to Laser");
+  const inProduction = orderItems.filter((o) => o.productionStatus === "In Production");
+  const readyToShip = orderItems.filter((o) => o.productionStatus === "Ready to Ship");
+
+  // Build action items — SOPs are tasks, not a separate category
   const actionItems = [];
+
+  // Daily tasks (SOPs rendered as tasks, not "Run SOP-001")
+  sopsDueToday.forEach((s) => {
+    // Friendly task name — strip SOP prefix
+    const taskName = s.title.replace(/^(Daily |Monthly |Weekly )/, "");
+    actionItems.push({
+      icon: "\u2611",
+      label: taskName,
+      detail: `${s.timeBox || "15-20 min"}`,
+      source: s.cadence,
+      href: `/sops/${s.id}`,
+      priority: 1,
+    });
+  });
 
   // Anniversary emails for this user
   myPending.forEach((h) => {
     actionItems.push({
       icon: "\u2605",
-      label: `Send anniversary email for ${h.name}`,
+      label: `Anniversary email: ${h.name}`,
       detail: h.familyEmail ? `Family: ${h.familyEmail}` : "No family email — needs research",
       source: "Anniversary",
       href: "/anniversaries",
-      priority: h.familyEmail ? 1 : 3,
+      priority: h.familyEmail ? 2 : 4,
     });
   });
 
-  // SOPs due today
-  sopsDueToday.forEach((s) => {
-    actionItems.push({
-      icon: "\u2611",
-      label: `Run ${s.id}: ${s.title}`,
-      detail: `${s.cadence} \u00b7 ${s.timeBox || "15-20 min"}`,
-      source: "SOP",
-      href: `/sops/${s.id}`,
-      priority: 2,
-    });
-  });
-
-  // Admin-only items
+  // Admin/Founder tasks
   if (isAdmin) {
+    // Orders needing triage
+    needsDecision.forEach((o) => {
+      actionItems.push({
+        icon: "\u2692",
+        label: `Triage order: ${o.name || o.sku}`,
+        detail: `${o.customerName || "Unknown"} \u00b7 ${o.orderType || ""}`,
+        source: "Order",
+        href: "/orders",
+        priority: 1,
+      });
+    });
+
+    // Bracelets ready to laser
+    if (readyToLaser.length > 0) {
+      actionItems.push({
+        icon: "\u2604",
+        label: `${readyToLaser.length} bracelet${readyToLaser.length > 1 ? "s" : ""} ready to laser`,
+        detail: readyToLaser.map((o) => o.sku || o.name).slice(0, 3).join(", "),
+        source: "Production",
+        href: "/laser",
+        priority: 1,
+      });
+    }
+
+    // In production
+    if (inProduction.length > 0) {
+      actionItems.push({
+        icon: "\u2604",
+        label: `${inProduction.length} in production`,
+        detail: inProduction.map((o) => o.sku || o.name).slice(0, 3).join(", "),
+        source: "Production",
+        href: "/laser",
+        priority: 3,
+      });
+    }
+
+    // Ready to ship (assign to Kristin)
+    if (readyToShip.length > 0) {
+      actionItems.push({
+        icon: "\u{1F4E6}",
+        label: `${readyToShip.length} ready to ship`,
+        detail: "Ship to Kristin for fulfillment",
+        source: "Shipping",
+        href: "/orders",
+        priority: 2,
+      });
+    }
+
+    // Design tasks to assign/review
+    designQueue.forEach((d) => {
+      if (d.designStatus === "Queued") {
+        actionItems.push({
+          icon: "\u270E",
+          label: `Assign design: ${d.name}`,
+          detail: d.designBrief ? d.designBrief.substring(0, 60) + "..." : "Send to Ryan",
+          source: "Design",
+          href: "/designs",
+          priority: 2,
+        });
+      } else if (d.designStatus === "Submitted") {
+        actionItems.push({
+          icon: "\u270E",
+          label: `Review design: ${d.name}`,
+          detail: "Ryan submitted — needs your approval",
+          source: "Design",
+          href: "/designs",
+          priority: 1,
+        });
+      }
+    });
+
     // Unthank'd donors
     unthankedDonations.forEach((d) => {
       actionItems.push({
         icon: "\u2665",
-        label: `Thank ${d.donorName || d.donorEmail} for $${d.amount} donation`,
+        label: `Thank ${d.donorName || d.donorEmail} ($${d.amount})`,
         detail: new Date(d.donationDate).toLocaleDateString(),
         source: "Donor",
         href: "/donors",
-        priority: 2,
+        priority: 3,
       });
     });
+  }
 
-    // Design tasks
-    if (designStats && (designStats.queued > 0 || designStats.inProgress > 0)) {
+  // Kristin sees shipping tasks
+  if (user?.name === "Kristin Hughes") {
+    if (readyToShip.length > 0) {
       actionItems.push({
-        icon: "\u270E",
-        label: `${designStats.queued + designStats.inProgress} design tasks need attention`,
-        detail: `${designStats.queued} queued, ${designStats.inProgress} in progress`,
-        source: "Design",
-        href: "/designs",
-        priority: 2,
+        icon: "\u{1F4E6}",
+        label: `${readyToShip.length} bracelet${readyToShip.length > 1 ? "s" : ""} to ship`,
+        detail: readyToShip.map((o) => o.sku || o.name).slice(0, 3).join(", "),
+        source: "Shipping",
+        href: "/orders",
+        priority: 1,
       });
     }
+  }
+
+  // Ryan sees design tasks
+  if (user?.name === "Ryan Santana") {
+    designQueue.forEach((d) => {
+      if (d.designStatus === "Queued" || d.designStatus === "In Progress") {
+        actionItems.push({
+          icon: "\u270E",
+          label: `Design: ${d.name}`,
+          detail: d.designBrief ? d.designBrief.substring(0, 60) + "..." : "",
+          source: "Design",
+          href: "/designs",
+          priority: d.designPriority === "Urgent" ? 1 : 2,
+        });
+      }
+    });
   }
 
   // Sort by priority
@@ -345,28 +445,29 @@ export default function DailyBrief({
         </div>
       )}
 
-      {/* SOP Quick-Run */}
-      {sopsDueToday.length > 0 && (
+      {/* Order Pipeline Summary — admin only */}
+      {isAdmin && orderItems.length > 0 && (
         <div className="section">
-          <DataCard title={`SOPs Due Today (${sopsDueToday.length})`}>
-            {sopsDueToday.map((s) => (
-              <div key={s.id} style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "8px 0", borderBottom: "1px solid var(--card-border)",
-              }}>
-                <div>
-                  <span style={{ fontSize: 13, color: "var(--text-bright)", fontWeight: 500 }}>{s.title}</span>
-                  <span style={{ fontSize: 11, color: "var(--text-dim)", marginLeft: 8 }}>{s.cadence} {"\u00b7"} {s.timeBox || ""}</span>
+          <DataCard title="Order Pipeline">
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+              {[
+                { label: "Needs Decision", count: needsDecision.length, color: "#ef4444" },
+                { label: "Design", count: designNeeded.length, color: "#f59e0b" },
+                { label: "Ready to Laser", count: readyToLaser.length, color: "#3b82f6" },
+                { label: "In Production", count: inProduction.length, color: "#8b5cf6" },
+                { label: "Ready to Ship", count: readyToShip.length, color: "#22c55e" },
+              ].filter(s => s.count > 0).map((s) => (
+                <div key={s.label} style={{ textAlign: "center", minWidth: 80 }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: s.color }}>{s.count}</div>
+                  <div style={{ fontSize: 11, color: "var(--text-dim)" }}>{s.label}</div>
                 </div>
-                <Link href={`/sops/${s.id}`} style={{
-                  fontSize: 11, padding: "4px 12px", borderRadius: 6,
-                  background: "#3b82f622", color: "#3b82f6",
-                  textDecoration: "none", fontWeight: 600,
-                }}>
-                  Run
-                </Link>
-              </div>
-            ))}
+              ))}
+            </div>
+            <div style={{ marginTop: 12, textAlign: "right" }}>
+              <Link href="/orders" style={{ fontSize: 12, color: "var(--gold)", textDecoration: "none" }}>
+                View Full Queue {"\u2192"}
+              </Link>
+            </div>
           </DataCard>
         </div>
       )}

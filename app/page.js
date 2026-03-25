@@ -26,7 +26,9 @@ export default async function DashboardPage() {
   let donationStats = null;
   let recentDonations = [];
   let designStats = null;
+  let designQueue = [];
   let orderStats = null;
+  let orderItems = [];
 
   try {
     const { getDonationStats, getDonations } = await import("@/lib/data/donations");
@@ -41,8 +43,15 @@ export default async function DashboardPage() {
   } catch {}
 
   try {
-    const { getDesignStats } = await import("@/lib/data/designs");
+    const { getDesignStats, getDesignQueue } = await import("@/lib/data/designs");
     designStats = await getDesignStats();
+    designQueue = await getDesignQueue();
+  } catch {}
+
+  try {
+    const { getOrderStats, getActiveOrderItems } = await import("@/lib/data/orders");
+    orderStats = await getOrderStats();
+    orderItems = await getActiveOrderItems();
   } catch {}
 
   const monthName = getMonthName(getCurrentMonth());
@@ -62,7 +71,9 @@ export default async function DashboardPage() {
         donationStats={donationStats}
         recentDonations={recentDonations}
         designStats={designStats}
+        designQueue={designQueue}
         orderStats={orderStats}
+        orderItems={orderItems}
         monthName={monthName}
       />
     </PageShell>
