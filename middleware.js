@@ -59,8 +59,11 @@ export async function middleware(request) {
   }
 
   const userEmail = await verifyAndExtract(session.value, secret);
-  if (!userEmail) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  if (!userEmail || !userEmail.includes("@")) {
+    // Invalid or old-format session — force re-login
+    const response = NextResponse.redirect(new URL("/login", request.url));
+    response.cookies.delete(SESSION_COOKIE);
+    return response;
   }
 
   // Pass user email to server components via header
