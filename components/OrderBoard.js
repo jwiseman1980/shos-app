@@ -136,12 +136,8 @@ function OrderCard({ order, onItemStatusChange, section = "default" }) {
                 <th style={thStyle}>SKU</th>
                 <th style={{ ...thStyle, textAlign: "center" }}>Qty</th>
                 <th style={thStyle}>Size</th>
-                {section === "laser" ? (
-                  <th style={thStyle}>SVG</th>
-                ) : section === "ship" ? (
-                  null
-                ) : (
-                  <th style={thStyle}>Design</th>
+                {section !== "ship" && (
+                  <th style={thStyle}>{section === "laser" ? "SVG" : "Design"}</th>
                 )}
                 <th style={thStyle}>Status</th>
               </tr>
@@ -163,25 +159,23 @@ function OrderCard({ order, onItemStatusChange, section = "default" }) {
                   <td style={{ ...tdStyle, fontSize: 12, color: "var(--text-dim)" }}>
                     {item.size === "Regular-7in" ? '7"' : item.size === "Small-6in" ? '6"' : item.size || "\u2014"}
                   </td>
-                  {section === "laser" ? (
+                  {section !== "ship" && (
                     <td style={tdStyle}>
-                      {item.designUrl ? (
-                        <a href={item.designUrl} target="_blank" rel="noopener"
-                          style={{ color: "var(--status-green)", textDecoration: "none", fontSize: 12, fontWeight: 600 }}>
-                          {"\u2B07"} Download
-                        </a>
+                      {section === "laser" ? (
+                        item.designUrl ? (
+                          <a href={item.designUrl} target="_blank" rel="noopener"
+                            style={{ color: "var(--status-green)", textDecoration: "none", fontSize: 12, fontWeight: 600 }}>
+                            {"\u2B07"} Download
+                          </a>
+                        ) : (
+                          <span style={{ color: "var(--status-green)", fontSize: 11 }}>In SF</span>
+                        )
                       ) : (
-                        <span style={{ color: "var(--text-dim)", fontSize: 11 }}>In SF</span>
-                      )}
-                    </td>
-                  ) : section === "ship" ? (
-                    null
-                  ) : (
-                    <td style={{ ...tdStyle, textAlign: "center" }}>
-                      {item.hasDesign ? (
-                        <span style={{ color: "var(--status-green)", fontSize: 12 }}>{"\u2713"}</span>
-                      ) : (
-                        <span style={{ color: "var(--status-orange)", fontSize: 11 }}>Needed</span>
+                        item.hasDesign ? (
+                          <span style={{ color: "var(--status-green)", fontSize: 12 }}>{"\u2713"}</span>
+                        ) : (
+                          <span style={{ color: "var(--status-orange)", fontSize: 11 }}>Needed</span>
+                        )
                       )}
                     </td>
                   )}
