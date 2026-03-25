@@ -32,8 +32,9 @@ const NAV_GROUPS = [
   {
     label: "Engagement",
     items: [
+      { href: "/messages", icon: "\u2709", label: "Family Messages" },
       { href: "/donors", icon: "\u2665", label: "Donor Engagement" },
-      { href: "/email", icon: "\u2709", label: "Email Composer" },
+      { href: "/email", icon: "\u270E", label: "Email Composer" },
     ],
   },
   {
@@ -42,6 +43,7 @@ const NAV_GROUPS = [
       { href: "/volunteers", icon: "\u263A", label: "Volunteers" },
       { href: "/org", icon: "\u2630", label: "Org Chart" },
       { href: "/finance", icon: "\u0024", label: "Finance" },
+      { href: "/settings", icon: "\u2699", label: "Settings" },
     ],
   },
 ];
