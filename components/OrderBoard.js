@@ -33,7 +33,7 @@ function StatusBadge({ status }) {
   );
 }
 
-function OrderCard({ order, onItemStatusChange }) {
+function OrderCard({ order, onItemStatusChange, section = "default" }) {
   const [expanded, setExpanded] = useState(true);
   const [updating, setUpdating] = useState({});
 
@@ -136,7 +136,13 @@ function OrderCard({ order, onItemStatusChange }) {
                 <th style={thStyle}>SKU</th>
                 <th style={{ ...thStyle, textAlign: "center" }}>Qty</th>
                 <th style={thStyle}>Size</th>
-                <th style={thStyle}>Design</th>
+                {section === "laser" ? (
+                  <th style={thStyle}>SVG</th>
+                ) : section === "ship" ? (
+                  null
+                ) : (
+                  <th style={thStyle}>Design</th>
+                )}
                 <th style={thStyle}>Status</th>
               </tr>
             </thead>
@@ -157,13 +163,28 @@ function OrderCard({ order, onItemStatusChange }) {
                   <td style={{ ...tdStyle, fontSize: 12, color: "var(--text-dim)" }}>
                     {item.size === "Regular-7in" ? '7"' : item.size === "Small-6in" ? '6"' : item.size || "\u2014"}
                   </td>
-                  <td style={{ ...tdStyle, textAlign: "center" }}>
-                    {item.hasDesign ? (
-                      <span style={{ color: "var(--status-green)", fontSize: 12 }}>{"\u2713"}</span>
-                    ) : (
-                      <span style={{ color: "var(--status-orange)", fontSize: 11 }}>Needed</span>
-                    )}
-                  </td>
+                  {section === "laser" ? (
+                    <td style={tdStyle}>
+                      {item.designUrl ? (
+                        <a href={item.designUrl} target="_blank" rel="noopener"
+                          style={{ color: "var(--status-green)", textDecoration: "none", fontSize: 12, fontWeight: 600 }}>
+                          {"\u2B07"} Download
+                        </a>
+                      ) : (
+                        <span style={{ color: "var(--text-dim)", fontSize: 11 }}>In SF</span>
+                      )}
+                    </td>
+                  ) : section === "ship" ? (
+                    null
+                  ) : (
+                    <td style={{ ...tdStyle, textAlign: "center" }}>
+                      {item.hasDesign ? (
+                        <span style={{ color: "var(--status-green)", fontSize: 12 }}>{"\u2713"}</span>
+                      ) : (
+                        <span style={{ color: "var(--status-orange)", fontSize: 11 }}>Needed</span>
+                      )}
+                    </td>
+                  )}
                   <td style={tdStyle}>
                     <select
                       value={item.productionStatus}
@@ -262,9 +283,9 @@ export default function OrderBoard({ orders: initialOrders = [] }) {
       )}
 
       {inProduction.length > 0 && (
-        <Section title={`In Production (${inProduction.length})`} color="#3b82f6">
+        <Section title={`Laser Queue (${inProduction.length})`} color="#3b82f6">
           {inProduction.map((o) => (
-            <OrderCard key={o.id} order={o} onItemStatusChange={handleItemStatusChange} />
+            <OrderCard key={o.id} order={o} onItemStatusChange={handleItemStatusChange} section="laser" />
           ))}
         </Section>
       )}
@@ -272,7 +293,7 @@ export default function OrderBoard({ orders: initialOrders = [] }) {
       {readyToShip.length > 0 && (
         <Section title={`Ready to Ship (${readyToShip.length})`} color="#22c55e">
           {readyToShip.map((o) => (
-            <OrderCard key={o.id} order={o} onItemStatusChange={handleItemStatusChange} />
+            <OrderCard key={o.id} order={o} onItemStatusChange={handleItemStatusChange} section="ship" />
           ))}
         </Section>
       )}
