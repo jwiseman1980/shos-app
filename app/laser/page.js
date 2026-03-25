@@ -92,45 +92,43 @@ export default async function LaserPage() {
                     <th style={thStyle}>SKU</th>
                     <th style={thStyle}>Qty</th>
                     <th style={thStyle}>Size</th>
-                    <th style={thStyle}>Design</th>
+                    <th style={thStyle}>SVG</th>
                     <th style={thStyle}>Customer</th>
                     <th style={thStyle}>Order</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {laserQueue.map((item) => (
-                    <tr key={item.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
-                      <td style={tdStyle}>
-                        <div style={{ fontWeight: 500, color: "var(--text-bright)" }}>{item.name}</div>
-                      </td>
-                      <td style={tdStyle}>
-                        <span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--text-dim)" }}>
-                          {item.sku || "\u2014"}
-                        </span>
-                      </td>
-                      <td style={{ ...tdStyle, textAlign: "center", color: "var(--text-bright)" }}>{item.quantity}</td>
-                      <td style={{ ...tdStyle, fontSize: 12, color: "var(--text-dim)" }}>
-                        {item.size === "Regular-7in" ? '7"' : item.size === "Small-6in" ? '6"' : item.size || "\u2014"}
-                      </td>
-                      <td style={tdStyle}>
-                        {item.hasDesign && item.designUrl ? (
-                          <a href={item.designUrl} target="_blank" rel="noopener"
+                  {laserQueue.map((item) => {
+                    const baseSku = (item.sku || "").replace(/-[67]$/, "").replace(/-[67]D$/, "").replace(/_-D$/, "").replace(/-D$/, "");
+                    const downloadUrl = baseSku ? `/api/designs/download?sku=${encodeURIComponent(baseSku)}` : "";
+                    return (
+                      <tr key={item.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
+                        <td style={tdStyle}>
+                          <div style={{ fontWeight: 500, color: "var(--text-bright)" }}>{item.name}</div>
+                        </td>
+                        <td style={tdStyle}>
+                          <span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--text-dim)" }}>
+                            {item.sku || "\u2014"}
+                          </span>
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: "center", color: "var(--text-bright)" }}>{item.quantity}</td>
+                        <td style={{ ...tdStyle, fontSize: 12, color: "var(--text-dim)" }}>
+                          {item.size === "Regular-7in" ? '7"' : item.size === "Small-6in" ? '6"' : item.size || "\u2014"}
+                        </td>
+                        <td style={tdStyle}>
+                          <a href={downloadUrl} target="_blank" rel="noopener"
                             style={{ color: "var(--status-green)", textDecoration: "none", fontSize: 12, fontWeight: 600 }}>
-                            {"\u2B07"} Download SVG
+                            {"\u2B07"} Download
                           </a>
-                        ) : item.hasDesign ? (
-                          <span style={{ color: "var(--status-green)", fontSize: 12 }}>{"\u2713"} Has design</span>
-                        ) : (
-                          <span style={{ color: "var(--status-orange)", fontSize: 12 }}>No design</span>
-                        )}
-                      </td>
-                      <td style={tdStyle}>
-                        <div style={{ fontSize: 12, color: "var(--text-bright)" }}>{item.customerName}</div>
-                        {item.shipTo && <div style={{ fontSize: 11, color: "var(--text-dim)" }}>{item.shipTo}</div>}
-                      </td>
-                      <td style={{ ...tdStyle, fontSize: 11, color: "var(--text-dim)" }}>{item.orderName}</td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td style={tdStyle}>
+                          <div style={{ fontSize: 12, color: "var(--text-bright)" }}>{item.customerName}</div>
+                          {item.shipTo && <div style={{ fontSize: 11, color: "var(--text-dim)" }}>{item.shipTo}</div>}
+                        </td>
+                        <td style={{ ...tdStyle, fontSize: 11, color: "var(--text-dim)" }}>{item.orderName}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
