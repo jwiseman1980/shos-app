@@ -48,9 +48,26 @@ async function getInventoryData() {
 export default async function InventoryPage() {
   const { heroes, totals } = await getInventoryData();
 
-  const highStock = heroes.filter((h) => h.total >= 10);
-  const medStock = heroes.filter((h) => h.total >= 4 && h.total < 10);
-  const lowStockItems = heroes.filter((h) => h.total <= 3);
+  // Sort by last name (extract from hero name or SKU)
+  const getLastName = (h) => {
+    const sku = h.sku || "";
+    const parts = sku.split("-");
+    // Group bracelets don't have a simple last name — they have keywords like CLASS, SOAR, RUGBY, etc.
+    const isGroup = /CLASS|SOAR|RUGBY|NIGHTSTALKERS|HKIA|NYNG|BP|SPRINT|MEMORIAL|FALLEN/i.test(sku);
+    if (isGroup) return null;
+    // Last segment before size suffix is the name
+    const namePart = parts.length >= 2 ? parts[parts.length - 1].replace(/^(7|6|D)$/, "") || parts[parts.length - 2] : "";
+    return namePart || h.name;
+  };
+
+  const individualHeroes = heroes.filter((h) => getLastName(h) !== null)
+    .sort((a, b) => (getLastName(a) || "").localeCompare(getLastName(b) || ""));
+  const groupBracelets = heroes.filter((h) => getLastName(h) === null)
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const lowStockItems = individualHeroes.filter((h) => h.total <= 3);
+  const medStock = individualHeroes.filter((h) => h.total >= 4 && h.total < 10);
+  const highStock = individualHeroes.filter((h) => h.total >= 10);
 
   return (
     <PageShell title="Inventory Burnout" subtitle="Legacy pre-made bracelet stock — burns down to zero">
@@ -112,6 +129,17 @@ export default async function InventoryPage() {
         <div className="section">
           <DataCard title={`Medium Stock (${medStock.length} SKUs with 4-9)`}>
             <InventoryTable items={medStock} />
+          </DataCard>
+        </div>
+      )}
+
+      {groupBracelets.length > 0 && (
+        <div className="section">
+          <DataCard title={`Group / Unit Bracelets (${groupBracelets.length})`}>
+            <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
+              Class, unit, and memorial event bracelets — not individual heroes.
+            </div>
+            <InventoryTable items={groupBracelets} />
           </DataCard>
         </div>
       )}
