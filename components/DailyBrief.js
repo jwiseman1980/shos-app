@@ -1,9 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import StatBlock from "@/components/StatBlock";
 import DataCard from "@/components/DataCard";
+
+const SOP_HISTORY_KEY = "shos-sop-run-history";
+
+function getTodayCompletedSops() {
+  try {
+    const history = JSON.parse(localStorage.getItem(SOP_HISTORY_KEY) || "[]");
+    const today = new Date().toDateString();
+    return history
+      .filter((r) => new Date(r.completedAt).toDateString() === today)
+      .map((r) => r.sopId);
+  } catch {
+    return [];
+  }
+}
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -12,15 +26,19 @@ function getGreeting() {
   return "Good evening";
 }
 
-function ActionRow({ icon, label, source, children, href }) {
+function ActionRow({ icon, label, source, children, href, isDone }) {
   return (
     <div style={{
       display: "flex", alignItems: "flex-start", gap: 12,
       padding: "10px 0", borderBottom: "1px solid var(--card-border)",
+      opacity: isDone ? 0.5 : 1,
     }}>
       <span style={{ fontSize: 16, flexShrink: 0, width: 24, textAlign: "center" }}>{icon}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, color: "var(--text-bright)", fontWeight: 500 }}>{label}</div>
+        <div style={{
+          fontSize: 13, color: isDone ? "var(--text-dim)" : "var(--text-bright)", fontWeight: 500,
+          textDecoration: isDone ? "line-through" : "none",
+        }}>{label.replace(/~~/g, "")}</div>
         {children && <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 2 }}>{children}</div>}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -74,6 +92,12 @@ export default function DailyBrief({
   const isAdmin = user?.isFounder || user?.domains?.includes("All");
   const userName = user?.name?.split(" ")[0] || "there";
 
+  // Track which SOPs were completed today
+  const [completedSopIds, setCompletedSopIds] = useState([]);
+  useEffect(() => {
+    setCompletedSopIds(getTodayCompletedSops());
+  }, []);
+
   // Filter anniversary heroes assigned to this user
   const myAnniversaries = thisMonthHeroes.filter(
     (h) => h.anniversaryAssignedTo === user?.name
@@ -104,16 +128,18 @@ export default function DailyBrief({
   const actionItems = [];
 
   // Daily tasks (SOPs rendered as tasks, not "Run SOP-001")
+  // Completed SOPs show as done, incomplete ones show as action items
   sopsDueToday.forEach((s) => {
-    // Friendly task name — strip SOP prefix
+    const isDone = completedSopIds.includes(s.id);
     const taskName = s.title.replace(/^(Daily |Monthly |Weekly )/, "");
     actionItems.push({
-      icon: "\u2611",
-      label: taskName,
-      detail: `${s.timeBox || "15-20 min"}`,
+      icon: isDone ? "\u2705" : "\u2611",
+      label: isDone ? `~~${taskName}~~` : taskName,
+      detail: isDone ? "Completed today" : `${s.timeBox || "15-20 min"}`,
       source: s.cadence,
       href: `/sops/${s.id}`,
-      priority: 1,
+      priority: isDone ? 99 : 1, // Push completed to bottom
+      isDone,
     });
   });
 
@@ -287,9 +313,9 @@ export default function DailyBrief({
         />
         <StatBlock
           label="SOPs Due Today"
-          value={sopsDueToday.length}
-          note={sopsDueToday.length > 0 ? sopsDueToday.map((s) => s.id).join(", ") : "None due"}
-          accent={sopsDueToday.length > 0 ? "var(--status-blue)" : "var(--status-green)"}
+          value={`${completedSopIds.filter(id => sopsDueToday.some(s => s.id === id)).length}/${sopsDueToday.length}`}
+          note={sopsDueToday.length > 0 ? sopsDueToday.map((s) => completedSopIds.includes(s.id) ? `~${s.id}~` : s.id).join(", ") : "None due"}
+          accent={completedSopIds.filter(id => sopsDueToday.some(s => s.id === id)).length === sopsDueToday.length && sopsDueToday.length > 0 ? "var(--status-green)" : "var(--status-blue)"}
         />
         {isAdmin && (
           <>
@@ -331,7 +357,7 @@ export default function DailyBrief({
           {visibleItems.length > 0 ? (
             <div>
               {visibleItems.map((item, i) => (
-                <ActionRow key={i} icon={item.icon} label={item.label} source={item.source} href={item.href}>
+                <ActionRow key={i} icon={item.icon} label={item.label} source={item.source} href={item.href} isDone={item.isDone}>
                   {item.detail}
                 </ActionRow>
               ))}
