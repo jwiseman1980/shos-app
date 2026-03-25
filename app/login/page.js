@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,14 +19,15 @@ export default function LoginPage() {
       const res = await fetch("/api/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ email, password }),
       });
 
       if (res.ok) {
         router.push("/");
         router.refresh();
       } else {
-        setError("Invalid password");
+        const data = await res.json();
+        setError(data.error || "Invalid credentials");
       }
     } catch {
       setError("Connection error");
@@ -41,12 +43,21 @@ export default function LoginPage() {
         <p className="login-subtitle">Steel Hearts Operating System</p>
         {error && <p className="login-error">{error}</p>}
         <input
+          type="email"
+          className="login-input"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoFocus
+          autoComplete="email"
+        />
+        <input
           type="password"
           className="login-input"
-          placeholder="Enter password"
+          placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          autoFocus
+          autoComplete="current-password"
         />
         <button type="submit" className="login-btn" disabled={loading}>
           {loading ? "Signing in..." : "Sign In"}

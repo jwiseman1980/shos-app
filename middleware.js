@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 
 const SESSION_COOKIE = "shos_session";
 
-async function verify(signed, secret) {
+async function verifyAndExtract(signed, secret) {
   const idx = signed.lastIndexOf(".");
-  if (idx === -1) return false;
+  if (idx === -1) return null;
   const value = signed.slice(0, idx);
   const providedSig = signed.slice(idx + 1);
 
@@ -21,7 +21,11 @@ async function verify(signed, secret) {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
-  return expectedSig === providedSig;
+  if (expectedSig !== providedSig) return null;
+
+  // Extract email from payload (email:timestamp:random)
+  const email = value.split(":")[0];
+  return email || null;
 }
 
 export async function middleware(request) {
@@ -50,12 +54,19 @@ export async function middleware(request) {
   const session = request.cookies.get(SESSION_COOKIE);
   const secret = process.env.SESSION_SECRET || "fallback-dev-secret";
 
-  if (!session || !(await verify(session.value, secret))) {
-    const loginUrl = new URL("/login", request.url);
-    return NextResponse.redirect(loginUrl);
+  if (!session) {
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  return NextResponse.next();
+  const userEmail = await verifyAndExtract(session.value, secret);
+  if (!userEmail) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  // Pass user email to server components via header
+  const response = NextResponse.next();
+  response.headers.set("x-user-email", userEmail);
+  return response;
 }
 
 export const config = {

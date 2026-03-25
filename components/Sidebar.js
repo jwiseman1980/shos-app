@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 const NAV_GROUPS = [
   {
     label: "Operations",
     items: [
-      { href: "/", icon: "\u2302", label: "Dashboard" },
+      { href: "/", icon: "\u2302", label: "Daily Brief" },
       { href: "/sops", icon: "\u2611", label: "SOP Runner" },
     ],
   },
@@ -45,8 +45,15 @@ const NAV_GROUPS = [
   },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ user }) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    document.cookie = "shos_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    router.push("/login");
+    router.refresh();
+  };
 
   return (
     <aside className="sidebar">
@@ -77,7 +84,37 @@ export default function Sidebar() {
       </nav>
 
       <div className="sidebar-footer">
-        SHOS v0.1 &middot; Internal Use Only
+        {user && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: "50%",
+              background: user.color || "#1e3a5f",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 11, fontWeight: 700, color: "#fff", flexShrink: 0,
+            }}>
+              {user.initials}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-bright)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {user.name}
+              </div>
+              <div style={{ fontSize: 10, color: "var(--text-dim)" }}>{user.role}</div>
+            </div>
+            <button
+              onClick={handleLogout}
+              style={{
+                background: "none", border: "none", color: "var(--text-dim)",
+                cursor: "pointer", fontSize: 11, padding: "2px 6px",
+              }}
+              title="Sign out"
+            >
+              {"\u2192"}
+            </button>
+          </div>
+        )}
+        <div style={{ fontSize: 10, color: "var(--text-dim)" }}>
+          SHOS v0.2 &middot; Internal Use Only
+        </div>
       </div>
     </aside>
   );

@@ -1,16 +1,34 @@
 import { NextResponse } from "next/server";
-import { createSession, checkPassword, SESSION_COOKIE, SESSION_MAX_AGE } from "@/lib/auth";
+import {
+  createSession,
+  authenticateUser,
+  SESSION_COOKIE,
+  SESSION_MAX_AGE,
+} from "@/lib/auth";
 
 export async function POST(request) {
   const body = await request.json();
-  const { password } = body;
+  const { email, password } = body;
 
-  if (!checkPassword(password)) {
-    return NextResponse.json({ error: "Invalid password" }, { status: 401 });
+  const volunteer = await authenticateUser(email, password);
+  if (!volunteer) {
+    return NextResponse.json(
+      { error: "Invalid email or password" },
+      { status: 401 }
+    );
   }
 
-  const session = createSession();
-  const response = NextResponse.json({ ok: true });
+  const session = createSession(volunteer.email);
+  const response = NextResponse.json({
+    ok: true,
+    user: {
+      name: volunteer.name,
+      email: volunteer.email,
+      role: volunteer.role,
+      initials: volunteer.initials,
+      isFounder: volunteer.isFounder || false,
+    },
+  });
 
   response.cookies.set(SESSION_COOKIE, session, {
     httpOnly: true,
