@@ -131,11 +131,11 @@ function DesignTable({ items, showStatus = true, showPriority = true, showBrief 
 }
 
 export default async function DesignsPage() {
-  const [queue, needsDesign, stats] = await Promise.all([
+  const [queue, stats] = await Promise.all([
     getDesignQueue(),
-    getNeedsDesign(),
     getDesignStats(),
   ]);
+  const needsDesign = [];
 
   const totalActive = stats.queued + stats.inProgress + stats.submitted;
 
