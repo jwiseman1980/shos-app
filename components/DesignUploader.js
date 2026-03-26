@@ -176,7 +176,7 @@ function DesignCard({ item, onStatusChange, onUpload }) {
               </span>
             </div>
             <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
-              File should be named {item.sku}.svg
+              Name files: {item.sku}-7.svg (7") and {item.sku}-6.svg (6")
             </div>
             <input
               ref={fileRef}
