@@ -26,6 +26,7 @@ const NAV_GROUPS = [
       { href: "/designs", icon: "\u270E", label: "Design Queue" },
       { href: "/bracelets", icon: "\u25CB", label: "Bracelet Pipeline" },
       { href: "/laser", icon: "\u2604", label: "Laser Production" },
+      { href: "/shipping", icon: "\u{1F4E6}", label: "Shipping Queue" },
       { href: "/inventory", icon: "\u2193", label: "Inventory Burnout" },
     ],
   },
