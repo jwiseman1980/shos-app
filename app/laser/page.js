@@ -4,6 +4,7 @@ import PageShell from "@/components/PageShell";
 import DataCard from "@/components/DataCard";
 import StatBlock from "@/components/StatBlock";
 import { getItemsByStatus } from "@/lib/data/orders";
+import LaserQueue from "@/components/LaserQueue";
 
 const PRODUCTION_PRESETS = [
   { name: "Green/Teal", color: "#5fb89a", hex: "#5fb89a", power: 15, speed: 200, freq: 65, source: "D1.1", desc: "Mint/seafoam green" },
@@ -82,56 +83,9 @@ export default async function LaserPage() {
         <div className="section">
           <DataCard title={`Laser Queue (${laserQueue.length} items)`}>
             <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
-              Items ready to burn. Max 3 per run. Download SVG, load in xTool Creative Studio, apply Success 6 settings.
+              Items ready to burn. Max 3 per run. Download SVG, load in xTool Creative Studio, apply Success 6 settings. Hit Done when finished.
             </div>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ borderBottom: "1px solid var(--card-border)" }}>
-                    <th style={thStyle}>Item</th>
-                    <th style={thStyle}>SKU</th>
-                    <th style={thStyle}>Qty</th>
-                    <th style={thStyle}>Size</th>
-                    <th style={thStyle}>SVG</th>
-                    <th style={thStyle}>Customer</th>
-                    <th style={thStyle}>Order</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {laserQueue.map((item) => {
-                    const baseSku = (item.sku || "").replace(/-[67]$/, "").replace(/-[67]D$/, "").replace(/_-D$/, "").replace(/-D$/, "");
-                    const downloadUrl = baseSku ? `/api/designs/download?sku=${encodeURIComponent(baseSku)}` : "";
-                    return (
-                      <tr key={item.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
-                        <td style={tdStyle}>
-                          <div style={{ fontWeight: 500, color: "var(--text-bright)" }}>{item.name}</div>
-                        </td>
-                        <td style={tdStyle}>
-                          <span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--text-dim)" }}>
-                            {item.sku || "\u2014"}
-                          </span>
-                        </td>
-                        <td style={{ ...tdStyle, textAlign: "center", color: "var(--text-bright)" }}>{item.quantity}</td>
-                        <td style={{ ...tdStyle, fontSize: 12, color: "var(--text-dim)" }}>
-                          {item.size === "Regular-7in" ? '7"' : item.size === "Small-6in" ? '6"' : item.size || "\u2014"}
-                        </td>
-                        <td style={tdStyle}>
-                          <a href={downloadUrl} target="_blank" rel="noopener"
-                            style={{ color: "var(--status-green)", textDecoration: "none", fontSize: 12, fontWeight: 600 }}>
-                            {"\u2B07"} Download
-                          </a>
-                        </td>
-                        <td style={tdStyle}>
-                          <div style={{ fontSize: 12, color: "var(--text-bright)" }}>{item.customerName}</div>
-                          {item.shipTo && <div style={{ fontSize: 11, color: "var(--text-dim)" }}>{item.shipTo}</div>}
-                        </td>
-                        <td style={{ ...tdStyle, fontSize: 11, color: "var(--text-dim)" }}>{item.orderName}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <LaserQueue items={laserQueue} />
           </DataCard>
         </div>
       )}
