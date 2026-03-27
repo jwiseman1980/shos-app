@@ -1,8 +1,10 @@
+"use client";
+
+import { useState } from "react";
 import PageShell from "@/components/PageShell";
 import DataCard from "@/components/DataCard";
+import RoleChat from "@/components/RoleChat";
 import Link from "next/link";
-
-export const dynamic = "force-dynamic";
 
 const COMMS_COLOR = "#8e44ad";
 
@@ -38,6 +40,7 @@ const QUICKLINKS = [
 ];
 
 export default function CommsPage() {
+  const [chatOpen, setChatOpen] = useState(false);
   return (
     <PageShell
       title="Communications"
@@ -67,11 +70,11 @@ export default function CommsPage() {
         <button
           className="talk-to-role-btn"
           style={{ background: COMMS_COLOR, color: "#fff", flexShrink: 0 }}
-          disabled
-          title="Coming in next build — requires Claude API integration"
+          onClick={() => setChatOpen(true)}
         >
           Talk to Comms →
         </button>
+        {chatOpen && <RoleChat role="comms" onClose={() => setChatOpen(false)} />}
       </div>
 
       {/* Quick links */}

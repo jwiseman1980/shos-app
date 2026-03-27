@@ -1,8 +1,10 @@
+"use client";
+
+import { useState } from "react";
 import PageShell from "@/components/PageShell";
 import DataCard from "@/components/DataCard";
+import RoleChat from "@/components/RoleChat";
 import Link from "next/link";
-
-export const dynamic = "force-dynamic";
 
 const COO_COLOR = "#e67e22";
 
@@ -43,6 +45,7 @@ const QUICKLINKS = [
 ];
 
 export default function CooPage() {
+  const [chatOpen, setChatOpen] = useState(false);
   return (
     <PageShell
       title="COO"
@@ -72,11 +75,11 @@ export default function CooPage() {
         <button
           className="talk-to-role-btn"
           style={{ background: COO_COLOR, color: "#0a0a0e", flexShrink: 0 }}
-          disabled
-          title="Coming in next build — requires Claude API integration"
+          onClick={() => setChatOpen(true)}
         >
           Talk to COO →
         </button>
+        {chatOpen && <RoleChat role="coo" onClose={() => setChatOpen(false)} />}
       </div>
 
       {/* Quick links */}

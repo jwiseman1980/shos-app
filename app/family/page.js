@@ -1,8 +1,10 @@
+"use client";
+
+import { useState } from "react";
 import PageShell from "@/components/PageShell";
 import DataCard from "@/components/DataCard";
+import RoleChat from "@/components/RoleChat";
 import Link from "next/link";
-
-export const dynamic = "force-dynamic";
 
 const FAMILY_COLOR = "#e74c3c";
 
@@ -39,6 +41,7 @@ const QUICKLINKS = [
 ];
 
 export default function FamilyPage() {
+  const [chatOpen, setChatOpen] = useState(false);
   return (
     <PageShell
       title="Family Relations"
@@ -68,11 +71,11 @@ export default function FamilyPage() {
         <button
           className="talk-to-role-btn"
           style={{ background: FAMILY_COLOR, color: "#fff", flexShrink: 0 }}
-          disabled
-          title="Coming in next build — requires Claude API integration"
+          onClick={() => setChatOpen(true)}
         >
           Talk to Family →
         </button>
+        {chatOpen && <RoleChat role="family" onClose={() => setChatOpen(false)} />}
       </div>
 
       {/* Quick links */}

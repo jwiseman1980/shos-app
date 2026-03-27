@@ -1,8 +1,10 @@
+"use client";
+
+import { useState } from "react";
 import PageShell from "@/components/PageShell";
 import DataCard from "@/components/DataCard";
+import RoleChat from "@/components/RoleChat";
 import Link from "next/link";
-
-export const dynamic = "force-dynamic";
 
 const DEV_COLOR = "#3498db";
 
@@ -38,6 +40,7 @@ const QUICKLINKS = [
 ];
 
 export default function DevPage() {
+  const [chatOpen, setChatOpen] = useState(false);
   return (
     <PageShell
       title="Development"
@@ -67,11 +70,11 @@ export default function DevPage() {
         <button
           className="talk-to-role-btn"
           style={{ background: DEV_COLOR, color: "#fff", flexShrink: 0 }}
-          disabled
-          title="Coming in next build — requires Claude API integration"
+          onClick={() => setChatOpen(true)}
         >
           Talk to Dev →
         </button>
+        {chatOpen && <RoleChat role="dev" onClose={() => setChatOpen(false)} />}
       </div>
 
       {/* Build status callout */}
