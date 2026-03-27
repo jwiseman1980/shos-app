@@ -17,16 +17,16 @@ export const ROLE_COLORS = {
 const NAV_ROLES = [
   {
     role: "ed",
-    label: "Executive Director",
+    label: "Command",
     href: "/",
     items: [
-      { href: "/", label: "Command", exact: true },
+      { href: "/", label: "Daily Brief", exact: true },
       { href: "/gyst", label: "Personal" },
     ],
   },
   {
     role: "cos",
-    label: "Chief of Staff",
+    label: "Governance",
     href: "/cos",
     items: [
       { href: "/cos", label: "Overview", exact: true },
@@ -38,7 +38,7 @@ const NAV_ROLES = [
   },
   {
     role: "cfo",
-    label: "CFO",
+    label: "Finance",
     href: "/finance",
     items: [
       { href: "/finance", label: "Overview", exact: true },
@@ -53,7 +53,7 @@ const NAV_ROLES = [
   },
   {
     role: "coo",
-    label: "COO",
+    label: "Operations",
     href: "/coo",
     items: [
       { href: "/coo", label: "Overview", exact: true },
