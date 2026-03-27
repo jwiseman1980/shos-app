@@ -133,6 +133,38 @@ const TOOLS = [
       required: ["soql"],
     },
   },
+  {
+    name: "app_query",
+    description: `Query the SHOS app's internal API to get live operational data. Use this to look up orders, shipping queues, designs, donors, families, anniversaries, finances, and more.
+
+Available endpoints:
+- /api/orders — all orders (use ?status=shipped|pending|etc to filter)
+- /api/orders/triage — orders needing action (design needed, ready to ship, etc.)
+- /api/anniversaries — upcoming anniversaries
+- /api/designs — design queue
+- /api/donors — donor list
+- /api/families — family records
+- /api/messages — family messages
+- /api/heroes — hero records
+- /api/briefing — daily brief data (action items, KPIs)
+- /api/finance/obligations — obligation tracker
+- /api/finance/org-balances — org balances
+- /api/finance/disbursements — disbursement records
+- /api/finance/expenses — expense records
+- /api/finance/donations-received — donations received
+
+Always use app_query (not sf_query) when a user asks about orders, shipping, designs, or other app data. sf_query is for direct Salesforce SOQL only.`,
+    input_schema: {
+      type: "object",
+      properties: {
+        endpoint: {
+          type: "string",
+          description: "The API endpoint path, e.g. /api/orders or /api/orders?status=pending",
+        },
+      },
+      required: ["endpoint"],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -232,6 +264,37 @@ function executeFlagToRole(sourceRole, targetRole, message, priority) {
   }
 }
 
+async function executeAppQuery(endpoint) {
+  try {
+    // Build base URL — works on Vercel and locally
+    const base = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+
+    // Ensure endpoint starts with /
+    const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+    const url = `${base}${path}`;
+
+    const res = await fetch(url, {
+      headers: {
+        // Use SHOS_API_KEY to bypass middleware auth — same bypass used by external integrations
+        "x-api-key": process.env.SHOS_API_KEY || "",
+      },
+    });
+
+    if (!res.ok) {
+      return `API request failed: ${res.status} ${res.statusText} for ${endpoint}`;
+    }
+
+    const data = await res.json();
+    // Limit response size to avoid token blowout
+    const text = JSON.stringify(data, null, 2);
+    return text.length > 8000 ? text.slice(0, 8000) + "\n...(truncated)" : text;
+  } catch (e) {
+    return `App query failed: ${e.message}`;
+  }
+}
+
 async function executeSfQuery(soql) {
   if (process.env.SF_LIVE !== "true") {
     return "Salesforce is not connected (SF_LIVE is not true). Query not executed.";
@@ -261,6 +324,8 @@ async function handleToolCall(role, toolName, toolInput) {
       return executeFlagToRole(role, toolInput.target_role, toolInput.message, toolInput.priority);
     case "sf_query":
       return await executeSfQuery(toolInput.soql);
+    case "app_query":
+      return await executeAppQuery(toolInput.endpoint);
     default:
       return `Unknown tool: ${toolName}`;
   }
