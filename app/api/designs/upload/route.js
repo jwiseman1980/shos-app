@@ -25,8 +25,11 @@ export async function POST(request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const stream = Readable.from(buffer);
 
-    // Upload to Google Drive
-    const driveResult = await uploadDesignSVG(stream, sku);
+    // Upload to Google Drive — pass original filename so size variants are preserved
+    // e.g., USMA23-MORTON-7.svg stays as-is instead of being renamed to USMA23-MORTON.svg
+    const rawName = file.name || "";
+    const originalFileName = rawName.endsWith(".svg") ? rawName : `${sku}.svg`;
+    const driveResult = await uploadDesignSVG(stream, sku, originalFileName);
 
     // Update SF record with design URL and mark as complete
     if (heroId && process.env.SF_LIVE === "true") {

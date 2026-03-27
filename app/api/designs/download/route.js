@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { sfQuery } from "@/lib/salesforce";
 
 /**
- * GET /api/designs/download?sku=USMA23-MORTON
+ * GET /api/designs/download?sku=USMA23-MORTON-7
  * Serves the SVG file attached to a Memorial_Bracelet__c record.
- * Finds the hero by SKU, gets the SVG ContentDocument, returns the file.
+ * Size-aware: if SKU includes a size suffix (-6, -7, -6D, -7D), looks for
+ * the size-specific SVG first, then falls back to base SKU.
  */
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -15,8 +16,10 @@ export async function GET(request) {
   }
 
   try {
-    // Strip size suffix to get base SKU
-    const baseSku = sku.replace(/-[67]$/, "").replace(/-[67]D$/, "").replace(/_-D$/, "").replace(/-D$/, "");
+    // Extract size and base SKU
+    const sizeMatch = sku.match(/-([67])D?$/);
+    const size = sizeMatch ? sizeMatch[1] : null;
+    const baseSku = sku.replace(/-[67]D?$/, "").replace(/_-D$/, "").replace(/-D$/, "");
 
     // Find hero
     const heroes = await sfQuery(
@@ -42,9 +45,26 @@ export async function GET(request) {
       return NextResponse.json({ error: `No SVG found for ${baseSku}` }, { status: 404 });
     }
 
+    // If size specified, try to find size-specific SVG first
+    let targetSvg = null;
+    if (size && svgs.length > 1) {
+      targetSvg = svgs.find((f) => {
+        const title = (f.ContentDocument?.Title || "").toUpperCase();
+        return title.includes(`-${size}`) || title.includes(`_${size}`);
+      });
+    }
+    // Fall back to first SVG if no size match or no size specified
+    if (!targetSvg) {
+      // If size specified and multiple SVGs exist, warn but still serve something
+      if (size && svgs.length > 1) {
+        console.warn(`No size-${size} SVG found for ${baseSku}, serving first available`);
+      }
+      targetSvg = svgs[0];
+    }
+
     // Get the file content via ContentVersion
-    const versionId = svgs[0].ContentDocument.LatestPublishedVersionId;
-    const title = svgs[0].ContentDocument.Title;
+    const versionId = targetSvg.ContentDocument.LatestPublishedVersionId;
+    const title = targetSvg.ContentDocument.Title;
 
     // Get access token for direct download
     const tokenRes = await fetch("https://login.salesforce.com/services/oauth2/token", {

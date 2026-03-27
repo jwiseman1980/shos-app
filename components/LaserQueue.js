@@ -10,12 +10,27 @@ export default function LaserQueue({ items: initialItems = [] }) {
   const [updating, setUpdating] = useState({});
 
   const handleDone = async (itemId, itemName) => {
+    // Confirmation before advancing to ship queue
+    if (!window.confirm(`Mark "${itemName}" as done and move to shipping queue?`)) {
+      return;
+    }
+    await updateStatus(itemId, "Ready to Ship", itemName);
+  };
+
+  const handleMoveBack = async (itemId, itemName) => {
+    if (!window.confirm(`Move "${itemName}" back to Design Queue?`)) {
+      return;
+    }
+    await updateStatus(itemId, "Design Needed", itemName);
+  };
+
+  const updateStatus = async (itemId, status, itemName) => {
     setUpdating((prev) => ({ ...prev, [itemId]: true }));
     try {
       const res = await fetch("/api/orders", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId, status: "Ready to Ship", heroName: itemName }),
+        body: JSON.stringify({ itemId, status, heroName: itemName }),
       });
       const data = await res.json();
       if (data.success) {
@@ -53,8 +68,8 @@ export default function LaserQueue({ items: initialItems = [] }) {
         </thead>
         <tbody>
           {items.map((item) => {
-            const baseSku = (item.sku || "").replace(/-[67]$/, "").replace(/-[67]D$/, "").replace(/_-D$/, "").replace(/-D$/, "");
-            const downloadUrl = baseSku ? `/api/designs/download?sku=${encodeURIComponent(baseSku)}` : "";
+            // Use full SKU (with size) for download so correct size variant is served
+            const downloadUrl = item.sku ? `/api/designs/download?sku=${encodeURIComponent(item.sku)}` : "";
             return (
               <tr key={item.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
                 <td style={tdStyle}>
@@ -81,19 +96,35 @@ export default function LaserQueue({ items: initialItems = [] }) {
                 </td>
                 <td style={{ ...tdStyle, fontSize: 11, color: "var(--text-dim)" }}>{item.orderName}</td>
                 <td style={tdStyle}>
-                  <button
-                    onClick={() => handleDone(item.id, item.name)}
-                    disabled={updating[item.id]}
-                    style={{
-                      padding: "5px 12px", fontSize: 11, fontWeight: 600,
-                      borderRadius: 6, border: "none", cursor: "pointer",
-                      background: "#22c55e22", color: "#22c55e",
-                      opacity: updating[item.id] ? 0.5 : 1,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {updating[item.id] ? "..." : "\u2713 Done"}
-                  </button>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      onClick={() => handleMoveBack(item.id, item.name)}
+                      disabled={updating[item.id]}
+                      title="Move back to design queue"
+                      style={{
+                        padding: "5px 10px", fontSize: 11, fontWeight: 600,
+                        borderRadius: 6, border: "1px solid #6b7280", cursor: "pointer",
+                        background: "transparent", color: "#6b7280",
+                        opacity: updating[item.id] ? 0.5 : 1,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {"\u2190"} Back
+                    </button>
+                    <button
+                      onClick={() => handleDone(item.id, item.name)}
+                      disabled={updating[item.id]}
+                      style={{
+                        padding: "5px 14px", fontSize: 11, fontWeight: 600,
+                        borderRadius: 6, border: "1px solid #2563eb", cursor: "pointer",
+                        background: "#2563eb", color: "#fff",
+                        opacity: updating[item.id] ? 0.5 : 1,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {updating[item.id] ? "Saving..." : "Mark Done"}
+                    </button>
+                  </div>
                 </td>
               </tr>
             );

@@ -35,8 +35,12 @@ function DesignCard({ item, onStatusChange, onUpload }) {
   const fileRef = useRef(null);
 
   const handleFile = async (file) => {
-    if (!file || !file.name.endsWith(".svg")) {
-      setUploadResult({ error: "Only SVG files accepted" });
+    if (!file) {
+      setUploadResult({ error: "No file received — try clicking 'browse' instead of drag-drop" });
+      return;
+    }
+    if (!file.name.toLowerCase().endsWith(".svg")) {
+      setUploadResult({ error: `Only SVG files accepted (got: ${file.name})` });
       return;
     }
     setUploading(true);
