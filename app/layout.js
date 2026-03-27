@@ -1,5 +1,6 @@
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
+import FloatingRoleChat from "@/components/FloatingRoleChat";
 import { isAuthenticated, getSessionUser } from "@/lib/auth";
 import { headers } from "next/headers";
 
@@ -28,6 +29,7 @@ export default async function RootLayout({ children }) {
           <div className="app-layout">
             <Sidebar user={user} />
             <main className="app-content">{children}</main>
+            <FloatingRoleChat />
           </div>
         ) : (
           children
