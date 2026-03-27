@@ -1,6 +1,7 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync } from "fs";
 import { join } from "path";
 import { isAuthenticated } from "@/lib/auth";
+import { readKnowledge, writeKnowledge, logFriction as storageLogFriction } from "@/lib/storage/index.js";
 
 export const dynamic = "force-dynamic";
 
@@ -171,25 +172,12 @@ Always use app_query (not sf_query) when a user asks about orders, shipping, des
 // Tool execution
 // ---------------------------------------------------------------------------
 
-function executeReadContextFile(role) {
-  const filename = CONTEXT_FILES[role];
-  if (!filename) return `No context file configured for role: ${role}`;
-  try {
-    return readFileSync(join(process.cwd(), filename), "utf8");
-  } catch {
-    return `Context file ${filename} not found or unreadable.`;
-  }
+async function executeReadContextFile(role) {
+  return await readKnowledge(role);
 }
 
-function executeUpdateContextFile(role, content) {
-  const filename = CONTEXT_FILES[role];
-  if (!filename) return `No context file configured for role: ${role}`;
-  try {
-    writeFileSync(join(process.cwd(), filename), content, "utf8");
-    return `Context file ${filename} updated successfully.`;
-  } catch (e) {
-    return `Failed to update context file: ${e.message}`;
-  }
+async function executeUpdateContextFile(role, content) {
+  return await writeKnowledge(role, content);
 }
 
 function executeReadShosState() {
@@ -200,26 +188,8 @@ function executeReadShosState() {
   }
 }
 
-function executeLogFriction(role, type, priority, description) {
-  try {
-    const frictionPath = join(process.cwd(), "FRICTION_LOG.md");
-    const content = existsSync(frictionPath)
-      ? readFileSync(frictionPath, "utf8")
-      : "# Friction Log\n\n## Open Items\n\n| Date | Role | Type | Priority | Description | Status |\n|------|------|------|----------|-------------|--------|\n";
-
-    const date = new Date().toISOString().split("T")[0];
-    const newRow = `| ${date} | ${ROLE_NAMES[role] || role} | ${type} | ${priority} | ${description} | open |`;
-
-    // Insert before the Done section or at end of table
-    const updated = content.includes("## Done")
-      ? content.replace("## Done", `${newRow}\n\n## Done`)
-      : content + "\n" + newRow;
-
-    writeFileSync(frictionPath, updated, "utf8");
-    return `Friction logged: [${priority}] ${type} — "${description}"`;
-  } catch (e) {
-    return `Failed to log friction: ${e.message}`;
-  }
+async function executeLogFriction(role, type, priority, description) {
+  return await storageLogFriction(role, type, priority, description);
 }
 
 function executeLogDecision(role, decision, reasoning) {
@@ -311,13 +281,13 @@ async function executeSfQuery(soql) {
 async function handleToolCall(role, toolName, toolInput) {
   switch (toolName) {
     case "read_context_file":
-      return executeReadContextFile(toolInput.role);
+      return await executeReadContextFile(toolInput.role);
     case "update_context_file":
-      return executeUpdateContextFile(role, toolInput.content);
+      return await executeUpdateContextFile(role, toolInput.content);
     case "read_shos_state":
       return executeReadShosState();
     case "log_friction":
-      return executeLogFriction(role, toolInput.type, toolInput.priority, toolInput.description);
+      return await executeLogFriction(role, toolInput.type, toolInput.priority, toolInput.description);
     case "log_decision":
       return executeLogDecision(role, toolInput.decision, toolInput.reasoning);
     case "flag_to_role":
@@ -335,18 +305,9 @@ async function handleToolCall(role, toolName, toolInput) {
 // System prompt builder
 // ---------------------------------------------------------------------------
 
-function buildSystemPrompt(role) {
+async function buildSystemPrompt(role) {
   const roleName = ROLE_NAMES[role] || role.toUpperCase();
-  const contextFile = CONTEXT_FILES[role];
-  let contextContent = "";
-
-  if (contextFile) {
-    try {
-      contextContent = readFileSync(join(process.cwd(), contextFile), "utf8");
-    } catch {
-      contextContent = "(Context file not yet available — this is a fresh role session.)";
-    }
-  }
+  const contextContent = await readKnowledge(role);
 
   return `You are the ${roleName} of Steel Hearts, a Gold Star family memorial bracelet nonprofit. You are operating inside the Steel Hearts Operating System (SHOS).
 
@@ -396,7 +357,7 @@ export async function POST(request) {
     return Response.json({ error: "Invalid role" }, { status: 400 });
   }
 
-  const systemPrompt = buildSystemPrompt(role);
+  const systemPrompt = await buildSystemPrompt(role);
 
   // Agentic loop — keep going until we get a final text response (no more tool calls)
   let currentMessages = [...messages];
