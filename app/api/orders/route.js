@@ -4,6 +4,10 @@ import { sfQuery } from "@/lib/salesforce";
 import { createOrder } from "@/lib/shipstation";
 
 const SLACK_WEBHOOK = process.env.SLACK_SOP_WEBHOOK;
+// Per-person DM webhooks — notifications go to BOTH ops hub AND the person's DM
+const SLACK_DM_JOSEPH = process.env.SLACK_DM_JOSEPH;
+const SLACK_DM_RYAN = process.env.SLACK_DM_RYAN;
+const SLACK_DM_KRISTIN = process.env.SLACK_DM_KRISTIN;
 
 /**
  * When an item moves to Ready to Ship, check if ALL items in the parent order
@@ -83,10 +87,10 @@ async function autoPushToShipStation(itemId) {
   }
 }
 
-async function postToSlack(text) {
-  if (!SLACK_WEBHOOK) return;
+async function postToSlack(text, webhook = SLACK_WEBHOOK) {
+  if (!webhook) return;
   try {
-    await fetch(SLACK_WEBHOOK, {
+    await fetch(webhook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
@@ -94,6 +98,18 @@ async function postToSlack(text) {
   } catch (e) {
     console.warn("Slack post failed:", e.message);
   }
+}
+
+/**
+ * Send to ops hub AND the person's DM so everyone sees progress
+ * and the responsible person gets a direct ping.
+ */
+async function notifyPerson(text, dmWebhook) {
+  await Promise.all([
+    postToSlack(text),                       // ops hub — everyone sees the work getting done
+    dmWebhook ? postToSlack(text, dmWebhook) // DM — direct ping to the person responsible
+              : Promise.resolve(),
+  ]);
 }
 
 /**
@@ -134,9 +150,14 @@ export async function PATCH(request) {
     if (result.success) {
       const name = heroName || "Order item";
       if (status === "Ready to Laser") {
-        await postToSlack(`\ud83d\udd25 ${name} bracelet ready for laser production`);
+        // Notify Joseph — he runs the laser
+        await notifyPerson(`🔥 ${name} bracelet ready for laser production`, SLACK_DM_JOSEPH);
+      } else if (status === "Design Needed") {
+        // Notify Ryan — he creates designs
+        await notifyPerson(`🎨 New design task: ${name} bracelet needs a design`, SLACK_DM_RYAN);
       } else if (status === "Ready to Ship") {
-        await postToSlack(`\ud83d\udce6 ${name} bracelet ready to ship`);
+        // Notify Kristin — she handles shipping
+        await notifyPerson(`📦 ${name} bracelet ready to ship`, SLACK_DM_KRISTIN);
         // Auto-push to ShipStation if ALL items in this order are now Ready to Ship
         try {
           await autoPushToShipStation(itemId);
@@ -144,7 +165,7 @@ export async function PATCH(request) {
           console.warn("ShipStation auto-push failed:", ssErr.message);
         }
       } else if (status === "Shipped") {
-        await postToSlack(`\u2705 ${name} bracelet shipped`);
+        await postToSlack(`✅ ${name} bracelet shipped`);
       }
     }
 
@@ -182,7 +203,15 @@ export async function POST(request) {
     const result = await createDonatedOrder(body);
 
     if (result.success) {
-      await postToSlack(`\ud83c\udf81 New donated order: ${heroName} for ${recipientName} (${result.orderName})`);
+      await postToSlack(`🎁 New donated order: ${heroName} for ${recipientName} (${result.orderName})`);
+
+      if (result.autoAdvanced) {
+        // Design found, auto-advanced → notify Joseph for laser
+        await notifyPerson(
+          `🔥 ${heroName} bracelet auto-advanced to Ready to Laser (design found)`,
+          SLACK_DM_JOSEPH
+        );
+      }
     }
 
     return NextResponse.json({

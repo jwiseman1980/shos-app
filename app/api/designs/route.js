@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sfUpdate, sfQuery } from "@/lib/salesforce";
+import { list, del } from "@vercel/blob";
 
 const SF_LIVE = process.env.SF_LIVE === "true";
 
@@ -86,7 +87,7 @@ export async function PATCH(request) {
     const updateData = { Design_Status__c: status };
     if (brief) updateData.Design_Brief__c = brief;
 
-    // If completing, also mark design as created
+    // If completing, also mark design as created and clean up temp reference images
     if (status === "Complete") {
       updateData.Bracelet_Design_Created__c = true;
       updateData.Has_Graphic_Design__c = true;
@@ -94,9 +95,30 @@ export async function PATCH(request) {
 
     await sfUpdate("Memorial_Bracelet__c", heroId, updateData);
 
+    // Clean up Vercel Blob reference images when design is complete
+    let blobsDeleted = 0;
+    if (status === "Complete") {
+      try {
+        // Look up the SKU to find the blob prefix
+        const [hero] = await sfQuery(
+          `SELECT Lineitem_sku__c FROM Memorial_Bracelet__c WHERE Id = '${heroId}' LIMIT 1`
+        );
+        if (hero?.Lineitem_sku__c) {
+          const prefix = `design-refs/${hero.Lineitem_sku__c}/`;
+          const { blobs } = await list({ prefix });
+          if (blobs.length > 0) {
+            await Promise.all(blobs.map((b) => del(b.url)));
+            blobsDeleted = blobs.length;
+          }
+        }
+      } catch (cleanupErr) {
+        console.warn("Blob cleanup failed (non-critical):", cleanupErr.message);
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      message: `Design status updated to "${status}"`,
+      message: `Design status updated to "${status}"${blobsDeleted > 0 ? ` (cleaned up ${blobsDeleted} reference image${blobsDeleted > 1 ? "s" : ""})` : ""}`,
     });
   } catch (error) {
     console.error("Failed to update design:", error.message);

@@ -121,7 +121,6 @@ export default function DailyBrief({
   const unthankedDonations = recentDonations.filter((d) => !d.thankYouSent);
 
   // Order items breakdown
-  const needsDecision = orderItems.filter((o) => o.productionStatus === "Needs Decision");
   const designNeeded = orderItems.filter((o) => o.productionStatus === "Design Needed" || o.productionStatus === "Design In Progress");
   const readyToLaser = orderItems.filter((o) => o.productionStatus === "Ready to Laser");
   const inProduction = orderItems.filter((o) => o.productionStatus === "In Production");
@@ -160,17 +159,17 @@ export default function DailyBrief({
 
   // Admin/Founder tasks
   if (isAdmin) {
-    // Orders needing triage
-    needsDecision.forEach((o) => {
+    // Designs needed
+    if (designNeeded.length > 0) {
       actionItems.push({
-        icon: "\u2692",
-        label: `Triage order: ${o.name || o.sku}`,
-        detail: `${o.customerName || "Unknown"} \u00b7 ${o.orderType || ""}`,
-        source: "Order",
+        icon: "\ud83c\udfa8",
+        label: `${designNeeded.length} bracelet${designNeeded.length > 1 ? "s" : ""} need design`,
+        detail: designNeeded.map((o) => o.name || o.sku).slice(0, 3).join(", "),
+        source: "Design",
         href: "/orders",
-        priority: 1,
+        priority: 3,
       });
-    });
+    }
 
     // Bracelets ready to laser
     if (readyToLaser.length > 0) {
@@ -507,7 +506,6 @@ export default function DailyBrief({
           <DataCard title="Order Pipeline">
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
               {[
-                { label: "Needs Decision", count: needsDecision.length, color: "#ef4444" },
                 { label: "Design", count: designNeeded.length, color: "#f59e0b" },
                 { label: "Ready to Laser", count: readyToLaser.length, color: "#3b82f6" },
                 { label: "In Production", count: inProduction.length, color: "#8b5cf6" },

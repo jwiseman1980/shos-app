@@ -22,10 +22,10 @@ export default async function OrdersPage() {
     <PageShell title="Order Queue" subtitle="Fulfillment pipeline — Salesforce + ShipStation">
       <div className="stat-grid">
         <StatBlock
-          label="Needs Decision"
-          value={stats.needsDecision || 0}
-          note="Awaiting triage"
-          accent="var(--status-red)"
+          label="Design Queue"
+          value={(stats.designNeeded || 0) + (stats.designInProgress || 0)}
+          note={`${stats.designNeeded || 0} needed \u00b7 ${stats.designInProgress || 0} in progress`}
+          accent="var(--status-orange)"
         />
         <StatBlock
           label="In Production"

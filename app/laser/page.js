@@ -38,7 +38,7 @@ const STANDARD_ENGRAVE = {
 const BED_POSITIONS = [
   { pos: 1, size: '7"', x: 0.7, y: 0.341, w: 6.859, h: 0.621 },
   { pos: 2, size: '7"', x: 0.7, y: 1.528, w: 6.859, h: 0.621 },
-  { pos: 2, size: '6"', x: 0.621, y: 1.743, w: 5.9, h: 0.44 },
+  { pos: 2, size: '6"', x: 0.621, y: 1.747, w: 5.9, h: 0.44 },
   { pos: 3, size: '7"', x: 0.7, y: 2.707, w: 6.859, h: 0.621 },
 ];
 

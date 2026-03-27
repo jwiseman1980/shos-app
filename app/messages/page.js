@@ -5,6 +5,7 @@ import DataCard from "@/components/DataCard";
 import StatBlock from "@/components/StatBlock";
 import MessageTracker from "@/components/MessageTracker";
 import { getMessagesGroupedByHero, getMessageStats } from "@/lib/data/messages";
+import volunteers from "@/data/volunteers.json";
 import Link from "next/link";
 
 export default async function FamilyMessagesPage({ searchParams }) {
@@ -60,6 +61,12 @@ export default async function FamilyMessagesPage({ searchParams }) {
   // Compute eligible count from matched only
   const eligibleCount = matchedGroups.filter((g) => g.eligible).length;
   const heroesWithContact = matchedGroups.filter((g) => g.familyContactEmail).length;
+  const draftsCreated = matchedGroups.filter((g) => g.sentMessages > 0).length;
+
+  // Safe volunteer list (strip password hashes before passing to client)
+  const safeVolunteers = volunteers
+    .filter((v) => v.email && v.email.endsWith("@steel-hearts.org"))
+    .map(({ name, email, role, initials }) => ({ name, email, role, initials }));
 
   return (
     <PageShell
@@ -90,6 +97,12 @@ export default async function FamilyMessagesPage({ searchParams }) {
           label="Sent"
           value={stats.sentMessages}
           accent="var(--status-green)"
+        />
+        <StatBlock
+          label="Drafts Created"
+          value={draftsCreated}
+          note={`${draftsCreated} heroes delivered`}
+          accent="var(--status-purple)"
         />
         <StatBlock
           label="Unmatched"
@@ -214,7 +227,7 @@ export default async function FamilyMessagesPage({ searchParams }) {
             No heroes match the current filters.
           </p>
         ) : (
-          <MessageTracker heroGroups={filtered} />
+          <MessageTracker heroGroups={filtered} volunteers={safeVolunteers} />
         )}
       </DataCard>
 

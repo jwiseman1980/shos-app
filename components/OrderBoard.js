@@ -3,7 +3,6 @@
 import { useState } from "react";
 
 const statusColors = {
-  "Needs Decision": { bg: "#ef444422", text: "#ef4444", label: "Needs Decision" },
   "Design Needed": { bg: "#f59e0b22", text: "#f59e0b", label: "Design Needed" },
   "Design In Progress": { bg: "#8b5cf622", text: "#8b5cf6", label: "Design In Progress" },
   "Ready to Laser": { bg: "#3b82f622", text: "#3b82f6", label: "Ready to Laser" },
@@ -12,7 +11,6 @@ const statusColors = {
 };
 
 const STATUS_OPTIONS = [
-  "Needs Decision",
   "Design Needed",
   "Design In Progress",
   "Ready to Laser",
@@ -242,32 +240,20 @@ export default function OrderBoard({ orders: initialOrders = [] }) {
   };
 
   // Group orders by worst status
-  const needsDecision = orders.filter((o) =>
-    o.items.some((i) => i.productionStatus === "Needs Decision")
-  );
   const inDesign = orders.filter((o) =>
-    !o.items.some((i) => i.productionStatus === "Needs Decision") &&
     o.items.some((i) => i.productionStatus === "Design Needed" || i.productionStatus === "Design In Progress")
   );
   const inProduction = orders.filter((o) =>
-    !o.items.some((i) => ["Needs Decision", "Design Needed", "Design In Progress"].includes(i.productionStatus)) &&
+    !o.items.some((i) => ["Design Needed", "Design In Progress"].includes(i.productionStatus)) &&
     o.items.some((i) => i.productionStatus === "Ready to Laser" || i.productionStatus === "In Production")
   );
   const readyToShip = orders.filter((o) =>
-    !o.items.some((i) => ["Needs Decision", "Design Needed", "Design In Progress", "Ready to Laser", "In Production"].includes(i.productionStatus)) &&
+    !o.items.some((i) => ["Design Needed", "Design In Progress", "Ready to Laser", "In Production"].includes(i.productionStatus)) &&
     o.items.some((i) => i.productionStatus === "Ready to Ship")
   );
 
   return (
     <div>
-      {needsDecision.length > 0 && (
-        <Section title={`Needs Decision (${needsDecision.length})`} color="#ef4444">
-          {needsDecision.map((o) => (
-            <OrderCard key={o.id} order={o} onItemStatusChange={handleItemStatusChange} />
-          ))}
-        </Section>
-      )}
-
       {inDesign.length > 0 && (
         <Section title={`In Design (${inDesign.length})`} color="#f59e0b">
           {inDesign.map((o) => (

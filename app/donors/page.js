@@ -8,8 +8,9 @@ import {
   getDonationsNeedingImpactUpdate,
   getDonorRetentionStats,
 } from "@/lib/data/donations";
+import { getDVariantDonors } from "@/lib/data/obligations";
 import { getVolunteers } from "@/lib/data/volunteers";
-import { getCurrentYear, getMonthName, getCurrentMonth } from "@/lib/dates";
+import { getCurrentYear, getMonthName, getCurrentMonth, formatDate } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export default async function DonorEngagementPage() {
   const volunteers = await getVolunteers();
   const impactDue = await getDonationsNeedingImpactUpdate();
   const retention = await getDonorRetentionStats();
+  const dVariantDonors = await getDVariantDonors(getCurrentYear());
   const year = getCurrentYear();
   const monthName = getMonthName(getCurrentMonth());
 
@@ -248,6 +250,59 @@ export default async function DonorEngagementPage() {
           )}
         </DataCard>
       </div>
+
+      {/* D-Variant Donors — extra $10 to Steel Hearts Fund */}
+      {dVariantDonors.length > 0 && (
+        <DataCard title={`D-Variant Donors \u2014 Extra $10 to Steel Hearts (${dVariantDonors.length})`}>
+          <div style={{ padding: "4px 0 8px" }}>
+            <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
+              These supporters chose the $45 D-variant bracelet, adding an extra $10 donation to Steel Hearts Fund.
+              They deserve a thank-you for the additional contribution.
+            </div>
+            <div style={{ maxHeight: 350, overflowY: "auto" }}>
+              {dVariantDonors.slice(0, 15).map((donor, i) => {
+                const displayName = donor.name || (donor.email ? donor.email.split("@")[0].replace(/[._]/g, " ") : "Unknown");
+                return (
+                  <div key={donor.email || i} className="list-item">
+                    <div>
+                      {donor.email ? (
+                        <a
+                          href={`/donors/${encodeURIComponent(donor.email)}`}
+                          className="list-item-title"
+                          style={{ textDecoration: "none", borderBottom: "1px dashed var(--card-border)" }}
+                        >
+                          {displayName}
+                        </a>
+                      ) : (
+                        <div className="list-item-title">{displayName}</div>
+                      )}
+                      <div className="list-item-sub">
+                        {donor.purchases} D-variant purchase{donor.purchases !== 1 ? "s" : ""}
+                        {" \u00B7 "}
+                        {donor.heroes.slice(0, 2).join(", ")}
+                        {donor.heroes.length > 2 && ` +${donor.heroes.length - 2} more`}
+                        {" \u00B7 Last: "}
+                        {formatDate(donor.lastDate)}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--gold)" }}>
+                        +${donor.totalContribution}
+                      </div>
+                      <div style={{ fontSize: 10, color: "var(--text-dim)" }}>to SH Fund</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {dVariantDonors.length > 15 && (
+              <div style={{ fontSize: 11, color: "var(--text-dim)", padding: "8px 0", textAlign: "center" }}>
+                Showing top 15 of {dVariantDonors.length} D-variant donors
+              </div>
+            )}
+          </div>
+        </DataCard>
+      )}
 
       {/* Segment & Campaign Breakdown */}
       {(Object.keys(segmentCounts).length > 1 || campaigns.length > 0) && (

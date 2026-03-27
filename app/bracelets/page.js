@@ -3,6 +3,7 @@ import StatBlock from "@/components/StatBlock";
 import DataCard from "@/components/DataCard";
 import StatusBadge from "@/components/StatusBadge";
 import PipelineTracker from "@/components/PipelineTracker";
+import FamilyIntakeWizard from "@/components/FamilyIntakeWizard";
 import {
   getBraceletStats,
   getBraceletsByDesignStage,
@@ -10,6 +11,7 @@ import {
   getInventoryOverview,
 } from "@/lib/data/bracelets";
 import { getPipelineHeroes } from "@/lib/data/pipeline";
+import { getActiveIntakes } from "@/lib/data/families";
 
 const STAGE_ORDER = ["Draft", "Review", "Approved", "In Production", "Complete"];
 const STAGE_COLORS = {
@@ -37,11 +39,14 @@ const tdStyle = {
 };
 
 export default async function BraceletPipelinePage() {
-  const stats = await getBraceletStats();
-  const stageGroups = await getBraceletsByDesignStage();
-  const lowStock = await getLowStockBracelets();
-  const inventory = await getInventoryOverview();
-  const pipeline = await getPipelineHeroes();
+  const [stats, stageGroups, lowStock, inventory, pipeline, intakes] = await Promise.all([
+    getBraceletStats(),
+    getBraceletsByDesignStage(),
+    getLowStockBracelets(),
+    getInventoryOverview(),
+    getPipelineHeroes(),
+    getActiveIntakes(),
+  ]);
 
   // Pipeline bar widths (percentage of total)
   const pipelineStages = STAGE_ORDER.map((stage) => ({
@@ -96,80 +101,12 @@ export default async function BraceletPipelinePage() {
         />
       </div>
 
-      {/* New Intake — active onboarding */}
-      {pipeline.newIntake && pipeline.newIntake.length > 0 && (
-        <div className="section">
-          <DataCard title={`New Intake (${pipeline.stats.newIntakeCount || 0} heroes being onboarded)`}>
-            <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 16 }}>
-              Active requests — someone is waiting on us. These need family contact,
-              design, and listing before going live.
-            </div>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead>
-                  <tr style={{ borderBottom: "1px solid var(--card-border)", textAlign: "left" }}>
-                    <th style={thStyle}>Hero</th>
-                    <th style={thStyle}>SKU</th>
-                    <th style={thStyle}>Branch</th>
-                    <th style={thStyle}>Family Contact</th>
-                    <th style={thStyle}>Next Step</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pipeline.newIntake.map((h) => (
-                    <tr key={h.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
-                      <td style={tdStyle}>
-                        <div style={{ fontWeight: 500, color: "var(--text-bright)" }}>
-                          {h.name}
-                        </div>
-                        <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
-                          {h.incident || ""}
-                        </div>
-                      </td>
-                      <td style={tdStyle}>
-                        <span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--text-dim)" }}>
-                          {h.sku || "\u2014"}
-                        </span>
-                      </td>
-                      <td style={tdStyle}>
-                        <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
-                          {h.branch || "\u2014"}
-                        </span>
-                      </td>
-                      <td style={tdStyle}>
-                        {h.hasFamilyContact ? (
-                          <span style={{ color: "var(--status-green)" }}>{"\u2713"} Connected</span>
-                        ) : (
-                          <span style={{ color: "var(--status-orange)" }}>Needed</span>
-                        )}
-                      </td>
-                      <td style={tdStyle}>
-                        <span style={{
-                          display: "inline-block",
-                          padding: "2px 8px",
-                          borderRadius: 12,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          background: h.stage === "Intake" ? "#6b728022" :
-                            h.stage === "Family Outreach" ? "#8b5cf622" :
-                            h.stage === "Charity Designation" ? "#3b82f622" :
-                            h.stage === "Design" ? "#f59e0b22" : "#6b728022",
-                          color: h.stage === "Intake" ? "#6b7280" :
-                            h.stage === "Family Outreach" ? "#8b5cf6" :
-                            h.stage === "Charity Designation" ? "#3b82f6" :
-                            h.stage === "Design" ? "#f59e0b" : "#6b7280",
-                        }}>
-                          {h.stage}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </DataCard>
-        </div>
-      )}
+      {/* Family Intake — interactive wizard for onboarding new heroes */}
+      <div className="section">
+        <DataCard title={`Family Intake (${intakes.length} in pipeline)`}>
+          <FamilyIntakeWizard intakes={intakes} />
+        </DataCard>
+      </div>
 
       {/* Memorial Pipeline Tracker */}
       <div className="section">

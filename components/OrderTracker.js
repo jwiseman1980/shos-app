@@ -4,7 +4,6 @@ import { useState, useCallback } from "react";
 
 const STATUS_FLOW = [
   "Intake",
-  "Needs Decision",
   "Design Needed",
   "Ready to Laser",
   "Produced",
@@ -16,8 +15,7 @@ const STATUS_FLOW = [
 
 const STATUS_COLORS = {
   Intake: "var(--status-blue)",
-  "Needs Decision": "var(--status-orange)",
-  "Design Needed": "var(--status-purple)",
+  "Design Needed": "var(--status-orange)",
   "Ready to Laser": "var(--gold)",
   Produced: "var(--status-green)",
   "Ready to Ship": "var(--status-green)",

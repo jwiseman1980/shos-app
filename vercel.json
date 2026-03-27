@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/orders/reconcile?key=sh-api-dev-key-change-in-production",
+      "schedule": "7 6 * * *"
+    },
+    {
+      "path": "/api/orders/triage?key=sh-api-dev-key-change-in-production",
+      "schedule": "22 6 * * *"
+    }
+  ]
+}

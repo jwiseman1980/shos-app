@@ -3,55 +3,126 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
-const NAV_GROUPS = [
+// Role color palette — each role has a distinct identity
+export const ROLE_COLORS = {
+  ed:     "#c4a237",  // gold — direction, brand
+  cos:    "#b0b8c4",  // silver — governance, infrastructure
+  cfo:    "#27ae60",  // green — money
+  coo:    "#e67e22",  // orange — production
+  comms:  "#8e44ad",  // purple — creative, public-facing
+  dev:    "#3498db",  // blue — growth, fundraising
+  family: "#e74c3c",  // red — relationships, heart
+};
+
+const NAV_ROLES = [
   {
-    label: "Operations",
+    role: "ed",
+    label: "Executive Director",
+    href: "/",
     items: [
-      { href: "/", icon: "\u2302", label: "Daily Brief" },
-      { href: "/sops", icon: "\u2611", label: "SOP Runner" },
+      { href: "/", label: "Command", exact: true },
+      { href: "/gyst", label: "Personal" },
     ],
   },
   {
-    label: "Memorial",
+    role: "cos",
+    label: "Chief of Staff",
+    href: "/cos",
     items: [
-      { href: "/anniversaries", icon: "\u2605", label: "Anniversaries" },
-      { href: "/memorials", icon: "\u2756", label: "Memorial Pages" },
-      { href: "/content", icon: "\u270E", label: "Content Generator" },
+      { href: "/cos", label: "Overview", exact: true },
+      { href: "/sops", label: "SOPs" },
+      { href: "/email", label: "Email" },
+      { href: "/org", label: "Org Chart" },
+      { href: "/settings", label: "Settings" },
     ],
   },
   {
-    label: "Fulfillment",
+    role: "cfo",
+    label: "CFO",
+    href: "/finance",
     items: [
-      { href: "/orders", icon: "\u2692", label: "Order Queue" },
-      { href: "/designs", icon: "\u270E", label: "Design Queue" },
-      { href: "/bracelets", icon: "\u25CB", label: "Bracelet Pipeline" },
-      { href: "/laser", icon: "\u2604", label: "Laser Production" },
-      { href: "/shipping", icon: "\u{1F4E6}", label: "Shipping Queue" },
-      { href: "/inventory", icon: "\u2193", label: "Inventory Burnout" },
+      { href: "/finance", label: "Overview", exact: true },
+      { href: "/finance/report", label: "Monthly Report" },
+      { href: "/finance/disbursements", label: "Disbursements" },
+      { href: "/finance/recon", label: "Recon Matrix" },
+      { href: "/finance/expenses", label: "Expenses" },
+      { href: "/finance/donations", label: "Donations" },
+      { href: "/finance/close", label: "Monthly Close" },
+      { href: "/finance/archive", label: "Archive" },
     ],
   },
   {
-    label: "Engagement",
+    role: "coo",
+    label: "COO",
+    href: "/coo",
     items: [
-      { href: "/messages", icon: "\u2709", label: "Family Messages" },
-      { href: "/donors", icon: "\u2665", label: "Donor Engagement" },
-      { href: "/email", icon: "\u270E", label: "Email Composer" },
+      { href: "/coo", label: "Overview", exact: true },
+      { href: "/bracelets", label: "Pipeline" },
+      { href: "/orders", label: "Orders" },
+      { href: "/designs", label: "Designs" },
+      { href: "/laser", label: "Laser" },
+      { href: "/shipping", label: "Shipping" },
+      { href: "/inventory", label: "Inventory" },
     ],
   },
   {
-    label: "Organization",
+    role: "comms",
+    label: "Communications",
+    href: "/comms",
     items: [
-      { href: "/volunteers", icon: "\u263A", label: "Volunteers" },
-      { href: "/org", icon: "\u2630", label: "Org Chart" },
-      { href: "/finance", icon: "\u0024", label: "Finance" },
-      { href: "/settings", icon: "\u2699", label: "Settings" },
+      { href: "/comms", label: "Overview", exact: true },
+      { href: "/content", label: "Content Generator" },
+      { href: "/memorials", label: "Memorial Pages" },
+      { href: "/anniversaries", label: "Anniversaries" },
+    ],
+  },
+  {
+    role: "dev",
+    label: "Development",
+    href: "/dev",
+    items: [
+      { href: "/dev", label: "Overview", exact: true },
+      { href: "/donors", label: "Donors" },
+    ],
+  },
+  {
+    role: "family",
+    label: "Family Relations",
+    href: "/family",
+    items: [
+      { href: "/family", label: "Overview", exact: true },
+      { href: "/messages", label: "Messages" },
+      { href: "/families", label: "Families" },
+      { href: "/volunteers", label: "Volunteers" },
     ],
   },
 ];
 
+function isItemActive(item, pathname) {
+  return item.exact
+    ? pathname === item.href
+    : pathname === item.href || pathname.startsWith(item.href + "/");
+}
+
+function getActiveRole(pathname) {
+  for (const roleGroup of NAV_ROLES) {
+    for (const item of roleGroup.items) {
+      if (isItemActive(item, pathname)) return roleGroup.role;
+    }
+    if (
+      roleGroup.href !== "/" &&
+      (pathname === roleGroup.href || pathname.startsWith(roleGroup.href + "/"))
+    ) {
+      return roleGroup.role;
+    }
+  }
+  return "ed";
+}
+
 export default function Sidebar({ user }) {
   const pathname = usePathname();
   const router = useRouter();
+  const activeRole = getActiveRole(pathname);
 
   const handleLogout = async () => {
     document.cookie = "shos_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
@@ -62,7 +133,11 @@ export default function Sidebar({ user }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <img src="/brand/steel-hearts-logo-gold.svg" alt="Steel Hearts" style={{ width: 36, height: 36, flexShrink: 0 }} />
+        <img
+          src="/brand/steel-hearts-logo-gold.svg"
+          alt="Steel Hearts"
+          style={{ width: 36, height: 36, flexShrink: 0 }}
+        />
         <div>
           <div className="sidebar-brand-text">Steel Hearts</div>
           <div className="sidebar-brand-sub">Operating System</div>
@@ -70,21 +145,44 @@ export default function Sidebar({ user }) {
       </div>
 
       <nav className="sidebar-nav">
-        {NAV_GROUPS.map((group) => (
-          <div key={group.label} className="sidebar-group">
-            <div className="sidebar-group-label">{group.label}</div>
-            {group.items.map((item) => (
+        {NAV_ROLES.map((roleGroup) => {
+          const isActive = roleGroup.role === activeRole;
+          const color = ROLE_COLORS[roleGroup.role];
+
+          return (
+            <div key={roleGroup.role} className="sidebar-role-group">
               <Link
-                key={item.href}
-                href={item.href}
-                className={`sidebar-link ${pathname === item.href ? "active" : ""}`}
+                href={roleGroup.href}
+                className={`sidebar-role-header ${isActive ? "active" : ""}`}
+                style={{ "--role-color": color }}
               >
-                <span className="sidebar-link-icon">{item.icon}</span>
-                {item.label}
+                <span
+                  className="sidebar-role-dot"
+                  style={{ background: isActive ? color : "var(--text-dim)", opacity: isActive ? 1 : 0.3 }}
+                />
+                <span className="sidebar-role-label">{roleGroup.label}</span>
               </Link>
-            ))}
-          </div>
-        ))}
+
+              {isActive && (
+                <div className="sidebar-role-items">
+                  {roleGroup.items.map((item) => {
+                    const itemActive = isItemActive(item, pathname);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={`sidebar-sub-link ${itemActive ? "active" : ""}`}
+                        style={itemActive ? { color, borderLeftColor: color } : undefined}
+                      >
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </nav>
 
       <div className="sidebar-footer">
@@ -99,7 +197,10 @@ export default function Sidebar({ user }) {
               {user.initials}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-bright)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <div style={{
+                fontSize: 12, fontWeight: 600, color: "var(--text-bright)",
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+              }}>
                 {user.name}
               </div>
               <div style={{ fontSize: 10, color: "var(--text-dim)" }}>{user.role}</div>
@@ -117,7 +218,7 @@ export default function Sidebar({ user }) {
           </div>
         )}
         <div style={{ fontSize: 10, color: "var(--text-dim)" }}>
-          SHOS v0.2 &middot; Internal Use Only
+          SHOS v0.3 &middot; Internal Use Only
         </div>
       </div>
     </aside>
