@@ -236,10 +236,9 @@ function executeFlagToRole(sourceRole, targetRole, message, priority) {
 
 async function executeAppQuery(endpoint) {
   try {
-    // Build base URL — works on Vercel and locally
-    const base = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    // Build base URL — NEXT_PUBLIC_BASE_URL takes priority (production URL)
+    // VERCEL_URL is deployment-specific and changes per deploy, so we avoid it
+    const base = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
     // Ensure endpoint starts with /
     const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
@@ -320,6 +319,20 @@ This is your current knowledge file. It defines your state, open todos, and rece
 ---
 ${contextContent}
 ---
+
+## Salesforce Schema (Steel Hearts)
+Key objects — always use these exact API names in sf_query:
+- Orders: Squarespace_Order__c (fields: Name, Order_Number__c, Shipping_Name__c, Order_Status__c, Order_Type__c, Billing_Email__c, Shipping_Address1__c, Shipping_City__c, Shipping_State__c, Shipping_Postal__c, Total_Price__c, CreatedDate)
+- Order Items: Squarespace_Order_Item__c (fields: Name, Squarespace_Order__c, Hero__c, SKU__c, Item_Status__c, Quantity__c, Unit_Price__c)
+- Heroes: Hero__c (fields: Name, Branch__c, Last_Name__c, First_Name__c, Active_Listing__c, Intake_Status__c, Organization__c)
+- Contacts/Families: Contact (fields: Name, Email, Phone, MailingAddress, Family_Role__c)
+- Donations/Obligations: Donation__c (fields: Name, Hero__c, Organization__c, Amount__c, Status__c, Fund_Type__c, Donor_Name__c, Donation_Date__c)
+- Disbursements: Donation_Disbursement__c (fields: Name, Donation__c, Amount__c, Disbursement_Date__c, Status__c)
+- Volunteers: Contact with RecordType = Volunteer
+- Knowledge files: SHOS_Knowledge__c (Role__c, Content__c)
+- Friction log: SHOS_Friction__c (Role__c, Type__c, Priority__c, Description__c, Status__c)
+
+Prefer app_query over sf_query when the data is available via an API route. Use sf_query only for data not exposed through the app.
 
 ## How Sessions Work
 - You are here to help the Executive Director work through tasks in your domain
