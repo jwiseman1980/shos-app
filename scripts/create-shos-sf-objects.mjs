@@ -199,6 +199,19 @@ const PACKAGE_XML = `<?xml version="1.0" encoding="UTF-8"?>
         <members>SHOS_Friction__c</members>
         <name>CustomObject</name>
     </types>
+    <types>
+        <members>SHOS_Knowledge__c.Role__c</members>
+        <members>SHOS_Knowledge__c.Content__c</members>
+        <members>SHOS_Knowledge__c.Last_Updated__c</members>
+        <members>SHOS_Knowledge__c.Session_Count__c</members>
+        <members>SHOS_Friction__c.Role__c</members>
+        <members>SHOS_Friction__c.Type__c</members>
+        <members>SHOS_Friction__c.Priority__c</members>
+        <members>SHOS_Friction__c.Description__c</members>
+        <members>SHOS_Friction__c.Status__c</members>
+        <members>SHOS_Friction__c.Logged_Date__c</members>
+        <name>CustomField</name>
+    </types>
     <version>${API_VERSION}</version>
 </Package>`;
 

@@ -29,6 +29,11 @@ export async function POST(req) {
       quantity7 = 0,
       quantity6 = 0,
       notes = "",
+      shippingName = "",
+      shippingAddress1 = "",
+      shippingCity = "",
+      shippingState = "",
+      shippingPostal = "",
     } = body;
 
     if (!heroName) {
@@ -50,6 +55,11 @@ export async function POST(req) {
       source: "Family Intake",
       notes,
       sku: sku || "",
+      shippingName,
+      shippingAddress1,
+      shippingCity,
+      shippingState,
+      shippingPostal,
     });
 
     if (result.success) {

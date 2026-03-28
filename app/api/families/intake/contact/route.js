@@ -21,7 +21,10 @@ async function postSlack(text, webhook) {
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { heroId, heroName, firstName, lastName, email, phone, relationship } = body;
+    const {
+      heroId, heroName, firstName, lastName, email, phone, relationship,
+      mailingStreet, mailingCity, mailingState, mailingPostalCode,
+    } = body;
 
     if (!heroId || !firstName || !lastName) {
       return NextResponse.json(
@@ -36,8 +39,14 @@ export async function POST(req) {
       );
     }
 
-    // Create or find contact
-    const contact = await createFamilyContact({ firstName, lastName, email, phone });
+    // Create or find contact (with address)
+    const contact = await createFamilyContact({
+      firstName, lastName, email, phone,
+      mailingStreet: mailingStreet || "",
+      mailingCity: mailingCity || "",
+      mailingState: mailingState || "",
+      mailingPostalCode: mailingPostalCode || "",
+    });
     if (!contact.success) return NextResponse.json(contact, { status: 500 });
 
     // Link to hero
@@ -59,6 +68,7 @@ export async function POST(req) {
       contactName: contact.name,
       wasExisting: contact.wasExisting,
       associationId: link.associationId,
+      address: contact.address || null,
     });
   } catch (err) {
     console.error("Create contact error:", err.message);

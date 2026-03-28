@@ -6,6 +6,7 @@ import StatBlock from "@/components/StatBlock";
 import ShippingQueue from "@/components/ShippingQueue";
 import { getAwaitingShipment, getRecentlyShipped } from "@/lib/shipstation";
 import { getSessionUser } from "@/lib/auth";
+import { sfQuery } from "@/lib/salesforce";
 
 export default async function ShippingPage() {
   const user = await getSessionUser();
@@ -14,23 +15,78 @@ export default async function ShippingPage() {
   let error = null;
 
   try {
+    // Get ShipStation orders awaiting shipment
     const awaitingRes = await getAwaitingShipment();
     const awaitingOrders = awaitingRes?.orders || awaitingRes || [];
-    awaiting = (Array.isArray(awaitingOrders) ? awaitingOrders : []).map((o) => ({
-      orderId: o.orderId,
-      orderNumber: o.orderNumber,
-      orderDate: o.orderDate,
-      orderTotal: o.orderTotal,
-      shipTo: o.shipTo,
-      items: (o.items || []).map((i) => ({
-        sku: i.sku,
-        name: i.name,
-        quantity: i.quantity,
-      })),
-      customerEmail: o.customerEmail || "",
-      internalNotes: o.internalNotes || "",
-      orderStatus: o.orderStatus,
-    }));
+
+    // Safety net: cross-reference with SF to only show orders where all items are Ready to Ship
+    let readyOrderNumbers = new Set();
+    try {
+      if (process.env.SF_LIVE === "true") {
+        // Get all order names that have at least one item NOT yet Ready to Ship or Shipped
+        const notReady = await sfQuery(`
+          SELECT Squarespace_Order__r.Name
+          FROM Squarespace_Order_Item__c
+          WHERE Production_Status__c NOT IN ('Ready to Ship', 'Shipped')
+            AND Production_Status__c != null
+        `);
+        const notReadyNames = new Set(notReady.map((r) => r.Squarespace_Order__r?.Name).filter(Boolean));
+
+        // An order is "ready" if it's NOT in the notReady set
+        // Filter ShipStation orders against this
+        awaiting = (Array.isArray(awaitingOrders) ? awaitingOrders : [])
+          .filter((o) => !notReadyNames.has(o.orderNumber))
+          .map((o) => ({
+            orderId: o.orderId,
+            orderNumber: o.orderNumber,
+            orderDate: o.orderDate,
+            orderTotal: o.orderTotal,
+            shipTo: o.shipTo,
+            items: (o.items || []).map((i) => ({
+              sku: i.sku,
+              name: i.name,
+              quantity: i.quantity,
+            })),
+            customerEmail: o.customerEmail || "",
+            internalNotes: o.internalNotes || "",
+            orderStatus: o.orderStatus,
+          }));
+      } else {
+        // SF not live — just show all ShipStation orders
+        awaiting = (Array.isArray(awaitingOrders) ? awaitingOrders : []).map((o) => ({
+          orderId: o.orderId,
+          orderNumber: o.orderNumber,
+          orderDate: o.orderDate,
+          orderTotal: o.orderTotal,
+          shipTo: o.shipTo,
+          items: (o.items || []).map((i) => ({
+            sku: i.sku,
+            name: i.name,
+            quantity: i.quantity,
+          })),
+          customerEmail: o.customerEmail || "",
+          internalNotes: o.internalNotes || "",
+          orderStatus: o.orderStatus,
+        }));
+      }
+    } catch (sfErr) {
+      console.warn("SF cross-reference failed, showing all ShipStation orders:", sfErr.message);
+      awaiting = (Array.isArray(awaitingOrders) ? awaitingOrders : []).map((o) => ({
+        orderId: o.orderId,
+        orderNumber: o.orderNumber,
+        orderDate: o.orderDate,
+        orderTotal: o.orderTotal,
+        shipTo: o.shipTo,
+        items: (o.items || []).map((i) => ({
+          sku: i.sku,
+          name: i.name,
+          quantity: i.quantity,
+        })),
+        customerEmail: o.customerEmail || "",
+        internalNotes: o.internalNotes || "",
+        orderStatus: o.orderStatus,
+      }));
+    }
 
     const recentRes = await getRecentlyShipped(10);
     const recentOrders = recentRes?.orders || recentRes || [];

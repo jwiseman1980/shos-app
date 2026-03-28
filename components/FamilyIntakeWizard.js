@@ -53,6 +53,7 @@ export default function FamilyIntakeWizard({ intakes: initialIntakes }) {
 
   const [contactData, setContactData] = useState({
     firstName: "", lastName: "", email: "", phone: "", relationship: "Surviving Family",
+    mailingStreet: "", mailingCity: "", mailingState: "", mailingPostalCode: "",
   });
   const [contactResult, setContactResult] = useState(null);
 
@@ -64,7 +65,10 @@ export default function FamilyIntakeWizard({ intakes: initialIntakes }) {
   const [uploading, setUploading] = useState(false);
   const [designResult, setDesignResult] = useState(null);
 
-  const [orderData, setOrderData] = useState({ quantity7: 1, quantity6: 0, notes: "" });
+  const [orderData, setOrderData] = useState({
+    quantity7: 1, quantity6: 0, notes: "",
+    shippingName: "", shippingAddress1: "", shippingCity: "", shippingState: "", shippingPostal: "",
+  });
   const [orderResult, setOrderResult] = useState(null);
 
   // Resume an existing intake
@@ -147,6 +151,17 @@ export default function FamilyIntakeWizard({ intakes: initialIntakes }) {
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "Failed to create contact");
       setContactResult(data);
+      // Pre-fill order shipping from contact address
+      if (data.address || contactData.mailingStreet) {
+        setOrderData((prev) => ({
+          ...prev,
+          shippingName: `${contactData.firstName} ${contactData.lastName}`,
+          shippingAddress1: data.address?.street || contactData.mailingStreet || "",
+          shippingCity: data.address?.city || contactData.mailingCity || "",
+          shippingState: data.address?.state || contactData.mailingState || "",
+          shippingPostal: data.address?.postalCode || contactData.mailingPostalCode || "",
+        }));
+      }
       setCurrentStep(2);
     } catch (e) { setError(e.message); }
     setSaving(false);
@@ -203,6 +218,11 @@ export default function FamilyIntakeWizard({ intakes: initialIntakes }) {
           quantity7: orderData.quantity7,
           quantity6: orderData.quantity6,
           notes: orderData.notes,
+          shippingName: orderData.shippingName || contactResult?.contactName || heroResult.name,
+          shippingAddress1: orderData.shippingAddress1,
+          shippingCity: orderData.shippingCity,
+          shippingState: orderData.shippingState,
+          shippingPostal: orderData.shippingPostal,
         }),
       });
       const data = await res.json();
@@ -276,15 +296,18 @@ export default function FamilyIntakeWizard({ intakes: initialIntakes }) {
                     <button
                       onClick={() => resumeIntake(intake)}
                       style={{
-                        background: done >= total ? "#333" : "#2563eb",
-                        color: "#fff",
-                        border: "none",
+                        background: done >= total ? "transparent" : "var(--gold, #d4a843)",
+                        color: done >= total ? "#aaa" : "#000",
+                        border: done >= total ? "1px solid #555" : "1px solid var(--gold, #d4a843)",
                         borderRadius: "6px",
                         padding: "0.5rem 1.25rem",
                         cursor: "pointer",
                         fontWeight: "bold",
                         fontSize: "0.85rem",
+                        transition: "opacity 0.15s",
                       }}
+                      onMouseEnter={(e) => e.target.style.opacity = "0.85"}
+                      onMouseLeave={(e) => e.target.style.opacity = "1"}
                     >
                       {done >= total ? "View" : `Resume \u2192`}
                     </button>
@@ -370,6 +393,15 @@ export default function FamilyIntakeWizard({ intakes: initialIntakes }) {
             <Field label="Email" value={contactData.email} onChange={(v) => setContactData({ ...contactData, email: v })} type="email" />
             <Field label="Phone" value={contactData.phone} onChange={(v) => setContactData({ ...contactData, phone: v })} />
             <Select label="Relationship" value={contactData.relationship} onChange={(v) => setContactData({ ...contactData, relationship: v })} options={RELATIONSHIPS} />
+          </div>
+          <div style={{ marginTop: "1rem", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 600, color: "#ccc" }}>Mailing Address</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <Field label="Street Address" value={contactData.mailingStreet} onChange={(v) => setContactData({ ...contactData, mailingStreet: v })} placeholder="1 Lincoln Street Extension" />
+            </div>
+            <Field label="City" value={contactData.mailingCity} onChange={(v) => setContactData({ ...contactData, mailingCity: v })} />
+            <Field label="State" value={contactData.mailingState} onChange={(v) => setContactData({ ...contactData, mailingState: v })} />
+            <Field label="Zip" value={contactData.mailingPostalCode} onChange={(v) => setContactData({ ...contactData, mailingPostalCode: v })} />
           </div>
           <div style={{ marginTop: "1rem" }}>
             <button onClick={submitContact} disabled={saving || !contactData.firstName || !contactData.lastName || (!contactData.email && !contactData.phone)} className="btn-primary">
@@ -478,14 +510,26 @@ export default function FamilyIntakeWizard({ intakes: initialIntakes }) {
       {/* Step 4: Donated Order */}
       {currentStep === 4 && (
         <DataCard title="Step 5: Donated Order">
-          <p style={{ color: "#aaa", marginBottom: "1rem" }}>Create the donated bracelet order.</p>
+          <p style={{ color: "#aaa", marginBottom: "1rem" }}>Create the donated bracelet order. Separate line items are created for each size.</p>
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-            <Field label="Regular (7in)" value={orderData.quantity7} onChange={(v) => setOrderData({ ...orderData, quantity7: parseInt(v) || 0 })} type="number" />
-            <Field label="Small (6in)" value={orderData.quantity6} onChange={(v) => setOrderData({ ...orderData, quantity6: parseInt(v) || 0 })} type="number" />
+            <Field label='Regular (7")' value={orderData.quantity7} onChange={(v) => setOrderData({ ...orderData, quantity7: parseInt(v) || 0 })} type="number" />
+            <Field label='Small (6")' value={orderData.quantity6} onChange={(v) => setOrderData({ ...orderData, quantity6: parseInt(v) || 0 })} type="number" />
           </div>
+
+          <div style={{ marginTop: "1rem", marginBottom: "0.5rem", fontSize: "0.9rem", fontWeight: 600, color: "#ccc" }}>Shipping Address</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+            <Field label="Ship To Name" value={orderData.shippingName} onChange={(v) => setOrderData({ ...orderData, shippingName: v })} placeholder={contactResult?.contactName || ""} />
+            <Field label="Street Address *" value={orderData.shippingAddress1} onChange={(v) => setOrderData({ ...orderData, shippingAddress1: v })} />
+            <Field label="City *" value={orderData.shippingCity} onChange={(v) => setOrderData({ ...orderData, shippingCity: v })} />
+            <Field label="State *" value={orderData.shippingState} onChange={(v) => setOrderData({ ...orderData, shippingState: v })} />
+            <Field label="Zip *" value={orderData.shippingPostal} onChange={(v) => setOrderData({ ...orderData, shippingPostal: v })} />
+          </div>
+
           <Field label="Notes" value={orderData.notes} onChange={(v) => setOrderData({ ...orderData, notes: v })} placeholder="Any special instructions" />
+
           <div style={{ marginTop: "1rem" }}>
-            <button onClick={submitOrder} disabled={saving || (orderData.quantity7 + orderData.quantity6 < 1)} className="btn-primary">
+            <button onClick={submitOrder} disabled={saving || (orderData.quantity7 + orderData.quantity6 < 1) || !orderData.shippingAddress1 || !orderData.shippingCity || !orderData.shippingState || !orderData.shippingPostal} className="btn-primary">
               {saving ? "Creating..." : `Create Order (${(orderData.quantity7 || 0) + (orderData.quantity6 || 0)} bracelets)`}
             </button>
           </div>
