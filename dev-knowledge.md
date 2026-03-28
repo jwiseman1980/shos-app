@@ -1,7 +1,7 @@
 # Dev Knowledge File
 **Role:** Developer / Systems
 **Last Updated:** 2026-03-28
-**Session Count:** 0
+**Session Count:** 2
 
 ---
 
@@ -18,7 +18,7 @@ Dev owns the SHOS app, Salesforce configuration, integrations, and technical inf
 | Salesforce | Live — steelheartsincorporated.my.salesforce.com |
 | Gmail Integration | Live via service account |
 | ShipStation | Live |
-| Google Drive (design uploads) | BLOCKED — service account needs Drive scope in Google Admin Console |
+| Google Drive (design uploads) | Drive scope confirmed present in Admin Console — upload pipeline likely functional, needs test |
 | SHOS_Knowledge__c | Live with custom fields (Session 2) |
 | SHOS_Friction__c | Live with custom fields (Session 2) |
 
@@ -86,7 +86,7 @@ Dev owns the SHOS app, Salesforce configuration, integrations, and technical inf
 ## Known Issues / Technical Debt
 | Issue | Priority | Notes |
 |-------|----------|-------|
-| Google Drive service account missing Drive scope | High | Add scope in Google Admin Console → domain-wide delegation |
+| Google Drive upload — needs live test | Medium | Drive scope confirmed in Admin Console. Test upload via /designs page to verify end-to-end. |
 | write-coo-knowledge.mjs is deprecated | Low | Replaced by write-knowledge.mjs [role] |
 | migrate-capodanno-svgs-to-drive.mjs | Low | One-off script, can archive |
 | Bracelet_Size__c not reliable on import | Low | Fixed in app — SKU is now source of truth |
@@ -109,6 +109,9 @@ Dev owns the SHOS app, Salesforce configuration, integrations, and technical inf
 | 2026-03-28 | Knowledge file initialized | Dev role agent setup |
 | 2026-03-28 | SF proxy for design downloads | Drive service account not authorized. /api/designs/download uses SF bearer token — reliable and auth-handled. |
 | 2026-03-28 | SKU as source of truth for size | Bracelet_Size__c unreliable on import. sizeFromSku() helper added to orders.js. |
+| 2026-03-28 | All 7 role knowledge files initialized in SF | ED, COS, CFO, COO, Comms, Dev, Family — all live in SHOS_Knowledge__c |
+| 2026-03-28 | Global model set to Opus in settings.json | Better for strategic/architectural sessions. Role agents will use Sonnet/Haiku when built. |
+| 2026-03-28 | Agent initialization order decided | ED → COS → individual roles. Mirrors real org information flow. |
 
 ---
 
@@ -116,3 +119,4 @@ Dev owns the SHOS app, Salesforce configuration, integrations, and technical inf
 | Date | Summary |
 |------|---------|
 | 2026-03-28 | Major build session. Fixed OrderBoard (Needs Decision section), size display, design download routing, Capodanno design files, multiple SF data fixes. Added Design_Brief_6in__c field. Generalized write-knowledge.mjs. Deployed SHOS_Knowledge__c and SHOS_Friction__c custom fields with FLS. |
+| 2026-03-28 | Session 2 closeout. Pushed all 7 role skeleton knowledge files to SF. Committed and pushed all session work to git. Confirmed Drive scope already present in Google Admin Console — upload pipeline needs live test. Decided agent init order: ED → COS → individual roles. Global model switched to Opus. |
