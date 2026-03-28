@@ -46,11 +46,14 @@ export async function GET(request) {
     }
 
     // If size specified, try to find size-specific SVG first
+    // Matches: -6/-7 suffix, _6/_7 suffix, or "female cut" / "female" (= 6")
     let targetSvg = null;
     if (size && svgs.length > 1) {
       targetSvg = svgs.find((f) => {
         const title = (f.ContentDocument?.Title || "").toUpperCase();
-        return title.includes(`-${size}`) || title.includes(`_${size}`);
+        if (title.includes(`-${size}`) || title.includes(`_${size}`)) return true;
+        if (size === "6" && (title.includes("FEMALE") || title.includes("SMALL"))) return true;
+        return false;
       });
     }
     // Fall back to first SVG if no size match or no size specified
