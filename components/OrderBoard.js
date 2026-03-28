@@ -157,7 +157,7 @@ function OrderCard({ order, onItemStatusChange, section = "default" }) {
                     {item.quantity}
                   </td>
                   <td style={{ ...tdStyle, fontSize: 12, color: "var(--text-dim)" }}>
-                    {item.size === "Regular-7in" ? '7"' : item.size === "Small-6in" ? '6"' : item.size || "\u2014"}
+                    {item.size === "Regular-7in" || item.size === "7" ? '7"' : item.size === "Small-6in" || item.size === "6" ? '6"' : item.size || "\u2014"}
                   </td>
                   {section !== "ship" && (
                     <td style={tdStyle}>
