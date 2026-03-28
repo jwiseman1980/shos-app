@@ -32,13 +32,20 @@ export async function POST(request) {
     const driveResult = await uploadDesignSVG(stream, sku, originalFileName);
 
     // Update SF record with design URL and mark as complete
+    // 6" SKUs (ending in -6 or -6D) go into Design_Brief_6in__c; all others into Design_Brief__c
     if (heroId && process.env.SF_LIVE === "true") {
-      await sfUpdate("Memorial_Bracelet__c", heroId, {
+      const is6in = /-6D?$/i.test(sku);
+      const sfPayload = {
         Design_Status__c: "Complete",
         Bracelet_Design_Created__c: true,
         Has_Graphic_Design__c: true,
-        Design_Brief__c: `Design uploaded: ${driveResult.webViewLink}`,
-      });
+      };
+      if (is6in) {
+        sfPayload.Design_Brief_6in__c = `Design uploaded: ${driveResult.webViewLink}`;
+      } else {
+        sfPayload.Design_Brief__c = `Design uploaded: ${driveResult.webViewLink}`;
+      }
+      await sfUpdate("Memorial_Bracelet__c", heroId, sfPayload);
     }
 
     return NextResponse.json({
