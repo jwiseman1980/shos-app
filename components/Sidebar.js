@@ -188,6 +188,34 @@ export default function Sidebar({ user }) {
         })}
       </nav>
 
+      <a
+        href="https://steel-hearts.org"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "10px 16px",
+          margin: "0 12px 8px",
+          background: "rgba(196, 162, 55, 0.06)",
+          border: "1px solid rgba(196, 162, 55, 0.2)",
+          borderRadius: "var(--radius-md)",
+          color: "var(--gold)",
+          fontSize: 12,
+          fontWeight: 600,
+          textDecoration: "none",
+        }}
+      >
+        <span style={{ fontSize: 14 }}>&#8599;</span>
+        <span>
+          steel-hearts.org
+          <span style={{ display: "block", fontSize: 9, fontWeight: 400, color: "var(--text-dim)", marginTop: 1 }}>
+            Under construction
+          </span>
+        </span>
+      </a>
+
       <div className="sidebar-footer">
         {user && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
