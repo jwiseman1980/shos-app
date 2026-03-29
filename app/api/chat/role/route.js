@@ -900,7 +900,17 @@ export async function POST(request) {
     return Response.json({ error: "Invalid role" }, { status: 400 });
   }
 
-  const systemPrompt = await buildSystemPrompt(role);
+  let systemPrompt;
+  try {
+    systemPrompt = await buildSystemPrompt(role);
+  } catch (e) {
+    console.error("[chat/role] buildSystemPrompt failed:", e);
+    return Response.json({
+      error: "Failed to build system prompt",
+      message: e.message,
+    }, { status: 500 });
+  }
+
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
