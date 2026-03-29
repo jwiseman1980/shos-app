@@ -258,7 +258,7 @@ export default function RoleChat({ role, onClose }) {
   const quickActions = ROLE_QUICK_ACTIONS[role] || DEFAULT_QUICK_ACTIONS;
 
   return (
-    <div className="role-chat-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="role-chat-overlay">
       <div className="role-chat-panel" style={{ "--chat-color": color }}>
 
         {/* Header */}
