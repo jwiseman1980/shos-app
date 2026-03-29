@@ -73,6 +73,7 @@ const NAV_ROLES = [
     href: "/comms",
     items: [
       { href: "/comms", label: "Overview", exact: true },
+      { href: "/comms/social", label: "Social Media" },
       { href: "/content", label: "Content Generator" },
       { href: "/memorials", label: "Memorial Pages" },
     ],
