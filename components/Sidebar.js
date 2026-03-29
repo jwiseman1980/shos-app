@@ -21,6 +21,7 @@ const NAV_ROLES = [
     href: "/",
     items: [
       { href: "/", label: "Daily Brief", exact: true },
+      { href: "/tasks", label: "Tasks" },
       { href: "/gyst", label: "Personal" },
     ],
   },
@@ -31,6 +32,7 @@ const NAV_ROLES = [
     items: [
       { href: "/cos", label: "Overview", exact: true },
       { href: "/sops", label: "SOPs" },
+      { href: "/engagements", label: "Engagements" },
       { href: "/email", label: "Email" },
       { href: "/org", label: "Org Chart" },
       { href: "/settings", label: "Settings" },

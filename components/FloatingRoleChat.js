@@ -5,34 +5,37 @@ import { usePathname } from "next/navigation";
 import RoleChat from "@/components/RoleChat";
 
 const ROLE_COLORS = {
-  ed:     "#c4a237",
-  cos:    "#b0b8c4",
-  cfo:    "#27ae60",
-  coo:    "#e67e22",
-  comms:  "#8e44ad",
-  dev:    "#3498db",
-  family: "#e74c3c",
+  ed:        "#c4a237",
+  cos:       "#b0b8c4",
+  cfo:       "#27ae60",
+  coo:       "#e67e22",
+  comms:     "#8e44ad",
+  dev:       "#3498db",
+  family:    "#e74c3c",
+  architect: "#1abc9c",
 };
 
 const ROLE_LABELS = {
-  ed:     "ED",
-  cos:    "COS",
-  cfo:    "CFO",
-  coo:    "COO",
-  comms:  "Comms",
-  dev:    "Dev",
-  family: "Family",
+  ed:        "ED",
+  cos:       "COS",
+  cfo:       "CFO",
+  coo:       "COO",
+  comms:     "Comms",
+  dev:       "Dev",
+  family:    "Family",
+  architect: "CTO",
 };
 
 // Map paths to roles — first match wins
 const ROLE_PATHS = [
-  { role: "cfo",    prefixes: ["/finance"] },
-  { role: "cos",    prefixes: ["/cos", "/sops", "/email", "/org", "/settings"] },
-  { role: "coo",    prefixes: ["/coo", "/bracelets", "/orders", "/designs", "/laser", "/shipping", "/inventory"] },
-  { role: "comms",  prefixes: ["/comms", "/content", "/memorials", "/anniversaries"] },
-  { role: "dev",    prefixes: ["/dev", "/donors"] },
-  { role: "family", prefixes: ["/family", "/families", "/messages", "/volunteers"] },
-  { role: "ed",     prefixes: ["/gyst", "/"] },
+  { role: "cfo",       prefixes: ["/finance"] },
+  { role: "cos",       prefixes: ["/cos", "/sops", "/email", "/org", "/settings"] },
+  { role: "coo",       prefixes: ["/coo", "/bracelets", "/orders", "/designs", "/laser", "/shipping", "/inventory"] },
+  { role: "comms",     prefixes: ["/comms", "/content", "/memorials", "/anniversaries"] },
+  { role: "dev",       prefixes: ["/dev", "/donors"] },
+  { role: "family",    prefixes: ["/family", "/families", "/messages", "/volunteers"] },
+  { role: "architect", prefixes: ["/architect", "/infrastructure"] },
+  { role: "ed",        prefixes: ["/gyst", "/"] },
 ];
 
 function getRole(pathname) {

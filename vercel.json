@@ -7,6 +7,10 @@
     {
       "path": "/api/orders/triage?key=sh-api-dev-key-change-in-production",
       "schedule": "22 6 * * *"
+    },
+    {
+      "path": "/api/sync?key=sh-api-dev-key-change-in-production",
+      "schedule": "3 7 * * *"
     }
   ]
 }
