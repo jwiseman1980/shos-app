@@ -31,9 +31,9 @@ const ROLE_PATHS = [
   { role: "cfo",       prefixes: ["/finance"] },
   { role: "cos",       prefixes: ["/cos", "/sops", "/email", "/org", "/settings"] },
   { role: "coo",       prefixes: ["/coo", "/bracelets", "/orders", "/designs", "/laser", "/shipping", "/inventory"] },
-  { role: "comms",     prefixes: ["/comms", "/content", "/memorials", "/anniversaries"] },
+  { role: "comms",     prefixes: ["/comms", "/content", "/memorials"] },
   { role: "dev",       prefixes: ["/dev", "/donors"] },
-  { role: "family",    prefixes: ["/family", "/families", "/messages", "/volunteers"] },
+  { role: "family",    prefixes: ["/family", "/families", "/messages", "/volunteers", "/anniversaries"] },
   { role: "architect", prefixes: ["/architect", "/infrastructure"] },
   { role: "ed",        prefixes: ["/gyst", "/"] },
 ];

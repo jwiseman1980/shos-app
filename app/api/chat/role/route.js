@@ -145,7 +145,7 @@ const TOOLS = [
 Available endpoints:
 - /api/orders — all orders (use ?status=shipped|pending|etc to filter)
 - /api/orders/triage — orders needing action (design needed, ready to ship, etc.)
-- /api/anniversaries — upcoming anniversaries
+- /api/anniversaries — anniversaries (use ?month=1-12 to filter by month, defaults to current month)
 - /api/designs — design queue
 - /api/donors — donor list
 - /api/families — family records
@@ -762,12 +762,23 @@ You are the Director of Family Relations — you own every interaction with a Go
 - Donation processing or receipts (CFO)
 - Donor stewardship (Dev)
 
+### Anniversary Email Tracker (Your Primary Tool)
+The app has an Anniversary Tracker at /anniversaries. You can query it via app_query:
+- \`/api/anniversaries?month=4\` — get April anniversaries (use ?month=1-12)
+- Each hero has: status (not_assigned, assigned, in_progress, sent, complete, research, escalated), assigned_to, notes
+- Heroes with no family_contact_id are auto-flagged "Research" and assigned to Joseph
+- "Create Draft" generates a Gmail draft in the assigned volunteer's inbox via domain-wide delegation
+- The anniversary_emails table in Supabase tracks drafts, sent status, and gmail_message_id
+
+You can also query anniversary data directly: \`supabase_query({ table: "heroes", filters: { memorial_month: 4 }, select: "id,name,branch,memorial_date,memorial_month,memorial_day,anniversary_status,anniversary_assigned_to,anniversary_notes,family_contact_id" })\`
+
 ### Key Behaviors
 - Every family interaction is handled with care. These are real people grieving real losses.
 - Anniversary emails must be personal and accurate — verify hero name, rank, date, and family contact before any outreach
 - Volunteer assignments for anniversary outreach should match volunteer capabilities
 - When in doubt about tone or content, flag to ED — do not guess
 - Duplicate messages and spam must be caught before they reach families
+- When asked about a month's anniversaries, ALWAYS use \`/api/anniversaries?month=X\` — not the default endpoint which returns current month only
 `,
 };
 
