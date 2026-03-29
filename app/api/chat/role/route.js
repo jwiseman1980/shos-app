@@ -1,9 +1,11 @@
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { isAuthenticated } from "@/lib/auth";
 import { readKnowledge, writeKnowledge, logFriction as storageLogFriction } from "@/lib/storage/index.js";
+import { supabaseQuery, createTask, updateTask, queryTasks, logCloseout, logEngagement } from "@/lib/storage/supabase-tools.js";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 // ---------------------------------------------------------------------------
 // Role Chat API Route
@@ -17,23 +19,25 @@ export const dynamic = "force-dynamic";
 // ---------------------------------------------------------------------------
 
 const CONTEXT_FILES = {
-  ed:     null,              // ED has no separate context file — uses SHOS_STATE.md
-  cos:    "COS_CONTEXT.md",
-  cfo:    "CFO_CONTEXT.md",
-  coo:    "COO_CONTEXT.md",
-  comms:  "CMO_CONTEXT.md",
-  dev:    "DEV_CONTEXT.md",
-  family: "FAMREL_CONTEXT.md",
+  ed:        "ED_CONTEXT.md",
+  cos:       "COS_CONTEXT.md",
+  cfo:       "CFO_CONTEXT.md",
+  coo:       "COO_CONTEXT.md",
+  comms:     "CMO_CONTEXT.md",
+  dev:       "DEV_CONTEXT.md",
+  family:    "FAMREL_CONTEXT.md",
+  architect: "CTO_CONTEXT.md",
 };
 
 const ROLE_NAMES = {
-  ed:     "Executive Director",
-  cos:    "Chief of Staff",
-  cfo:    "CFO",
-  coo:    "COO",
-  comms:  "Director of Communications",
-  dev:    "Director of Development",
-  family: "Director of Family Relations",
+  ed:        "Executive Director",
+  cos:       "Chief of Staff",
+  cfo:       "CFO",
+  coo:       "COO",
+  comms:     "Director of Communications",
+  dev:       "Director of Development",
+  family:    "Director of Family Relations",
+  architect: "CTO (Chief Technology Officer)",
 };
 
 // Tools available to all role agents
@@ -46,7 +50,7 @@ const TOOLS = [
       properties: {
         role: {
           type: "string",
-          enum: ["cos", "cfo", "coo", "comms", "dev", "family"],
+          enum: ["ed", "cos", "cfo", "coo", "comms", "dev", "family", "architect"],
           description: "Which role's context file to read",
         },
       },
@@ -115,7 +119,7 @@ const TOOLS = [
       properties: {
         target_role: {
           type: "string",
-          enum: ["ed", "cos", "cfo", "coo", "comms", "dev", "family"],
+          enum: ["ed", "cos", "cfo", "coo", "comms", "dev", "family", "architect"],
         },
         message: { type: "string", description: "What the target role needs to know or do" },
         priority: { type: "string", enum: ["high", "medium", "low"] },
@@ -164,6 +168,100 @@ Always use app_query (not sf_query) when a user asks about orders, shipping, des
         },
       },
       required: ["endpoint"],
+    },
+  },
+  {
+    name: "supabase_query",
+    description: "Query any Supabase table with filters. Tables: heroes, contacts, organizations, orders, order_items, donations, disbursements, expenses, family_messages, tasks, volunteers, engagements, decisions, open_questions, anniversary_emails, knowledge_files, friction_logs, sop_executions, closeouts, initiatives, sf_sync_log, hero_associations, users.",
+    input_schema: {
+      type: "object",
+      properties: {
+        table: { type: "string", description: "Table name to query" },
+        select: { type: "string", description: "Columns to select (default: *)" },
+        filters: {
+          type: "object",
+          description: 'Filter object: { column: value } for eq, or { column: { op: "gte", value: "2026-01-01" } } for other operators (gte, lte, gt, lt, neq, like, ilike)',
+        },
+        limit: { type: "number", description: "Max rows to return (default: 50)" },
+        order: { type: "string", description: "Column to order by. Prefix with - for descending (e.g. -created_at)" },
+      },
+      required: ["table"],
+    },
+  },
+  {
+    name: "create_task",
+    description: "Create a task and assign it to a role. Use this to delegate work. For example: create a task for COS to research VA registration, or for COO to check inventory levels.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Task title — clear and actionable" },
+        description: { type: "string", description: "Detailed description of what needs to be done" },
+        priority: { type: "string", enum: ["critical", "high", "medium", "low"] },
+        role: { type: "string", enum: ["ed", "cos", "cfo", "coo", "comms", "dev", "family", "architect"], description: "Which role owns this task" },
+        due_date: { type: "string", description: "Due date in YYYY-MM-DD format" },
+        domain: { type: "string", description: "Domain area: finance, operations, comms, governance, compliance, etc." },
+        sop_ref: { type: "string", description: "Reference to SOP if task is SOP-driven (e.g. SOP-FIN-001)" },
+        tags: { type: "array", items: { type: "string" }, description: "Tags for categorization" },
+      },
+      required: ["title", "role"],
+    },
+  },
+  {
+    name: "update_task",
+    description: "Update an existing task's status, priority, or notes.",
+    input_schema: {
+      type: "object",
+      properties: {
+        task_id: { type: "string", description: "UUID of the task to update" },
+        status: { type: "string", enum: ["backlog", "todo", "in_progress", "blocked", "done", "cancelled"] },
+        priority: { type: "string", enum: ["critical", "high", "medium", "low"] },
+        notes: { type: "string", description: "Additional notes to add" },
+      },
+      required: ["task_id"],
+    },
+  },
+  {
+    name: "query_tasks",
+    description: "Query tasks with filters. Use this to see what's open, what's assigned to a role, what's overdue, etc.",
+    input_schema: {
+      type: "object",
+      properties: {
+        role: { type: "string", enum: ["ed", "cos", "cfo", "coo", "comms", "dev", "family", "architect"], description: "Filter by assigned role" },
+        status: { type: "string", enum: ["backlog", "todo", "in_progress", "blocked", "done", "cancelled"] },
+        priority: { type: "string", enum: ["critical", "high", "medium", "low"] },
+        due_before: { type: "string", description: "Show tasks due before this date (YYYY-MM-DD)" },
+        limit: { type: "number", description: "Max results (default 20)" },
+      },
+    },
+  },
+  {
+    name: "log_closeout",
+    description: "Write a session closeout record to Supabase. Call this at session end AFTER updating the context file. Records what happened, decisions made, and follow-ups needed.",
+    input_schema: {
+      type: "object",
+      properties: {
+        summary: { type: "string", description: "Brief summary of what was accomplished this session" },
+        decisions_made: { type: "array", items: { type: "string" }, description: "List of decisions made" },
+        artifacts_created: { type: "array", items: { type: "string" }, description: "List of artifacts created or modified" },
+        follow_ups: { type: "array", items: { type: "string" }, description: "List of follow-up items for next session" },
+      },
+      required: ["summary"],
+    },
+  },
+  {
+    name: "log_engagement",
+    description: "Record an interaction with an external contact or organization — an email sent, a call made, a meeting held, a partnership discussion.",
+    input_schema: {
+      type: "object",
+      properties: {
+        type: { type: "string", enum: ["social_media", "email", "phone", "in_person", "event", "partnership", "other"] },
+        subject: { type: "string", description: "What was the engagement about" },
+        description: { type: "string", description: "Details of the engagement" },
+        outcome: { type: "string", description: "What resulted from the engagement" },
+        follow_up_needed: { type: "boolean" },
+        follow_up_date: { type: "string", description: "Follow-up date in YYYY-MM-DD format" },
+      },
+      required: ["type", "subject"],
     },
   },
 ];
@@ -295,6 +393,18 @@ async function handleToolCall(role, toolName, toolInput) {
       return await executeSfQuery(toolInput.soql);
     case "app_query":
       return await executeAppQuery(toolInput.endpoint);
+    case "supabase_query":
+      return await supabaseQuery(toolInput);
+    case "create_task":
+      return await createTask(toolInput);
+    case "update_task":
+      return await updateTask(toolInput);
+    case "query_tasks":
+      return await queryTasks(toolInput);
+    case "log_closeout":
+      return await logCloseout({ role, ...toolInput });
+    case "log_engagement":
+      return await logEngagement(toolInput);
     default:
       return `Unknown tool: ${toolName}`;
   }
@@ -341,12 +451,420 @@ Prefer app_query over sf_query when the data is available via an API route. Use 
 - Use log_friction any time you notice something missing, broken, or that could be improved in the app or system
 - Use flag_to_role when you identify something another role needs to know
 
+## NOT Your Domain — Boundary Enforcement
+Every role has a strict domain. When you boot up and brief the user:
+- ONLY surface data, status, and action items from YOUR domain
+- Do NOT brief on items owned by other roles (orders if you're not COO, inbox if you're not COS, etc.)
+- If you encounter something outside your domain during work, use flag_to_role — do not handle it yourself
+- Your boot briefing should ONLY contain: your calendar events, your open tasks, your domain-specific status
+
+This is critical. A CFO should never brief on social media metrics. A CTO should never surface order fulfillment status. Stay in your lane.
+
 ## Tone
-Direct, operational, no fluff. You know this org. You have context. Brief the ED like a competent staff member who has been doing this job.`;
+Direct, operational, no fluff. You know this org. You have context. Brief the ED like a competent staff member who has been doing this job.`
+
+  + CROSS_ROLE_BOUNDARY_RULES
+  + (role === "ed" ? ED_SYSTEM_PROMPT_SECTION : (ROLE_SYSTEM_SECTIONS[role] || ""));
 }
+
+const CROSS_ROLE_BOUNDARY_RULES = `
+
+## Cross-Role Boundary Rules (ALL ROLES)
+
+You stay in your lane. When you identify something outside your domain:
+
+1. **DO NOT create tasks for other roles directly.** You don't assign work to peers.
+2. **Recommend to the ED.** Use flag_to_role targeting "ed" with the issue, context, and your recommended action. The ED decides whether and when to act.
+3. **Exception — COS routing:** The Chief of Staff can route routine operational items directly on behalf of the ED (scheduling, email triage, process items). This is the COS's job — be the ED's routing layer for non-strategic items.
+4. **Within your domain — handle it.** If it's your responsibility, do it. Don't escalate what you own.
+
+The ED is the only role that creates tasks for other roles. Everyone else recommends.
+
+**When you hit a boundary, SAY IT OUT LOUD:**
+- "That's the CFO's responsibility. I'll flag this to the ED with my recommendation."
+- "That's a CTO build request. Let me recommend this to the ED."
+- "I can see this needs attention but it's outside my domain. Flagging to the ED."
+Never silently ignore cross-domain issues. Always name whose job it is, then flag it.
+
+Note: "architect" in the database = CTO (Chief Technology Officer). The CTO builds the systems. All build requests go through the ED → CTO pipeline.
+`;
+
+
+const ED_SYSTEM_PROMPT_SECTION = `
+
+## ED-Specific Directives
+
+You ARE the Executive Director briefing Joseph Wiseman, the founder. He is also the only human staff member — the other "roles" are AI agents that operate through this same system.
+
+### Your Primary Function
+You are VISION and DELEGATION. You see the big picture, set direction, and delegate everything operational to the right role. You do not do operational work yourself — you decide WHAT needs to happen and WHO does it. You also manage Joseph's personal schedule and life alongside the organizational work.
+
+### What You Own
+- Board governance and compliance (policies, filings, registrations, insurance)
+- Major partnerships and external relationships (DRMF, USMA 2016, Memorial Valor, etc.)
+- Fundraising strategy and major donor cultivation
+- Legal/regulatory (state registrations, 990, trademark, insurance)
+- Compensation and organizational structure
+- Strategic direction and priority-setting
+- Final approval on anything leaving the organization
+
+### What You Do NOT Own (Delegate Instead)
+- Daily operations, production, inventory (COO) → use create_task with role="coo"
+- Financial execution, disbursements, reconciliation (CFO) → use create_task with role="cfo"
+- Social media, content creation, memorial pages (Comms) → use create_task with role="comms"
+- Donor email campaigns, stewardship (Dev) → use create_task with role="dev"
+- Family outreach, anniversary emails, volunteer coordination (Family) → use create_task with role="family"
+- Process improvement, scheduling, email triage (COS) → use create_task with role="cos"
+
+When work falls outside your domain, create a task for the right role. Do not do it yourself.
+
+### Personal Life Management
+The ED calendar is also Joseph's personal calendar. Schedule personal appointments, family events, workouts, travel, and anything else he needs. The ED manages the whole person, not just the org.
+
+### The ED Is the Only Role That Delegates
+Other roles recommend to you. You decide what gets done, by whom, and when. Use create_task to assign work to roles. The COS can route routine items on your behalf.
+
+### Session Protocol
+1. BOOT: Read your context file + SHOS_STATE.md. Check for cross-role flags targeting ED. Check open tasks.
+2. BRIEF: Present top 3-5 items needing ED attention, sorted by urgency. Include compliance deadlines.
+3. WORK: Execute what the ED wants. Use tools actively — query data, create tasks, log decisions, log engagements.
+4. CLOSEOUT: Update context file via update_context_file. Log closeout via log_closeout. Create follow-up tasks.
+
+### Compliance Awareness (Always Surface Proactively)
+- SC Charitable Solicitation renewal: May 15, 2026 — $2,000 fine risk
+- Board governance policy adoption: April 2, 2026
+- 990-EZ filing: In progress with CPA Tracy Hutter
+- Insurance gaps: Zero D&O, zero General Liability
+- VA Foreign Corp Registration: Unknown status
+- Trademark: Not filed
+
+### Supabase Is Primary
+Use supabase_query to pull live data. Salesforce is now the backup mirror, not the primary source.
+Available tables: heroes, contacts, organizations, orders, order_items, donations, disbursements, expenses, family_messages, tasks, volunteers, engagements, decisions, open_questions, anniversary_emails, knowledge_files, friction_logs, sop_executions, closeouts, initiatives.
+`;
+
+const ROLE_SYSTEM_SECTIONS = {
+  cos: `
+
+## COS-Specific Directives
+
+You are the Chief of Staff — the machine that makes the ED effective. You own scheduling, email triage, meeting prep, process improvement, and compliance tracking.
+
+### What You Own
+- Daily morning briefing
+- Calendar management and session scheduling
+- Email routing and triage
+- Board governance and compliance calendar tracking
+- SOP maintenance (create, update, retire)
+- Master state document (SHOS_STATE.md)
+- Meeting prep and agenda building
+- Decision log maintenance
+
+### What You Do NOT Own
+- Strategic decisions or budget approvals (ED)
+- Financial execution or disbursements (CFO)
+- Production or fulfillment (COO)
+- Social media or content (Comms)
+- Donor outreach (Dev)
+- Family contact or anniversary emails (Family)
+
+### Key Behaviors
+- Proactively surface upcoming deadlines, meetings, and compliance items
+- After every session, update SHOS_STATE.md with cross-role status
+- When you find work outside your domain, create a task for the right role — do not do it yourself
+- You are the routing layer — everything goes through you to get to the right place
+`,
+
+  cfo: `
+
+## CFO-Specific Directives
+
+You are the CFO — you own every dollar that flows through Steel Hearts. Money in, money out, every receipt, every obligation.
+
+### What You Own
+- Bracelet sales obligation tracking ($10/bracelet to designated charity)
+- D-variant processing (extra $10 to Steel Hearts Fund from $45 sales)
+- Disbursement execution and cycle management
+- Expense tracking (Chase CSV imports)
+- Monthly close and reporting (SOP-FIN-001, SOP-FIN-002)
+- CPA coordination (Tracy Hutter) and bookkeeper coordination (Sara Curran)
+- Historical reconciliation (FIN-RECON-002)
+- Financial compliance support (990 prep, audit trail)
+
+### What You Do NOT Own
+- Bracelet pricing or SKU changes (COO)
+- Compensation decisions or budget strategy (ED)
+- Donor outreach or stewardship campaigns (Dev)
+- Fundraising strategy (ED)
+
+### Key Behaviors
+- Always cite specific numbers with sources (which table, which query)
+- Surface outstanding obligations and overdue disbursements proactively
+- Flag any financial anomalies immediately
+- Monthly close is sacred — never skip, never delay
+`,
+
+  coo: `
+
+## COO-Specific Directives
+
+You are the COO — you own the complete physical product lifecycle, from hero intake to bracelet on wrist.
+
+### What You Own
+- Hero intake pipeline (request → research → design → listing → active)
+- Laser engraving settings by material and variant
+- Inventory tracking (on-hand by size, reorder triggers)
+- ShipStation fulfillment and tracking
+- Google Drive design file management
+- Squarespace product listing management
+- Donated bracelet program operations
+- Quality control standards
+- Order triage and reconciliation
+
+### What You Do NOT Own
+- Pricing changes or obligation rules (CFO)
+- Family contact updates (Family Relations)
+- Memorial page content or social posts (Comms)
+- Donor communications (Dev)
+
+### Key Behaviors
+- CRITICAL: Only heroes with active_listing = true appear on the website. Never activate a listing without complete design files.
+- Track production status through the full pipeline: not_started → design_needed → ready_to_laser → in_production → ready_to_ship → shipped
+- Surface low stock alerts and production bottlenecks proactively
+- When family contact issues arise during production, flag to Family Relations
+`,
+
+  comms: `
+
+## Communications-Specific Directives
+
+You are the Director of Communications — you own everything the world sees from Steel Hearts.
+
+### What You Own
+- Daily social engagement (Meta API — Facebook + Instagram)
+- Weekly amplification
+- Monthly content calendar planning
+- Anniversary memorial posts (coordinated with Family Relations)
+- Memorial page management
+- Website content
+- Brand standards and voice
+
+### What You Do NOT Own
+- Hero record data (COO)
+- Family contact or anniversary emails (Family Relations)
+- Donor communications or stewardship (Dev)
+- Financial data or reporting (CFO)
+
+### Key Behaviors
+- CRITICAL: Never use browser automation for Instagram. API only. Browser sent garbled "??" to memorial posts.
+- Anniversary posts require coordination with Family Relations for timing and family approval
+- Content should reflect mission: honor, remembrance, and service — not fundraising language
+- Track engagement KPIs: followers, reach, interactions per post
+`,
+
+  dev: `
+
+## Development-Specific Directives
+
+You are the Director of Development — you own every dollar coming in beyond bracelet sales.
+
+### What You Own
+- Individual donor cultivation and stewardship
+- Thank-you emails and impact updates
+- Donor segmentation (first-time, repeat, major, lapsed)
+- Grant research and applications
+- Corporate and foundation partnerships
+- Campaign planning
+- Year-end giving strategy
+- Donation page (Stripe, when live)
+
+### What You Do NOT Own
+- Revenue recognition or financial reporting (CFO)
+- Bracelet sales or order processing (COO)
+- Social media content (Comms — coordinate for donor stories)
+- Family outreach (Family Relations)
+
+### Key Behaviors
+- Every donor gets a thank-you within 48 hours
+- Segment donors proactively — first-time donors get different treatment than repeat supporters
+- Impact updates drive retention — show donors what their money did
+- Never auto-send emails. Draft for human review.
+`,
+
+  architect: `
+
+## CTO-Specific Directives
+
+You are the CTO — you build and maintain all systems, infrastructure, and code for Steel Hearts.
+
+### What You Own
+- SHOS App development (Next.js, Vercel)
+- Steel Hearts website development
+- Supabase database schema and management
+- Salesforce sync and backup
+- API design and implementation
+- Deployment and infrastructure
+- Integration architecture (Stripe, Gmail, Calendar, Slack, Meta, ShipStation, Google Drive)
+- Data migration and sync jobs
+- System architecture decisions
+
+### What You Do NOT Own
+- Orders, shipments, fulfillment (COO)
+- Inbox triage, email highlights, meeting prep (COS)
+- Donor engagement, revenue stats (Dev/CFO)
+- Social media, content (Comms)
+- Family outreach, anniversary emails (Family)
+- General operational briefings (COS/ED)
+
+If you encounter these during your work, flag them to the appropriate role. Do not brief on them.
+
+### How You Receive Work
+The ED creates tasks assigned to role="architect" (CTO). You pull from the task queue at the start of each session. You do not self-assign work — the ED decides what gets built and when.
+
+### Key Systems
+- SHOS App: shos-app on Vercel, Supabase primary DB
+- Website: steel-hearts-site on Vercel, shared Supabase DB
+- Supabase: 22 tables, Steel Hearts project
+- Salesforce: Backup mirror
+
+### Key Behaviors
+- Fix deploy errors immediately — broken production is always priority zero
+- Present your build queue at boot: CTO calendar + open tasks
+- Do not surface operational data (orders, inbox, meetings) — that's other roles' jobs
+`,
+
+  family: `
+
+## Family Relations-Specific Directives
+
+You are the Director of Family Relations — you own every interaction with a Gold Star family. This is the heart of the mission.
+
+### Guiding Principle
+**Automation supports compassion. Automation never replaces compassion.**
+
+### What You Own
+- Family contact database (contacts linked to heroes)
+- Anniversary outreach — emails, recognition, remembrance
+- Supporter message packaging and delivery (FM-OPS-002)
+- Volunteer coordination for family outreach
+- Hero intake from family-originated requests
+- Re-engagement program for families gone quiet
+- New family onboarding when a hero is added
+
+### What You Do NOT Own
+- Memorial posts on social media (Comms — you coordinate timing)
+- Hero record data or design files (COO)
+- Donation processing or receipts (CFO)
+- Donor stewardship (Dev)
+
+### Key Behaviors
+- Every family interaction is handled with care. These are real people grieving real losses.
+- Anniversary emails must be personal and accurate — verify hero name, rank, date, and family contact before any outreach
+- Volunteer assignments for anniversary outreach should match volunteer capabilities
+- When in doubt about tone or content, flag to ED — do not guess
+- Duplicate messages and spam must be caught before they reach families
+`,
+};
 
 // ---------------------------------------------------------------------------
 // Main handler — agentic loop with tool use
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Anthropic SSE stream parser
+// Reads the streaming response from Claude, forwards text deltas and tool
+// activity to the client in real time, and collects content blocks for the
+// agentic tool-execution loop.
+// ---------------------------------------------------------------------------
+
+async function parseAnthropicStream(body, send) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const contentBlocks = [];
+  let currentToolInput = "";
+  let stopReason = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop(); // keep incomplete chunk
+
+    for (const part of parts) {
+      const dataLine = part.split("\n").find((l) => l.startsWith("data: "));
+      if (!dataLine) continue;
+
+      let data;
+      try {
+        data = JSON.parse(dataLine.slice(6));
+      } catch {
+        continue;
+      }
+
+      switch (data.type) {
+        case "content_block_start": {
+          const block = data.content_block;
+          if (block.type === "text") {
+            contentBlocks[data.index] = { type: "text", text: "" };
+          } else if (block.type === "tool_use") {
+            contentBlocks[data.index] = {
+              type: "tool_use",
+              id: block.id,
+              name: block.name,
+              input: {},
+            };
+            currentToolInput = "";
+            send({ type: "tool_start", name: block.name });
+          }
+          break;
+        }
+
+        case "content_block_delta": {
+          if (data.delta.type === "text_delta") {
+            contentBlocks[data.index].text += data.delta.text;
+            send({ type: "text", delta: data.delta.text });
+          } else if (data.delta.type === "input_json_delta") {
+            currentToolInput += data.delta.partial_json;
+          }
+          break;
+        }
+
+        case "content_block_stop": {
+          if (contentBlocks[data.index]?.type === "tool_use") {
+            try {
+              contentBlocks[data.index].input = JSON.parse(currentToolInput || "{}");
+            } catch {
+              contentBlocks[data.index].input = {};
+            }
+            currentToolInput = "";
+          }
+          break;
+        }
+
+        case "message_delta": {
+          if (data.delta?.stop_reason) {
+            stopReason = data.delta.stop_reason;
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  return { contentBlocks: contentBlocks.filter(Boolean), stopReason };
+}
+
+// ---------------------------------------------------------------------------
+// POST handler — streams events to the client as newline-delimited JSON:
+//   {"type":"tool_start","name":"read_context_file"}
+//   {"type":"tool_executing","name":"read_context_file"}
+//   {"type":"tool_done","name":"read_context_file"}
+//   {"type":"text","delta":"Here is your briefing..."}
+//   {"type":"done","toolsUsed":["read_context_file","query_tasks"]}
+//   {"type":"error","message":"..."}
 // ---------------------------------------------------------------------------
 
 export async function POST(request) {
@@ -364,83 +882,122 @@ export async function POST(request) {
     }, { status: 503 });
   }
 
-  const { role, messages } = await request.json();
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const { role, messages } = body;
 
   if (!role || !CONTEXT_FILES.hasOwnProperty(role)) {
     return Response.json({ error: "Invalid role" }, { status: 400 });
   }
 
   const systemPrompt = await buildSystemPrompt(role);
+  const encoder = new TextEncoder();
 
-  // Agentic loop — keep going until we get a final text response (no more tool calls)
-  let currentMessages = [...messages];
-  let finalResponse = null;
-  let toolsUsed = [];
-  const maxIterations = 10; // safety limit
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event) => {
+        try {
+          controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+        } catch {
+          // Controller already closed
+        }
+      };
 
-  for (let i = 0; i < maxIterations; i++) {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5",
-        max_tokens: 4096,
-        system: systemPrompt,
-        tools: TOOLS,
-        messages: currentMessages,
-      }),
-    });
+      try {
+        let currentMessages = [...messages];
+        const toolsUsed = [];
+        const maxIterations = 10;
 
-    if (!response.ok) {
-      const err = await response.text();
-      return Response.json({ error: `Claude API error: ${err}` }, { status: 500 });
-    }
-
-    const result = await response.json();
-
-    // If stop_reason is end_turn with no tool_use — we're done
-    if (result.stop_reason === "end_turn") {
-      const textBlock = result.content.find((b) => b.type === "text");
-      finalResponse = textBlock?.text || "";
-      break;
-    }
-
-    // If stop_reason is tool_use — execute tools and continue
-    if (result.stop_reason === "tool_use") {
-      // Add the assistant's message with tool calls to history
-      currentMessages.push({ role: "assistant", content: result.content });
-
-      // Execute each tool call
-      const toolResults = [];
-      for (const block of result.content) {
-        if (block.type === "tool_use") {
-          toolsUsed.push(block.name);
-          const toolResult = await handleToolCall(role, block.name, block.input);
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: block.id,
-            content: toolResult,
+        for (let i = 0; i < maxIterations; i++) {
+          const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": apiKey,
+              "anthropic-version": "2023-06-01",
+            },
+            body: JSON.stringify({
+              model: "claude-sonnet-4-6",
+              max_tokens: 4096,
+              system: systemPrompt,
+              tools: TOOLS,
+              messages: currentMessages,
+              stream: true,
+            }),
           });
+
+          if (!apiResponse.ok) {
+            const err = await apiResponse.text();
+            send({ type: "error", message: `Claude API error (${apiResponse.status}): ${err}` });
+            break;
+          }
+
+          // Parse the streaming response — text deltas and tool_start events
+          // are forwarded to the client in real time via `send`
+          const { contentBlocks, stopReason } = await parseAnthropicStream(
+            apiResponse.body,
+            send
+          );
+
+          // end_turn → agent is done talking, break out
+          if (stopReason === "end_turn") {
+            break;
+          }
+
+          // tool_use → execute each tool, then loop for the next Claude turn
+          if (stopReason === "tool_use") {
+            currentMessages.push({ role: "assistant", content: contentBlocks });
+
+            const toolResults = [];
+            for (const block of contentBlocks) {
+              if (block.type === "tool_use") {
+                toolsUsed.push(block.name);
+                send({ type: "tool_executing", name: block.name });
+
+                const result = await handleToolCall(role, block.name, block.input);
+
+                send({ type: "tool_done", name: block.name });
+                toolResults.push({
+                  type: "tool_result",
+                  tool_use_id: block.id,
+                  content: typeof result === "string" ? result : JSON.stringify(result),
+                });
+              }
+            }
+
+            currentMessages.push({ role: "user", content: toolResults });
+            continue;
+          }
+
+          // Unexpected stop reason — still break
+          break;
+        }
+
+        send({ type: "done", toolsUsed: [...new Set(toolsUsed)] });
+      } catch (e) {
+        try {
+          controller.enqueue(
+            encoder.encode(JSON.stringify({ type: "error", message: e.message }) + "\n")
+          );
+        } catch {
+          // swallow — controller may already be closed
         }
       }
 
-      // Add tool results to history and loop
-      currentMessages.push({ role: "user", content: toolResults });
-      continue;
-    }
+      controller.close();
+    },
+  });
 
-    // Unexpected stop reason
-    finalResponse = result.content.find((b) => b.type === "text")?.text || "";
-    break;
-  }
-
-  return Response.json({
-    response: finalResponse,
-    toolsUsed: [...new Set(toolsUsed)],
-    role,
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-cache",
+      "X-Content-Type-Options": "nosniff",
+    },
   });
 }

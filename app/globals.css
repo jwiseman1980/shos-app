@@ -963,6 +963,73 @@ p {
   letter-spacing: 0;
 }
 
+/* Streaming tool pills */
+.role-chat-tool-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 8px;
+}
+
+.role-chat-tool-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.role-chat-tool-pill.active {
+  border: 1px solid;
+  color: var(--text-bright);
+  background: rgba(255, 255, 255, 0.04);
+  animation: pill-pulse 1.8s ease-in-out infinite;
+}
+
+.role-chat-tool-pill.done {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-dim);
+  background: transparent;
+}
+
+.role-chat-tool-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border-top: 1.5px solid;
+  border-radius: 50%;
+  animation: tool-spin 0.8s linear infinite;
+}
+
+@keyframes tool-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pill-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* Streaming text cursor */
+.role-chat-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 14px;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: cursor-blink 0.8s step-end infinite;
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
 .role-chat-msg-text {
   font-size: 13px;
   line-height: 1.65;
@@ -1286,4 +1353,81 @@ p {
   .grid-2, .grid-3 {
     grid-template-columns: 1fr;
   }
+  .task-board-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Task Board ── */
+.task-board-columns {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  min-height: 400px;
+}
+.task-board-column {
+  background: #111827;
+  border-radius: 8px;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+.task-column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #e5e7eb;
+  border-top: 2px solid #6b7280;
+  border-bottom: 1px solid #1f2937;
+}
+.task-column-body {
+  flex: 1;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+.task-card {
+  background: #1a1a2e;
+  border: 1px solid #2a2a3e;
+  border-radius: 6px;
+  padding: 10px;
+  transition: border-color 0.15s;
+}
+.task-card:hover {
+  border-color: #444;
+}
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.create-task-btn {
+  padding: 6px 14px;
+  background: #c4a237;
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.create-task-btn:hover {
+  background: #d4b247;
+}
+.create-task-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: #111827;
+  border: 1px solid #333;
+  border-radius: 8px;
+  width: 100%;
 }
