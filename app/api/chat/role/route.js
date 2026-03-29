@@ -171,6 +171,37 @@ Always use app_query (not sf_query) when a user asks about orders, shipping, des
     },
   },
   {
+    name: "app_mutation",
+    description: `Write data through the SHOS app's internal API. Use this for any action that changes data — assigning volunteers, updating statuses, creating records, etc.
+
+Available mutation endpoints:
+- PATCH /api/heroes/update — update anniversary status, assignment, notes, completion date. Body: { sfId, status, assignedToName, notes, completedDate, heroName }
+- POST /api/anniversaries/draft-email — create a Gmail draft for an anniversary email. Body: { heroName, branch, years, memorialDate, familyEmail, familyName, senderEmail, senderName, sfId }
+- POST /api/tasks — create a task. Body: { title, description, status, priority, role, domain, hero_id, due_date, tags }
+- POST /api/engagements — log an engagement. Body: { type, subject, description, outcome, follow_up_needed, follow_up_date }
+
+Always confirm with the user before making bulk mutations (e.g., assigning 20 heroes at once). Single updates are fine without confirmation.`,
+    input_schema: {
+      type: "object",
+      properties: {
+        endpoint: {
+          type: "string",
+          description: "The API endpoint path, e.g. /api/heroes/update",
+        },
+        method: {
+          type: "string",
+          enum: ["POST", "PATCH", "PUT"],
+          description: "HTTP method",
+        },
+        body: {
+          type: "object",
+          description: "The request body to send as JSON",
+        },
+      },
+      required: ["endpoint", "method", "body"],
+    },
+  },
+  {
     name: "supabase_query",
     description: "Query any Supabase table with filters. Tables: heroes, contacts, organizations, orders, order_items, donations, disbursements, expenses, family_messages, tasks, volunteers, engagements, decisions, open_questions, anniversary_emails, knowledge_files, friction_logs, sop_executions, closeouts, initiatives, sf_sync_log, hero_associations, users.",
     input_schema: {
@@ -362,6 +393,34 @@ async function executeAppQuery(endpoint) {
   }
 }
 
+async function executeAppMutation(endpoint, method, body) {
+  try {
+    const base = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+    const url = `${base}${path}`;
+
+    const res = await fetch(url, {
+      method: method || "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.SHOS_API_KEY || "",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      return `Mutation failed (${res.status}): ${JSON.stringify(data)}`;
+    }
+
+    const text = JSON.stringify(data, null, 2);
+    return text.length > 4000 ? text.slice(0, 4000) + "\n...(truncated)" : text;
+  } catch (e) {
+    return `App mutation failed: ${e.message}`;
+  }
+}
+
 async function executeSfQuery(soql) {
   if (process.env.SF_LIVE !== "true") {
     return "Salesforce is not connected (SF_LIVE is not true). Query not executed.";
@@ -393,6 +452,8 @@ async function handleToolCall(role, toolName, toolInput) {
       return await executeSfQuery(toolInput.soql);
     case "app_query":
       return await executeAppQuery(toolInput.endpoint);
+    case "app_mutation":
+      return await executeAppMutation(toolInput.endpoint, toolInput.method, toolInput.body);
     case "supabase_query":
       return await supabaseQuery(toolInput);
     case "create_task":
