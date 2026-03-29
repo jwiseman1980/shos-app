@@ -137,6 +137,53 @@ export async function PATCH(request) {
     const slackWebhook = process.env.SLACK_SOP_WEBHOOK;
     const displayName = heroName || sfId;
 
+    // --- Look up hero record for task creation and notifications ---
+    const { data: heroRecord } = await supabase
+      .from("heroes")
+      .select("id, memorial_date, memorial_month, memorial_day")
+      .eq("sf_id", sfId)
+      .single();
+
+    // --- Auto-create task when volunteer is assigned ---
+    if (assignedToName) {
+      try {
+        // Look up assignee's user ID
+        const { data: taskUser } = await supabase
+          .from("users")
+          .select("id")
+          .ilike("name", assignedToName)
+          .limit(1)
+          .single();
+
+        // Check if an open anniversary task already exists for this hero
+        const existingCheck = heroRecord?.id
+          ? await supabase
+              .from("tasks")
+              .select("id")
+              .eq("hero_id", heroRecord.id)
+              .eq("domain", "anniversary")
+              .in("status", ["backlog", "todo", "in_progress"])
+              .limit(1)
+          : { data: [] };
+
+        if (!existingCheck.data?.length) {
+          await supabase.from("tasks").insert({
+            title: `Send anniversary email — ${displayName}`,
+            description: `Create and send the remembrance email for ${displayName}. Go to the Anniversary Email Tracker to draft and send.`,
+            status: "todo",
+            priority: "medium",
+            role: "family",
+            domain: "anniversary",
+            hero_id: heroRecord?.id || null,
+            assigned_to: taskUser?.id || null,
+            tags: ["anniversary", "email"],
+          });
+        }
+      } catch (taskErr) {
+        console.warn("[heroes/update] Task auto-creation failed:", taskErr.message);
+      }
+    }
+
     // --- Notify volunteer on assignment (email + Slack) ---
     if (assignedToName && assignedToName !== "Joseph Wiseman") {
       // Look up volunteer email
@@ -189,6 +236,24 @@ export async function PATCH(request) {
         } catch {
           // Best effort
         }
+      }
+    }
+
+    // --- Auto-complete anniversary task when status is Sent/Complete ---
+    if (
+      status &&
+      ["Complete", "Completed", "Sent", "complete", "sent"].includes(status) &&
+      heroRecord?.id
+    ) {
+      try {
+        await supabase
+          .from("tasks")
+          .update({ status: "done", completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+          .eq("hero_id", heroRecord.id)
+          .eq("domain", "anniversary")
+          .in("status", ["backlog", "todo", "in_progress"]);
+      } catch {
+        // Best effort
       }
     }
 
