@@ -1,17 +1,19 @@
 import { NextResponse } from "next/server";
+import { getServerClient } from "@/lib/supabase";
 
 /**
  * PATCH /api/heroes/update
- * Updates anniversary fields on a Memorial_Bracelet__c record in Salesforce.
+ * Updates anniversary fields on a hero record.
+ * Writes to Supabase FIRST (primary), then mirrors to Salesforce (backup).
  *
  * Body: {
- *   sfId: "a0uKj00000flMOpIAM",
- *   status: "In Progress",          // Anniversary_Status__c
- *   assignedTo: "003...",            // Anniversary_Assigned_To__c (Contact Id)
- *   assignedToName: "Chris Marti",   // Looks up Contact by name, sets Anniversary_Assigned_To__c
- *   notes: "some note",             // Anniversary_Notes__c
- *   completedDate: "2026-03-20",    // Anniversary_Completed_Date__c
- *   heroName: "CPT John Smith"      // Optional — for Slack messages
+ *   sfId: "a0uKj00000flMOpIAM",        // Salesforce ID (used to find the Supabase record)
+ *   status: "In Progress",              // anniversary_status
+ *   assignedTo: "uuid-or-sf-id",        // anniversary_assigned_to
+ *   assignedToName: "Chris Marti",      // Looks up volunteer by name
+ *   notes: "some note",                 // anniversary_notes
+ *   completedDate: "2026-03-20",        // anniversary_completed_date
+ *   heroName: "CPT John Smith"          // Optional — for Slack messages
  * }
  */
 export async function PATCH(request) {
@@ -20,109 +22,128 @@ export async function PATCH(request) {
     const { sfId, status, assignedTo, assignedToName, notes, completedDate, heroName } = body;
 
     if (!sfId) {
-      return NextResponse.json(
-        { error: "sfId is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "sfId is required" }, { status: 400 });
     }
 
-    // Check if SF is enabled
-    if (process.env.SF_LIVE !== "true") {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Salesforce is not connected. Set SF_LIVE=true to enable write-back.",
-          mock: true,
-        },
-        { status: 200 }
-      );
-    }
+    const supabase = getServerClient();
 
-    const { sfUpdate, sfQuery } = await import("@/lib/salesforce");
+    // Build Supabase update payload
+    const sbUpdate = {};
+    const sfUpdate = {};
 
-    // Build the update payload — only include fields that were provided
-    const updateData = {};
-
+    // Status
     if (status !== undefined) {
-      updateData.Anniversary_Status__c = status;
+      // Normalize for Supabase enum (lowercase, underscored)
+      const sbStatus = status.toLowerCase().replace(/\s+/g, "_");
+      sbUpdate.anniversary_status = sbStatus;
+      sfUpdate.Anniversary_Status__c = status;
     }
 
-    if (assignedTo !== undefined) {
-      updateData.Anniversary_Assigned_To__c = assignedTo || null;
-    }
-
-    // Look up User by name if assignedToName is provided
-    // (Anniversary_Assigned_To__c is a User lookup, not Contact)
+    // Assignment by name — look up in volunteers/users
     if (assignedToName !== undefined && assignedTo === undefined) {
       if (assignedToName) {
-        try {
-          const users = await sfQuery(
-            `SELECT Id FROM User WHERE Name = '${assignedToName.replace(/'/g, "\\'")}' AND IsActive = true LIMIT 1`
-          );
-          if (users.length > 0) {
-            updateData.Anniversary_Assigned_To__c = users[0].Id;
-          } else {
-            console.warn(`SF User not found for name: ${assignedToName}`);
-          }
-        } catch (lookupErr) {
-          console.warn(`User lookup failed: ${lookupErr.message}`);
+        // Look up user in Supabase by display_name
+        const { data: user } = await supabase
+          .from("users")
+          .select("id")
+          .ilike("display_name", assignedToName)
+          .limit(1)
+          .single();
+
+        if (user) {
+          sbUpdate.anniversary_assigned_to = user.id;
         }
       } else {
-        // Clearing assignment
-        updateData.Anniversary_Assigned_To__c = null;
+        sbUpdate.anniversary_assigned_to = null;
+      }
+    } else if (assignedTo !== undefined) {
+      sbUpdate.anniversary_assigned_to = assignedTo || null;
+    }
+
+    // Notes
+    if (notes !== undefined) {
+      sbUpdate.anniversary_notes = notes;
+      sfUpdate.Anniversary_Notes__c = notes;
+    }
+
+    // Completed date
+    if (completedDate !== undefined) {
+      sbUpdate.anniversary_completed_date = completedDate || null;
+      sfUpdate.Anniversary_Completed_Date__c = completedDate || null;
+    }
+
+    // Auto-set completed date when status is complete/sent
+    if (
+      status &&
+      ["Complete", "Completed", "Sent", "complete", "sent"].includes(status) &&
+      !completedDate
+    ) {
+      const today = new Date().toISOString().split("T")[0];
+      sbUpdate.anniversary_completed_date = today;
+      sfUpdate.Anniversary_Completed_Date__c = today;
+    }
+
+    if (Object.keys(sbUpdate).length === 0 && Object.keys(sfUpdate).length === 0) {
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+    }
+
+    // --- WRITE 1: Supabase (primary) ---
+    if (Object.keys(sbUpdate).length > 0) {
+      sbUpdate.updated_at = new Date().toISOString();
+
+      const { error: sbErr } = await supabase
+        .from("heroes")
+        .update(sbUpdate)
+        .eq("sf_id", sfId);
+
+      if (sbErr) {
+        console.error("[heroes/update] Supabase write failed:", sbErr.message);
+        // Don't return — still try SF as fallback
       }
     }
 
-    if (notes !== undefined) {
-      updateData.Anniversary_Notes__c = notes;
+    // --- WRITE 2: Salesforce (backup mirror) ---
+    if (process.env.SF_LIVE === "true" && Object.keys(sfUpdate).length > 0) {
+      try {
+        const { sfUpdate: sfDoUpdate, sfQuery } = await import("@/lib/salesforce");
+
+        // Look up SF user for assignment if we have a name
+        if (assignedToName !== undefined && assignedTo === undefined) {
+          if (assignedToName) {
+            try {
+              const users = await sfQuery(
+                `SELECT Id FROM User WHERE Name = '${assignedToName.replace(/'/g, "\\'")}' AND IsActive = true LIMIT 1`
+              );
+              if (users.length > 0) {
+                sfUpdate.Anniversary_Assigned_To__c = users[0].Id;
+              }
+            } catch (lookupErr) {
+              console.warn(`SF User lookup failed: ${lookupErr.message}`);
+            }
+          } else {
+            sfUpdate.Anniversary_Assigned_To__c = null;
+          }
+        } else if (assignedTo !== undefined) {
+          sfUpdate.Anniversary_Assigned_To__c = assignedTo || null;
+        }
+
+        await sfDoUpdate("Memorial_Bracelet__c", sfId, sfUpdate);
+      } catch (sfErr) {
+        console.warn("[heroes/update] SF mirror failed:", sfErr.message);
+        // Best effort — Supabase is the primary, SF failing is not fatal
+      }
     }
 
-    if (completedDate !== undefined) {
-      updateData.Anniversary_Completed_Date__c = completedDate || null;
-    }
-
-    // Auto-set completed date when status is set to complete/sent
-    if (
-      status &&
-      ["Complete", "Completed", "Sent"].includes(status) &&
-      !completedDate
-    ) {
-      updateData.Anniversary_Completed_Date__c = new Date()
-        .toISOString()
-        .split("T")[0];
-    }
-
-    // Auto-set In Progress when first assigning
-    if (
-      updateData.Anniversary_Assigned_To__c &&
-      !status
-    ) {
-      // Only auto-set if current status would be Not Started
-      // We don't override existing status
-    }
-
-    if (Object.keys(updateData).length === 0) {
-      return NextResponse.json(
-        { error: "No fields to update" },
-        { status: 400 }
-      );
-    }
-
-    await sfUpdate("Memorial_Bracelet__c", sfId, updateData);
-
-    // Post to Slack if webhook is configured and status changed to complete
+    // --- Slack notification on completion ---
     const slackWebhook = process.env.SLACK_SOP_WEBHOOK;
     if (
       slackWebhook &&
       status &&
-      ["Complete", "Completed", "Sent"].includes(status)
+      ["Complete", "Completed", "Sent", "complete", "sent"].includes(status)
     ) {
       try {
         const displayName = heroName || sfId;
-        const dateStr = new Date().toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-        });
+        const dateStr = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
         await fetch(slackWebhook, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -132,19 +153,17 @@ export async function PATCH(request) {
           }),
         });
       } catch {
-        // Slack post is best-effort
+        // Slack is best-effort
       }
     }
 
     return NextResponse.json({
       success: true,
-      updated: updateData,
+      updated: { ...sbUpdate, ...sfUpdate },
       sfId,
     });
   } catch (error) {
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 }
-    );
+    console.error("[heroes/update] Error:", error.message);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

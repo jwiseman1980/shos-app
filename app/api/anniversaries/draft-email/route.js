@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { getServerClient } from "@/lib/supabase";
 
 /**
  * POST /api/anniversaries/draft-email
  * Creates an anniversary remembrance email draft in a volunteer's Gmail.
+ * Updates status to "In Progress" / "email_drafted" in Supabase (primary) and Salesforce (mirror).
  *
  * Body: {
  *   heroName: "SSG John Smith",
@@ -83,7 +85,23 @@ export async function POST(request) {
       body: emailBody,
     });
 
-    // Auto-update Anniversary_Status__c to "In Progress" in Salesforce
+    // --- Update Supabase (primary) ---
+    if (sfId) {
+      try {
+        const supabase = getServerClient();
+        await supabase
+          .from("heroes")
+          .update({
+            anniversary_status: "email_drafted",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("sf_id", sfId);
+      } catch (sbErr) {
+        console.warn("[draft-email] Supabase status update failed:", sbErr.message);
+      }
+    }
+
+    // --- Mirror to Salesforce (backup) ---
     if (sfId && process.env.SF_LIVE === "true") {
       try {
         const { sfUpdate } = await import("@/lib/salesforce");
@@ -91,7 +109,7 @@ export async function POST(request) {
           Anniversary_Status__c: "In Progress",
         });
       } catch (sfErr) {
-        console.warn("SF status update failed:", sfErr.message);
+        console.warn("[draft-email] SF status update failed:", sfErr.message);
       }
     }
 
