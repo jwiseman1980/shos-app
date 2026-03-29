@@ -93,7 +93,7 @@ const NAV_ROLES = [
     href: "/family",
     items: [
       { href: "/family", label: "Overview", exact: true },
-      { href: "/anniversaries", label: "Anniversaries" },
+      { href: "/anniversaries", label: "Anniversary Emails" },
       { href: "/messages", label: "Messages" },
       { href: "/families", label: "Families" },
       { href: "/volunteers", label: "Volunteers" },

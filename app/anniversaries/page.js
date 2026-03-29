@@ -170,7 +170,7 @@ export default async function AnniversariesPage({ searchParams }) {
 
   return (
     <PageShell
-      title="Anniversary Tracker"
+      title="Anniversary Email Tracker"
       subtitle={`${monthName} ${year} — ${totalThisMonth} remembrances this month`}
     >
       {/* Month Selector */}
