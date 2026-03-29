@@ -8,6 +8,7 @@ import { getAnniversariesByMonth } from "@/lib/data/heroes";
 import { getVolunteers } from "@/lib/data/volunteers";
 import { getMonthName, getCurrentMonth, getCurrentYear, getDayOfMonth, yearsSince } from "@/lib/dates";
 import { getSessionUser } from "@/lib/auth";
+import { getServerClient } from "@/lib/supabase";
 import Link from "next/link";
 
 const MONTH_OPTIONS = [
@@ -88,6 +89,48 @@ export default async function AnniversariesPage({ searchParams }) {
         } : {}),
       };
     });
+
+  // Auto-create research tasks for heroes with no family contact
+  // Only creates if no existing open task for this hero+month
+  const researchHeroes = sorted.filter(
+    (h) => normalizeStatus(h.anniversaryStatus) === "research"
+  );
+  if (researchHeroes.length > 0) {
+    try {
+      const sb = getServerClient();
+      const heroIds = researchHeroes.map((h) => h.id).filter(Boolean);
+
+      // Check which heroes already have open research tasks
+      const { data: existingTasks } = await sb
+        .from("tasks")
+        .select("hero_id")
+        .in("hero_id", heroIds)
+        .in("status", ["backlog", "todo", "in_progress"])
+        .eq("domain", "family");
+
+      const existingHeroIds = new Set((existingTasks || []).map((t) => t.hero_id));
+
+      // Create tasks for heroes that don't have one yet
+      const newTasks = researchHeroes
+        .filter((h) => h.id && !existingHeroIds.has(h.id))
+        .map((h) => ({
+          title: `Research family contact — ${h.name}`,
+          description: `No family contact on file for ${h.name}. Find contact info so the anniversary email can be sent. Memorial date: ${getMonthName(selectedMonth)} ${h.dayOfMonth}.`,
+          status: "todo",
+          priority: "high",
+          role: "ed",
+          domain: "family",
+          hero_id: h.id,
+          tags: ["anniversary", "research"],
+        }));
+
+      if (newTasks.length > 0) {
+        await sb.from("tasks").insert(newTasks);
+      }
+    } catch (taskErr) {
+      console.warn("[anniversaries] Auto-task creation failed:", taskErr.message);
+    }
+  }
 
   // Compute stats from sorted heroes (which includes research flagging)
   const totalThisMonth = sorted.length;

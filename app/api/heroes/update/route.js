@@ -134,15 +134,71 @@ export async function PATCH(request) {
       }
     }
 
-    // --- Slack notification on completion ---
     const slackWebhook = process.env.SLACK_SOP_WEBHOOK;
+    const displayName = heroName || sfId;
+
+    // --- Notify volunteer on assignment (email + Slack) ---
+    if (assignedToName && assignedToName !== "Joseph Wiseman") {
+      // Look up volunteer email
+      const { data: assignedUser } = await supabase
+        .from("users")
+        .select("email, name")
+        .ilike("name", assignedToName)
+        .limit(1)
+        .single();
+
+      if (assignedUser?.email) {
+        // Email notification
+        try {
+          const { sendGmailMessage } = await import("@/lib/gmail");
+          await sendGmailMessage({
+            senderEmail: "joseph.wiseman@steel-hearts.org",
+            senderName: "Steel Hearts",
+            to: assignedUser.email,
+            subject: `Anniversary Assignment — ${displayName}`,
+            body: [
+              `Hi ${assignedUser.name.split(" ")[0]},`,
+              "",
+              `You've been assigned to handle the anniversary remembrance for ${displayName}.`,
+              "",
+              `Please log into the SHOS app and navigate to the Anniversary Tracker to review the details and create the email draft when you're ready.`,
+              "",
+              `https://shos-app.vercel.app/anniversaries`,
+              "",
+              "Thank you for helping us honor their memory.",
+              "",
+              "— Steel Hearts",
+            ].join("\n"),
+          });
+        } catch (emailErr) {
+          console.warn("[heroes/update] Assignment email failed:", emailErr.message);
+        }
+      }
+
+      // Slack notification
+      if (slackWebhook) {
+        try {
+          await fetch(slackWebhook, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: `:memo: Anniversary assigned — *${displayName}* → ${assignedToName}`,
+              unfurl_links: false,
+            }),
+          });
+        } catch {
+          // Best effort
+        }
+      }
+    }
+
+    // --- Slack notification on completion ---
     if (
       slackWebhook &&
       status &&
       ["Complete", "Completed", "Sent", "complete", "sent"].includes(status)
     ) {
       try {
-        const displayName = heroName || sfId;
         const dateStr = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
         await fetch(slackWebhook, {
           method: "POST",
