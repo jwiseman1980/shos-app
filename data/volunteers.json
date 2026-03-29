@@ -5,9 +5,11 @@
     "email": "joseph.wiseman@steel-hearts.org",
     "initials": "JW",
     "color": "#1e3a5f",
-    "domains": ["All"],
+    "domains": [
+      "All"
+    ],
     "isFounder": true,
-    "passwordHash": "$2b$10$p2T6MHR8dum6S65JoetHt.H3NKaqS0.O/TKcMOlNVjbPO5pBoDKr6"
+    "passwordHash": "$2b$10$P.VH17WZGoaHJ4wvoOBKNehFYR/888X9ye9LY2CqhLMpa0fjmpaSu"
   },
   {
     "name": "Chris Marti",
@@ -15,8 +17,11 @@
     "email": "chris.marti@steel-hearts.org",
     "initials": "CM",
     "color": "#2e7d32",
-    "domains": ["Memorial Ops", "Anniversary Emails"],
-    "passwordHash": "$2b$10$OFWANhpp.cCYR4YcMa.W5u1jOfQcuV8QEtWECwq/Ys2KNOmMxSA7."
+    "domains": [
+      "Memorial Ops",
+      "Anniversary Emails"
+    ],
+    "passwordHash": "$2b$10$iwByEjFh06ax0UpL/diU/uijRol8213jUuTXjGlPPi/L75Wk.i9GO"
   },
   {
     "name": "Kristin Hughes",
@@ -24,8 +29,10 @@
     "email": "kristin.hughes@steel-hearts.org",
     "initials": "KH",
     "color": "#6a1b9a",
-    "domains": ["Anniversary Emails"],
-    "passwordHash": "$2b$10$86emTlByaBwS1TTfNMM92eKPj5TRKaV.b9vP9qGzpy2Fml9caw6Vu"
+    "domains": [
+      "Anniversary Emails"
+    ],
+    "passwordHash": "$2b$10$RuekiYbxeFWuy1QDjmzdH..G2TyRDottFLf8xSkx5P3LXPsdjoRxa"
   },
   {
     "name": "Bianca Baldwin",
@@ -33,8 +40,10 @@
     "email": "bianca.baldwin@steel-hearts.org",
     "initials": "BB",
     "color": "#c62828",
-    "domains": ["Anniversary Emails"],
-    "passwordHash": "$2b$10$/bxU.LYbalBCA70dl4Vd7u91Tthh1dElFY0T1ymS1LSrjwJ5U5peG"
+    "domains": [
+      "Anniversary Emails"
+    ],
+    "passwordHash": "$2b$10$N13GGF4dcSKyvvs2jfA2M.Vz1VSb3V.A5OGdp1kuQ9YvKFaErhoI6"
   },
   {
     "name": "Sean Reeves",
@@ -42,8 +51,10 @@
     "email": "sean.reeves@steel-hearts.org",
     "initials": "SR",
     "color": "#00838f",
-    "domains": ["Anniversary Emails"],
-    "passwordHash": "$2b$10$drtya3F9FlpT83peDg/jE.qPINtGUsfOvvxpmR0GGOiY.s3eEB/.2"
+    "domains": [
+      "Anniversary Emails"
+    ],
+    "passwordHash": "$2b$10$nq24xWJbkEsfNpVrqDEStuYINmNYiTwq0i9OhkyX07VET3isXR.sO"
   },
   {
     "name": "Alex Kim",
@@ -51,8 +62,10 @@
     "email": "alex.kim@steel-hearts.org",
     "initials": "AK",
     "color": "#4527a0",
-    "domains": ["Anniversary Emails"],
-    "passwordHash": "$2b$10$kd7HnbOd92hjkI6rsOifkuOlwb9WkvrgG1epMWcSfotOTIk9UP0Ye"
+    "domains": [
+      "Anniversary Emails"
+    ],
+    "passwordHash": "$2b$10$JKU1T8zUKyfjT25Mqnv8muCsKWOo1yKaLpRtVDTMG488IkmBtmMA6"
   },
   {
     "name": "Melanie Gness",
@@ -60,8 +73,10 @@
     "email": "melanie.gness@steel-hearts.org",
     "initials": "MG",
     "color": "#e65100",
-    "domains": ["Anniversary Emails"],
-    "passwordHash": "$2b$10$m5rfWG90Bz/MIFRpNmEbeetz/wdttZj2rtr8zrXd9IyQd75IPwqXq"
+    "domains": [
+      "Anniversary Emails"
+    ],
+    "passwordHash": "$2b$10$AVHRjS5KVP6v/c354nC0XOxgVCRx65.M9X8tddbX0rXoBYJyU4QKa"
   },
   {
     "name": "Ryan Santana",
@@ -69,8 +84,10 @@
     "email": "ryan.santana@steel-hearts.org",
     "initials": "RS",
     "color": "#1565c0",
-    "domains": ["Anniversary Emails"],
-    "passwordHash": "$2b$10$5HEA/MTHgCTv8JYKIX67GenGlCAdMBIMgiNuNQhy8IMr0bdUWF6Zq"
+    "domains": [
+      "Anniversary Emails"
+    ],
+    "passwordHash": "$2b$10$huOnJkq5Sq6iDQ0rk353XOStgPk8NZKocTHanoaFq3Rp4PZ7gPT2u"
   },
   {
     "name": "Matt Schwartz",
@@ -78,8 +95,10 @@
     "email": "matthew.schwartz@steel-hearts.org",
     "initials": "MS",
     "color": "#ad1457",
-    "domains": ["Anniversary Emails"],
-    "passwordHash": "$2b$10$kyKROejcPHotjucWN4QHPugWaAzbHuQW/1QyKeqe6hWwf5k8jaUMq"
+    "domains": [
+      "Anniversary Emails"
+    ],
+    "passwordHash": "$2b$10$owW9vQw5ILz.hAiYKNDfYuwDF1rQDfRd8rCHuU.KOQzCh69GEUmdG"
   },
   {
     "name": "Crysta Gonzalez",
@@ -87,8 +106,10 @@
     "email": "crysta.gonzalez@steel-hearts.org",
     "initials": "CG",
     "color": "#00695c",
-    "domains": ["Anniversary Emails"],
-    "passwordHash": "$2b$10$E7Z2N5ssU.U3nvMUNGPwOuA8r5h5pFk/ebBbjV3r8aEhoD6UmaYjG"
+    "domains": [
+      "Anniversary Emails"
+    ],
+    "passwordHash": "$2b$10$x.sqc1ID2Hmdm7OW08uiYu.1TUsKgv5RLym60Vh/Sp8PFOoSKtHBO"
   },
   {
     "name": "Sara Curran",
@@ -96,8 +117,10 @@
     "email": "sara@external.com",
     "initials": "SC",
     "color": "#795548",
-    "domains": ["Finance"],
+    "domains": [
+      "Finance"
+    ],
     "isExternal": true,
-    "passwordHash": "$2b$10$7ibHN6irkQsoBeMVL8F8duzBg1w5MqmL1WPb1ZIGsIW7FN0GFUkIK"
+    "passwordHash": "$2b$10$fuBIx9qISH28hh1K6636gOt3dlTOe6YcJhl9.gmaQ5yrb746VWXzG"
   }
 ]
