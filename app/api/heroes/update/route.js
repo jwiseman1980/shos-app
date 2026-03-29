@@ -42,11 +42,11 @@ export async function PATCH(request) {
     // Assignment by name — look up in volunteers/users
     if (assignedToName !== undefined && assignedTo === undefined) {
       if (assignedToName) {
-        // Look up user in Supabase by display_name
+        // Look up user in Supabase by name
         const { data: user } = await supabase
           .from("users")
           .select("id")
-          .ilike("display_name", assignedToName)
+          .ilike("name", assignedToName)
           .limit(1)
           .single();
 
