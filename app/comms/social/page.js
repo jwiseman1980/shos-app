@@ -7,7 +7,7 @@ export const metadata = {
 };
 
 export default async function SocialMediaPage() {
-  const sop = getSopById("SOP-001");
+  const sop = await getSopById("SOP-001");
 
   return (
     <main className="page-shell">
