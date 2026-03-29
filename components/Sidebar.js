@@ -17,11 +17,11 @@ export const ROLE_COLORS = {
 const NAV_ROLES = [
   {
     role: "ed",
-    label: "Command",
+    label: "Dashboard",
     href: "/",
     items: [
-      { href: "/", label: "Daily Brief", exact: true },
-      { href: "/tasks", label: "Tasks" },
+      { href: "/", label: "My Tasks", exact: true },
+      { href: "/tasks", label: "All Tasks" },
       { href: "/gyst", label: "Personal" },
     ],
   },
