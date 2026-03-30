@@ -22,6 +22,7 @@ import {
   getPostComments,
   checkTokenHealth,
 } from "@/lib/meta";
+import { persistPosts, persistProfileSnapshot } from "@/lib/social-persist";
 
 export const dynamic = "force-dynamic";
 
@@ -37,14 +38,23 @@ export async function GET(request) {
 
   try {
     switch (action) {
-      case "fb_posts":
-        return NextResponse.json({ success: true, posts: await getFacebookPosts(limit) });
+      case "fb_posts": {
+        const fbPosts = await getFacebookPosts(limit);
+        persistPosts("facebook", fbPosts).catch(() => {});
+        return NextResponse.json({ success: true, posts: fbPosts });
+      }
 
-      case "ig_posts":
-        return NextResponse.json({ success: true, posts: await getInstagramPosts(limit) });
+      case "ig_posts": {
+        const igPosts = await getInstagramPosts(limit);
+        persistPosts("instagram", igPosts).catch(() => {});
+        return NextResponse.json({ success: true, posts: igPosts });
+      }
 
-      case "ig_profile":
-        return NextResponse.json({ success: true, profile: await getInstagramProfile() });
+      case "ig_profile": {
+        const profile = await getInstagramProfile();
+        persistProfileSnapshot(profile).catch(() => {});
+        return NextResponse.json({ success: true, profile });
+      }
 
       case "fb_insights":
         return NextResponse.json({ success: true, insights: await getFacebookInsights() });
@@ -65,6 +75,10 @@ export async function GET(request) {
           getFacebookPosts(5).catch(() => []),
           getInstagramPosts(5).catch(() => []),
         ]);
+        // Persist in background — never blocks response
+        if (igProfile) persistProfileSnapshot(igProfile).catch(() => {});
+        if (fbPosts.length) persistPosts("facebook", fbPosts).catch(() => {});
+        if (igPosts.length) persistPosts("instagram", igPosts).catch(() => {});
         return NextResponse.json({
           success: true,
           instagram: igProfile,
