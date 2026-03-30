@@ -3,32 +3,31 @@
 import { useState } from "react";
 
 const statusColors = {
-  "Needs Decision": { bg: "#ef444422", text: "#ef4444", label: "Needs Decision" },
-  "Design Needed": { bg: "#f59e0b22", text: "#f59e0b", label: "Design Needed" },
-  "Design In Progress": { bg: "#8b5cf622", text: "#8b5cf6", label: "Design In Progress" },
-  "Ready to Laser": { bg: "#3b82f622", text: "#3b82f6", label: "Ready to Laser" },
-  "In Production": { bg: "#06b6d422", text: "#06b6d4", label: "In Production" },
-  "Ready to Ship": { bg: "#22c55e22", text: "#22c55e", label: "Ready to Ship" },
+  "not_started": { bg: "#f59e0b22", text: "#f59e0b", label: "Design Needed" },
+  "design_needed": { bg: "#f59e0b22", text: "#f59e0b", label: "Design Needed" },
+  "ready_to_laser": { bg: "#3b82f622", text: "#3b82f6", label: "Ready to Laser" },
+  "in_production": { bg: "#06b6d422", text: "#06b6d4", label: "In Production" },
+  "ready_to_ship": { bg: "#22c55e22", text: "#22c55e", label: "Ready to Ship" },
+  "shipped": { bg: "#6b728022", text: "#6b7280", label: "Shipped" },
 };
 
+// Only valid Supabase enum values
 const STATUS_OPTIONS = [
-  "Needs Decision",
-  "Design Needed",
-  "Design In Progress",
-  "Ready to Laser",
-  "In Production",
-  "Ready to Ship",
-  "Shipped",
+  "design_needed",
+  "ready_to_laser",
+  "in_production",
+  "ready_to_ship",
+  "shipped",
 ];
 
 function StatusBadge({ status }) {
-  const c = statusColors[status] || { bg: "#6b728022", text: "#6b7280" };
+  const c = statusColors[status] || { bg: "#6b728022", text: "#6b7280", label: status };
   return (
     <span style={{
       display: "inline-block", padding: "2px 8px", borderRadius: 12,
       fontSize: 11, fontWeight: 600, background: c.bg, color: c.text,
     }}>
-      {status}
+      {c.label}
     </span>
   );
 }
@@ -57,13 +56,16 @@ function OrderCard({ order, onItemStatusChange, section = "default" }) {
   };
 
   // Determine overall order status from worst item status
+  // Map legacy statuses to design_needed for display
+  const normalizeStatus = (s) => s === "not_started" ? "design_needed" : s;
   const worstStatus = order.items.reduce((worst, item) => {
-    const idx = STATUS_OPTIONS.indexOf(item.productionStatus);
+    const status = normalizeStatus(item.productionStatus);
+    const idx = STATUS_OPTIONS.indexOf(status);
     const worstIdx = STATUS_OPTIONS.indexOf(worst);
-    return idx < worstIdx ? item.productionStatus : worst;
-  }, "Shipped");
+    return idx < worstIdx ? status : worst;
+  }, "shipped");
 
-  const isDonated = order.orderType === "Donated";
+  const isDonated = order.orderType === "donated";
   const itemCount = order.items.reduce((sum, i) => sum + (i.quantity || 1), 0);
 
   return (
@@ -90,7 +92,7 @@ function OrderCard({ order, onItemStatusChange, section = "default" }) {
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-bright)" }}>
-                {order.name}
+                {order.name || order.orderNumber}
               </span>
               {isDonated && (
                 <span style={{
@@ -114,9 +116,9 @@ function OrderCard({ order, onItemStatusChange, section = "default" }) {
           <span style={{ fontSize: 12, color: "var(--text-dim)" }}>
             {order.items.length} item{order.items.length > 1 ? "s" : ""} {"\u00b7"} {itemCount} bracelet{itemCount > 1 ? "s" : ""}
           </span>
-          {order.orderTotal > 0 && (
+          {(order.orderTotal > 0 || order.items.some(i => i.unitPrice > 0)) && (
             <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-bright)" }}>
-              ${order.orderTotal.toFixed(2)}
+              ${(order.orderTotal || order.items.reduce((s, i) => s + (i.unitPrice || 0) * (i.quantity || 1), 0)).toFixed(2)}
             </span>
           )}
           <StatusBadge status={worstStatus} />
@@ -197,7 +199,7 @@ function OrderCard({ order, onItemStatusChange, section = "default" }) {
                       }}
                     >
                       {STATUS_OPTIONS.map((s) => (
-                        <option key={s} value={s}>{s}</option>
+                        <option key={s} value={s}>{statusColors[s]?.label || s}</option>
                       ))}
                     </select>
                   </td>
@@ -233,49 +235,33 @@ export default function OrderBoard({ orders: initialOrders = [] }) {
         };
       }).filter((o) => {
         // Remove orders where all items are shipped
-        if (newStatus === "Shipped") {
-          return o.items.some((i) => i.productionStatus !== "Shipped");
+        if (newStatus === "shipped") {
+          return o.items.some((i) => i.productionStatus !== "shipped");
         }
         return true;
       })
     );
   };
 
-  // Group orders by worst status — priority order: Needs Decision > Design > Production > Ship
-  const needsDecision = orders.filter((o) =>
-    o.items.some((i) => i.productionStatus === "Needs Decision") &&
-    !o.items.some((i) => ["Design Needed", "Design In Progress", "Ready to Laser", "In Production", "Ready to Ship"].includes(i.productionStatus))
-  );
-  // Also surface orders that have a mix — Needs Decision alongside other statuses
-  const needsDecisionMixed = orders.filter((o) =>
-    o.items.some((i) => i.productionStatus === "Needs Decision") &&
-    o.items.some((i) => ["Design Needed", "Design In Progress", "Ready to Laser", "In Production", "Ready to Ship"].includes(i.productionStatus))
-  );
+  // Group orders by worst item status into pipeline stages
+  // "not_started" items are pre-triage, treated same as "design_needed"
+  const designStatuses = ["not_started", "design_needed"];
+  const laserStatuses = ["ready_to_laser", "in_production"];
+
   const inDesign = orders.filter((o) =>
-    !o.items.some((i) => i.productionStatus === "Needs Decision") &&
-    o.items.some((i) => i.productionStatus === "Design Needed" || i.productionStatus === "Design In Progress")
+    o.items.some((i) => designStatuses.includes(i.productionStatus))
   );
   const inProduction = orders.filter((o) =>
-    !o.items.some((i) => ["Needs Decision", "Design Needed", "Design In Progress"].includes(i.productionStatus)) &&
-    o.items.some((i) => i.productionStatus === "Ready to Laser" || i.productionStatus === "In Production")
+    !o.items.some((i) => designStatuses.includes(i.productionStatus)) &&
+    o.items.some((i) => laserStatuses.includes(i.productionStatus))
   );
   const readyToShip = orders.filter((o) =>
-    !o.items.some((i) => ["Needs Decision", "Design Needed", "Design In Progress", "Ready to Laser", "In Production"].includes(i.productionStatus)) &&
-    o.items.some((i) => i.productionStatus === "Ready to Ship")
+    !o.items.some((i) => [...designStatuses, ...laserStatuses].includes(i.productionStatus)) &&
+    o.items.some((i) => i.productionStatus === "ready_to_ship")
   );
-  // All orders with Needs Decision (pure + mixed)
-  const allNeedsDecision = [...needsDecision, ...needsDecisionMixed];
 
   return (
     <div>
-      {allNeedsDecision.length > 0 && (
-        <Section title={`Needs Decision (${allNeedsDecision.length})`} color="#ef4444">
-          {allNeedsDecision.map((o) => (
-            <OrderCard key={o.id} order={o} onItemStatusChange={handleItemStatusChange} />
-          ))}
-        </Section>
-      )}
-
       {inDesign.length > 0 && (
         <Section title={`In Design (${inDesign.length})`} color="#f59e0b">
           {inDesign.map((o) => (

@@ -59,8 +59,8 @@ export default async function LaserPage() {
   let inProduction = [];
   try {
     [readyToLaser, inProduction] = await Promise.all([
-      getItemsByStatus("Ready to Laser"),
-      getItemsByStatus("In Production"),
+      getItemsByStatus("ready_to_laser"),
+      getItemsByStatus("in_production"),
     ]);
   } catch (err) {
     console.error("Laser queue load error:", err.message);

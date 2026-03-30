@@ -3,25 +3,25 @@
 import { useState, useCallback } from "react";
 
 const STATUS_FLOW = [
-  "Intake",
-  "Design Needed",
-  "Ready to Laser",
-  "Produced",
-  "Ready to Ship",
-  "Shipped",
-  "Complete",
-  "Cancelled",
+  { value: "intake", label: "Intake" },
+  { value: "design_needed", label: "Design Needed" },
+  { value: "ready_to_laser", label: "Ready to Laser" },
+  { value: "in_production", label: "In Production" },
+  { value: "ready_to_ship", label: "Ready to Ship" },
+  { value: "shipped", label: "Shipped" },
+  { value: "complete", label: "Complete" },
+  { value: "cancelled", label: "Cancelled" },
 ];
 
 const STATUS_COLORS = {
-  Intake: "var(--status-blue)",
-  "Design Needed": "var(--status-orange)",
-  "Ready to Laser": "var(--gold)",
-  Produced: "var(--status-green)",
-  "Ready to Ship": "var(--status-green)",
-  Shipped: "var(--status-green)",
-  Complete: "var(--text-dim)",
-  Cancelled: "var(--status-red)",
+  intake: "var(--status-blue)",
+  design_needed: "var(--status-orange)",
+  ready_to_laser: "var(--gold)",
+  in_production: "var(--status-green)",
+  ready_to_ship: "var(--status-green)",
+  shipped: "var(--status-green)",
+  complete: "var(--text-dim)",
+  cancelled: "var(--status-red)",
 };
 
 const TYPE_COLORS = {
@@ -31,7 +31,7 @@ const TYPE_COLORS = {
 };
 
 function OrderRow({ order, onStatusChange, onAddDesignTask }) {
-  const [status, setStatus] = useState(order.status || "Intake");
+  const [status, setStatus] = useState(order.status || "intake");
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
 
@@ -56,8 +56,8 @@ function OrderRow({ order, onStatusChange, onAddDesignTask }) {
     }
   };
 
-  const needsDesign = status === "Design Needed";
-  const isShipped = status === "Shipped" || status === "Complete";
+  const needsDesign = status === "design_needed";
+  const isShipped = status === "shipped" || status === "complete";
 
   return (
     <tr
@@ -112,8 +112,8 @@ function OrderRow({ order, onStatusChange, onAddDesignTask }) {
             }}
           >
             {STATUS_FLOW.map((s) => (
-              <option key={s} value={s}>
-                {s}
+              <option key={s.value} value={s.value}>
+                {s.label}
               </option>
             ))}
           </select>

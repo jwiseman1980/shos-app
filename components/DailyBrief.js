@@ -121,10 +121,10 @@ export default function DailyBrief({
   const unthankedDonations = recentDonations.filter((d) => !d.thankYouSent);
 
   // Order items breakdown
-  const designNeeded = orderItems.filter((o) => o.productionStatus === "Design Needed" || o.productionStatus === "Design In Progress");
-  const readyToLaser = orderItems.filter((o) => o.productionStatus === "Ready to Laser");
-  const inProduction = orderItems.filter((o) => o.productionStatus === "In Production");
-  const readyToShip = orderItems.filter((o) => o.productionStatus === "Ready to Ship");
+  const designNeeded = orderItems.filter((o) => o.productionStatus === "design_needed" || o.productionStatus === "not_started");
+  const readyToLaser = orderItems.filter((o) => o.productionStatus === "ready_to_laser");
+  const inProduction = orderItems.filter((o) => o.productionStatus === "in_production");
+  const readyToShip = orderItems.filter((o) => o.productionStatus === "ready_to_ship");
 
   // Build action items — SOPs are tasks, not a separate category
   const actionItems = [];

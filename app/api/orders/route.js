@@ -42,7 +42,7 @@ async function autoPushToShipStation(itemId) {
      FROM Squarespace_Order_Item__c WHERE Squarespace_Order__c = '${orderId}'`
   );
   const allReady = allItems.every(
-    (i) => i.Production_Status__c === "Ready to Ship" || i.Production_Status__c === "Shipped"
+    (i) => i.Production_Status__c === "ready_to_ship" || i.Production_Status__c === "shipped"
   );
   if (!allReady) return;
 
@@ -67,7 +67,7 @@ async function autoPushToShipStation(itemId) {
       country: order.Shipping_Country__c || "US",
     },
     items: allItems
-      .filter((i) => i.Production_Status__c === "Ready to Ship")
+      .filter((i) => i.Production_Status__c === "ready_to_ship")
       .map((i) => ({
         sku: i.Lineitem_sku__c || "",
         name: i.Name || "Memorial Bracelet",
@@ -149,13 +149,13 @@ export async function PATCH(request) {
 
     if (result.success) {
       const name = heroName || "Order item";
-      if (status === "Ready to Laser") {
+      if (status === "ready_to_laser") {
         // Notify Joseph — he runs the laser
         await notifyPerson(`🔥 ${name} bracelet ready for laser production`, SLACK_DM_JOSEPH);
-      } else if (status === "Design Needed") {
+      } else if (status === "design_needed") {
         // Notify Ryan — he creates designs
         await notifyPerson(`🎨 New design task: ${name} bracelet needs a design`, SLACK_DM_RYAN);
-      } else if (status === "Ready to Ship") {
+      } else if (status === "ready_to_ship") {
         // Notify Kristin — she handles shipping
         await notifyPerson(`📦 ${name} bracelet ready to ship`, SLACK_DM_KRISTIN);
         // Auto-push to ShipStation if ALL items in this order are now Ready to Ship
@@ -164,7 +164,7 @@ export async function PATCH(request) {
         } catch (ssErr) {
           console.warn("ShipStation auto-push failed:", ssErr.message);
         }
-      } else if (status === "Shipped") {
+      } else if (status === "shipped") {
         await postToSlack(`✅ ${name} bracelet shipped`);
       }
     }

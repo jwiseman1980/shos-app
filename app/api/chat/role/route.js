@@ -346,6 +346,20 @@ Always confirm with the user before making bulk mutations (e.g., assigning 20 he
       required: ["action"],
     },
   },
+  {
+    name: "navigate_to",
+    description: "Navigate the user's browser to a page in the SHOS app. Use this whenever your response is about a specific domain so the user sees the relevant data. For example: discussing orders → navigate to /orders, asking about anniversaries → /anniversaries, finance questions → /finance, family messages → /families, hero details → /heroes, social media → /comms, designs → /designs. Always navigate when the conversation topic maps to a page.",
+    input_schema: {
+      type: "object",
+      properties: {
+        path: {
+          type: "string",
+          description: "The app path to navigate to, e.g. /orders, /anniversaries, /finance, /families, /heroes, /comms, /designs, /donors, /tasks, /governance",
+        },
+      },
+      required: ["path"],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -568,6 +582,9 @@ async function handleToolCall(role, toolName, toolInput) {
           return `Unknown social media action: ${action}`;
       }
     }
+    case "navigate_to":
+      // Navigation is handled by the stream layer — just acknowledge here
+      return `Navigating to ${toolInput.path}`;
     default:
       return `Unknown tool: ${toolName}`;
   }
@@ -611,97 +628,30 @@ async function buildSystemPrompt(pathname) {
     }
   } catch {}
 
-  return `You are the Steel Hearts Operator — the operational brain of Steel Hearts, a Gold Star family memorial bracelet nonprofit. You operate inside the Steel Hearts Operating System (SHOS).
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "America/New_York" });
+  const timeStr = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
 
-## Operating Model
-There are TWO roles in the system:
-- **Operator** (you) — handles ALL operational domains: orders, anniversaries, finance, social media, donors, families, governance. You execute work and flag build/architecture issues.
-- **Architect** (Joseph in Claude Code) — handles system design, code changes, API fixes, infrastructure. When you find bugs or need features, use \`log_friction\` or \`flag_to_role\` with target "architect".
+  return `You are the Steel Hearts Operator — the single operational agent for Steel Hearts, a Gold Star family memorial bracelet nonprofit. Today is ${dateStr}, ${timeStr} ET.
 
-There are NO separate CFO, COO, COS, or Comms agents. Those are task DOMAINS, not separate agents. Use role="operator" when creating tasks for yourself, role="architect" when flagging build work.
-
-## Current Page Context
-The user is viewing: ${pathname || "/"}
-${pageHint}
-Lead with what's relevant to this page, but you can discuss anything.
-
-## Your Context File
-${contextContent || "(No context file found yet — this is a fresh session.)"}
-
-## What You Know
-
-### Anniversary Emails
-Every hero has a memorial date. Each year, a team member personally reaches out to the Gold Star family. This is not automated mass mail — it's a human telling a family their hero is not forgotten.
-- Anniversary Email Tracker at /anniversaries — query via \`/api/anniversaries?month=1-12\`
-- Each hero has: status (not_assigned, assigned, in_progress, email_drafted, email_sent, complete, research, skipped), assigned_to, notes
-- Heroes with no family_contact_id are "Research" — need family contact found first
-- "Create Draft" generates a Gmail draft via domain-wide delegation
-- Use \`app_mutation\` with PATCH /api/heroes/update to assign volunteers: { sfId, assignedToName: "Kristin Hughes" }
-- When assigned, volunteer gets email + Slack notification automatically
-
-### Daily Social Media (SOP-001)
-15-20 minute daily process, any volunteer:
-1. Open Meta Business Suite → Inbox (business.facebook.com/latest/inbox)
-2. Respond to new DMs
-3. Review new comments — like genuine, hide spam/extremist, block hateful
-4. Growth Lever — love shared posts, invite reactors to follow
-5. Share to Stories — latest post to FB Story + IG Story
-6. Post completion to Slack #social-media-ops
-CRITICAL: Never use browser automation for Instagram. API only. This is non-negotiable.
-Social media metrics persist automatically to social_media_posts and social_media_profile_snapshots tables.
-
-### Orders & Production
-- Current orders come through Squarespace → land in Salesforce (Zapier). Supabase gets them via nightly sync.
-- Order pipeline: design_needed → ready_to_laser → in_production → ready_to_ship → shipped
-- Query: \`/api/orders\`, \`/api/orders/triage\`, \`/api/designs\`, or \`supabase_query\` on orders/order_items tables
-- CRITICAL: Only heroes with active_listing = true appear on the website
-- ShipStation handles fulfillment tracking
-- SKU format: BRANCH-LASTNAME-SIZE (e.g. USMA11-ROSS-7), D variants for donated bracelets
-- If order data looks incomplete, query Supabase directly — the API triage endpoint may have schema issues
-
-### Finance
-- Obligations, disbursements, donations, expenses via \`/api/finance/*\` endpoints
-- $10 charity obligation per bracelet sold; D variants add $10 to Steel Hearts
-- Monthly close is sacred — never skip
-
-### Donors & Development
-- Donor segments: first-time, repeat, major, lapsed
-- Query: \`/api/donors\`, \`/api/finance/donations-received\`
-
-### Governance & Compliance
-- SC Charitable Solicitation renewal: May 15, 2026
-- Board governance policy adoption: April 2, 2026
-- 990-EZ filing in progress with CPA Tracy Hutter
-- Insurance gaps: zero D&O, zero General Liability
-
-### Build Requests & Friction
-You cannot write code. When something needs to be built or fixed:
-- Use \`log_friction\` to document bugs, missing features, or improvement ideas
-- Use \`flag_to_role\` with target "architect" for urgent architecture/fix needs
-- Joseph handles builds in Claude Code sessions — the Architect reads these flags
-
-## Data Architecture
-- **Supabase** is the primary database. Salesforce is a nightly backup mirror.
-- **Squarespace** orders still write to Salesforce first (Zapier), then sync to Supabase nightly
-- **Meta Graph API** provides live Facebook + Instagram data via query_social_media tool
-- **Google Calendar** provides schedule context via query_calendar/create_calendar_event (may require service account auth)
-- **Gmail** drafts via domain-wide delegation (may require service account auth)
-
-## Supabase Tables
-Use supabase_query to pull live data. Tables: heroes, contacts, organizations, hero_associations, orders, order_items, donations, disbursements, expenses, obligations, family_messages, tasks, volunteers, engagements, decisions, open_questions, anniversary_emails, knowledge_files, friction_logs, sop_executions, closeouts, initiatives, social_media_posts, social_media_profile_snapshots, users, sf_sync_log.
-
-Prefer app_query/app_mutation for data available via API routes. Use supabase_query for direct table access when the API doesn't cover it.
+## Context
+${contextContent || "(No context file yet — read it via read_context_file role=operator.)"}
 ${learningContext}
 
-## How Sessions Work
-1. BOOT: Read context file (\`read_context_file\` role="operator") + check open tasks + brief based on current page
-2. WORK: Execute what the user wants. Use tools actively. Don't just describe — query, create, update.
-3. CLOSEOUT: Update context file via \`update_context_file\`. Log closeout via \`log_closeout\`. Create follow-up calendar events and tasks.
+## Page: ${pathname || "/"}
+${pageHint}
 
-Every session should leave a record. Every decision gets logged. Every follow-up gets a calendar slot or task.
+## Core Rules
+- Supabase is primary DB. Use supabase_query for direct access, app_query/app_mutation for API routes.
+- Tables: heroes, contacts, organizations, orders, order_items, donations, disbursements, expenses, family_messages, tasks, volunteers, engagements, decisions, open_questions, anniversary_emails, knowledge_files, friction_logs, sop_executions, closeouts, initiatives, social_media_posts, social_media_profile_snapshots, users, sf_sync_log.
+- $10 charity obligation per bracelet ($35 standard, $45 D-variant adds $10 to Steel Hearts). Only active_listing=true heroes on website.
+- Never use browser automation for Instagram. API only.
+- Email drafts only — never auto-send. Humans review and send.
+- Flag bugs/features to Architect via log_friction or flag_to_role target="architect". Auto-flag blockers immediately.
+- Navigate to relevant page via navigate_to when discussing a domain. Navigate early.
+- At session close: update_context_file + log_closeout + follow-up tasks/calendar events.
+- Be direct, take action, report results. No fluff.`;
 
-## Tone
-Direct, operational, no fluff. You know this org. Brief like a competent operator who has been running this system. Don't ask "what do you want to do?" with numbered lists — take action and report. If something is broken, flag it immediately and move on.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -866,7 +816,7 @@ export async function POST(request) {
               "anthropic-version": "2023-06-01",
             },
             body: JSON.stringify({
-              model: "claude-haiku-4-5-20251001",
+              model: "claude-sonnet-4-6",
               max_tokens: 4096,
               system: systemPrompt,
               tools: TOOLS,
@@ -876,6 +826,14 @@ export async function POST(request) {
           });
 
           if (!apiResponse.ok) {
+            // Retry once on rate limit (429) after a short pause
+            if (apiResponse.status === 429 && i < maxIterations - 1) {
+              const retryAfter = apiResponse.headers.get("retry-after");
+              const wait = retryAfter ? parseInt(retryAfter, 10) * 1000 : 5000;
+              send({ type: "text", delta: "\n_Rate limited — retrying in a moment..._\n" });
+              await new Promise(r => setTimeout(r, Math.min(wait, 10000)));
+              continue;
+            }
             const err = await apiResponse.text();
             send({ type: "error", message: `Claude API error (${apiResponse.status}): ${err}` });
             break;
@@ -903,13 +861,24 @@ export async function POST(request) {
                 toolsUsed.push(block.name);
                 send({ type: "tool_executing", name: block.name });
 
-                const result = await handleToolCall("operator", block.name, block.input);
+                // Emit navigation event before executing
+                if (block.name === "navigate_to" && block.input?.path) {
+                  send({ type: "navigate", path: block.input.path });
+                }
+
+                let result = await handleToolCall("operator", block.name, block.input);
+
+                // Truncate large tool results to avoid blowing rate limits
+                const resultStr = typeof result === "string" ? result : JSON.stringify(result);
+                const truncated = resultStr.length > 8000
+                  ? resultStr.slice(0, 8000) + "\n...(truncated — " + resultStr.length + " chars total. Query with narrower filters if you need more.)"
+                  : resultStr;
 
                 send({ type: "tool_done", name: block.name });
                 toolResults.push({
                   type: "tool_result",
                   tool_use_id: block.id,
-                  content: typeof result === "string" ? result : JSON.stringify(result),
+                  content: truncated,
                 });
               }
             }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import useVoice from "@/hooks/useVoice";
 
 const COLOR = "#c4a237";
@@ -15,6 +16,7 @@ const QUICK_ACTIONS = [
 ];
 
 export default function RoleChat({ pathname, onClose }) {
+  const router = useRouter();
   const [messages, setMessages] = useState([]);
   const [displayMessages, setDisplayMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -168,6 +170,11 @@ export default function RoleChat({ pathname, onClose }) {
                 toolsUsed: [...completedTools],
                 toolsActive: [...activeTools],
               });
+              break;
+            case "navigate":
+              if (event.path && event.path !== pathname) {
+                router.push(event.path);
+              }
               break;
             case "text":
               fullText += event.delta;

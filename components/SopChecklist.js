@@ -89,7 +89,7 @@ export default function SopChecklist({ sopId, sopTitle, steps }) {
     const allHistory = getRunHistory();
     setRunHistory(allHistory.filter((r) => r.sopId === sopId).slice(0, 5));
 
-    // Post to API (Slack)
+    // Post to API (Slack + logging)
     fetch("/api/sop-runs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -97,9 +97,16 @@ export default function SopChecklist({ sopId, sopTitle, steps }) {
     })
       .then((res) => res.json())
       .then((result) => {
-        setSlackResult(result.slack ? "posted" : "not-configured");
+        const status = result.slack ? "posted" : "not-configured";
+        setSlackResult(status);
+        // Update local history with Slack status
+        if (result.slack) {
+          const updated = { ...runData, slackPosted: true };
+          saveRunToHistory(updated);
+        }
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("SOP completion API error:", err);
         setSlackResult("error");
       });
   }, [hydrated, allDone, sopId, sopTitle, totalSteps]);

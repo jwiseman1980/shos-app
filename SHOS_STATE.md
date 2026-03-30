@@ -50,8 +50,12 @@
 |----------|-------|--------|
 | CRITICAL | Gmail/Calendar API auth: `unauthorized_client` — domain-wide delegation not configured in Google Workspace Admin | ✅ Fixed |
 | HIGH | Order triage API broken — schema mismatch on `order_items.memorial_bracelet_id` | ✅ Fixed (hero_id) |
-| HIGH | Squarespace → Supabase routing — orders only reach Supabase via nightly SF sync, consider dual-write | Open |
+| HIGH | Orders data layer — Salesforce column names (`name`, `manufactured`, `fulfillment_status`, etc.) referenced across orders.js | ✅ Fixed (all mapped to Supabase columns) |
+| HIGH | Squarespace → Supabase routing — orders only reach Supabase via nightly SF sync, consider dual-write | ✅ Built (`/api/webhooks/squarespace`) — needs Zapier config + Vercel env var |
 | MEDIUM | Screenshot/error capture — Operator can't see user's screen or capture errors | Open |
+| MEDIUM | Deep links — Operator chat navigates app via `navigate_to` tool | ✅ Done |
+| MEDIUM | Calendar API "Bad Request" — timestamps missing RFC3339 timezone offset | ✅ Fixed |
+| INFO | Rate limit fix — switched Haiku→Sonnet, added retry+truncation, slimmed prompt | ✅ Done |
 | MEDIUM | Friction log schema — now fixed (operator/architect added to shos_role enum) | ✅ Done |
 
 ### Google Calendar Auth Fix (for Joseph)
@@ -125,9 +129,15 @@
 ### Still Needed
 - ~~Google Workspace domain-wide delegation setup~~ ✅ Done
 - ~~Local `.env.local` needs Google service account credentials~~ ✅ Done
-- Order triage API schema fix
-- Architect knowledge file in Supabase
+- ~~Order triage API schema fix~~ ✅ Done
+- ~~Architect knowledge file in Supabase~~ ✅ Done (+ Operator knowledge file)
+- ~~Orders data layer Salesforce column cleanup~~ ✅ Done (name, manufactured, fulfillment_status, order_total, unit_cost, etc.)
 - Screenshot/error capture capability for Operator
+- ~~Deep link navigation from Operator chat responses~~ ✅ Done (navigate_to tool + RoleChat handler)
+- ~~Calendar API "Bad Request" errors~~ ✅ Fixed (RFC3339 timezone offset)
+- ~~Rate limit 429 errors~~ ✅ Fixed (Sonnet model + retry + truncation + slim prompt)
+- WEBHOOK_SECRET needs adding to Vercel env vars
+- Zapier needs second action configured for `/api/webhooks/squarespace`
 
 ---
 

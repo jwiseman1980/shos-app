@@ -84,7 +84,7 @@ function DesignTable({ items, showStatus = true, showPriority = true, showBrief 
             <tr key={item.id} style={{ borderBottom: "1px solid var(--card-border)" }}>
               <td style={tdStyle}>
                 <div style={{ fontWeight: 500, color: "var(--text-bright)" }}>
-                  {item.name}
+                  {item.heroName || item.sku}
                 </div>
                 {item.incident && (
                   <div style={{ fontSize: 11, color: "var(--text-dim)" }}>

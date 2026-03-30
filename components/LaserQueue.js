@@ -14,14 +14,14 @@ export default function LaserQueue({ items: initialItems = [] }) {
     if (!window.confirm(`Mark "${itemName}" as done and move to shipping queue?`)) {
       return;
     }
-    await updateStatus(itemId, "Ready to Ship", itemName);
+    await updateStatus(itemId, "ready_to_ship", itemName);
   };
 
   const handleMoveBack = async (itemId, itemName) => {
     if (!window.confirm(`Move "${itemName}" back to Design Queue?`)) {
       return;
     }
-    await updateStatus(itemId, "Design Needed", itemName);
+    await updateStatus(itemId, "design_needed", itemName);
   };
 
   const updateStatus = async (itemId, status, itemName) => {
