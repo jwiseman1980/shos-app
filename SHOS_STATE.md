@@ -1,9 +1,9 @@
 # SHOS State Document
-> **The cross-role nervous system.** Every role reads this at session open. Every role writes here at session close.
-> A new Executive Director can read this document and be oriented in 30 minutes.
+> **The cross-role nervous system.** The Operator and Architect both read this. Updated at every session close.
+> A new team member can read this document and be oriented in 30 minutes.
 
-**Last updated:** 2026-03-27
-**Updated by:** Joseph Wiseman (ED) + Claude (Architecture Session)
+**Last updated:** 2026-03-30
+**Updated by:** Joseph Wiseman + Claude (CTO/Architect Session)
 
 ---
 
@@ -14,123 +14,120 @@
 **Executive Director:** Joseph Wiseman (USMA '08)
 **Fiscal Year:** Calendar year
 **Legal:** Virginia 501(c)(3), founded ~2012
-**CPA:** Sara Curran / Tracy
+**CPA:** Sara Curran / Tracy Hutter
 
 **Operating status:** Active. Revenue from bracelet sales (~$35-$45/bracelet), small individual donor base. Building financial infrastructure and institutional processes through SHOS.
 
 ---
 
-## Role Status Blocks
+## Operating Model (Updated 2026-03-30)
 
-### Executive Director
-**Last active:** 2026-03-27
-**Current focus:** Architecture session — building SHOS role structure, redesigning app navigation, creating knowledge files for all roles.
-**Open flags:** None
-**Next session:** March 30 Monthly Close (CFO block, 10am-12pm ET)
+**Two agents:**
+- **Operator** — handles ALL operational domains: orders, anniversaries, finance, social media, donors, families, governance. Executes work and flags build issues.
+- **Architect** — handles system design, code changes, API fixes, infrastructure. Reads flags from Operator and friction logs.
 
----
-
-### Chief of Staff
-**Last active:** 2026-03-27 (inaugural session)
-**Current focus:** System initialization — knowledge file created, stop hook configured, session closeout model designed.
-**Open flags:** None
-**Next session:** Schedule after March 30 close. Priority: SOP audit and compliance calendar.
-**Knowledge file:** COS_CONTEXT.md
+**Legacy role names (ed, cos, cfo, coo, comms, dev, family) are now task DOMAINS, not separate agents.** The calendars are still split by functional domain (ops, finance, operations, comms, etc.).
 
 ---
 
-### CFO
-**Last active:** 2026-03-27
-**Current focus:** March 30 close preparation. Finance section fully built (8 pages live). Recon matrix live with 184 partner orgs and 370 Gmail receipts.
-**Open flags:**
-- 🔴 BLOCKING: Create SF fields before March 30 — Cycle_Month__c, Cycle_Year__c, Receipt_Captured__c on Donation_Disbursement__c
-- 🔴 BLOCKING: Create Expense__c custom object in SF before March 30
-**Next session:** March 30 Monthly Close (10am-12pm ET)
-**Knowledge file:** CFO_CONTEXT.md (rename from FINANCE_TODO.md — pending)
+## Data Architecture (Updated 2026-03-30)
+
+- **Supabase** — Primary database (replaced Salesforce 2026-03-28)
+- **Salesforce** — Nightly backup mirror only. DO NOT write new features to SF.
+- **Squarespace** — Current storefront. Orders → Salesforce (via Zapier) → Supabase (nightly sync)
+- **Meta Graph API** — Facebook + Instagram data, live in SHOS app. Metrics auto-persist to Supabase.
+- **Google Calendar** — Functional calendars per domain. Every session, task, and idea gets a slot.
+- **Gmail** — Anniversary email drafts via domain-wide delegation
+- **Stripe** — Test mode. Ready for website go-live.
+- **ShipStation** — Fulfillment tracking. Daily reconcile cron.
+- **Slack** — Webhook to #ops-hub. Richer integration planned.
 
 ---
 
-### COO
-**Last active:** Unknown (role not yet formalized)
-**Current focus:** 4 active intake heroes in pipeline. Normal production cadence.
-**Open flags:** COO knowledge file needs first session to establish baseline state.
-**Next session:** Schedule a COO block — pipeline review and knowledge file initialization.
-**Knowledge file:** COO_CONTEXT.md
+## Architect Backlog (Flagged by Operator 2026-03-30)
+
+| Priority | Issue | Status |
+|----------|-------|--------|
+| CRITICAL | Gmail/Calendar API auth: `unauthorized_client` — domain-wide delegation not configured in Google Workspace Admin | Open |
+| HIGH | Order triage API broken — schema mismatch on `order_items.memorial_bracelet_id` | Open |
+| HIGH | Squarespace → Supabase routing — orders only reach Supabase via nightly SF sync, consider dual-write | Open |
+| MEDIUM | Screenshot/error capture — Operator can't see user's screen or capture errors | Open |
+| MEDIUM | Friction log schema — now fixed (operator/architect added to shos_role enum) | ✅ Done |
+
+### Google Calendar Auth Fix (for Joseph)
+1. Go to `admin.google.com` → Security → API controls → Domain-wide Delegation
+2. Add service account Client ID (from GCP Console → shos-490912 → shos-gmail-service)
+3. Scopes: `https://www.googleapis.com/auth/calendar`, `https://www.googleapis.com/auth/gmail.compose`, `https://www.googleapis.com/auth/gmail.send`, `https://www.googleapis.com/auth/drive.file`
+4. Also add GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_SERVICE_ACCOUNT_KEY to local `.env.local` (pull from Vercel: `npx vercel env pull`)
 
 ---
 
-### Communications
-**Last active:** Unknown (role not yet formalized)
-**Current focus:** Daily social engagement running via Meta API. Weekly amplification SOPs active.
-**Open flags:** Comms knowledge file needs first session to establish baseline state.
-**Next session:** Schedule a Comms block — content calendar planning and knowledge file initialization.
-**Knowledge file:** CMO_CONTEXT.md
+## Operational Status
 
----
+### Orders & Production
+- Squarespace orders come in via Salesforce (Zapier integration)
+- Army Rugby design orders (USMA-ARMYRUGBY) — design_needed, 2 paid orders waiting
+- Query via `/api/orders/triage` or `supabase_query` on orders/order_items tables
 
-### Development
-**Last active:** Unknown (role not yet formalized)
-**Current focus:** Donors page live. No active campaigns or grants in flight.
-**Open flags:**
-- Development is the highest-value unbuilt role — schedule a Dev block soon.
-- Stripe donation page stub ready, activates with new website.
-**Next session:** Schedule a Dev block. Priority: donor segment review and fundraising strategy.
-**Knowledge file:** DEV_CONTEXT.md
+### Anniversaries
+- 8 April heroes need family contact research before anniversary outreach
+- Gmail draft creation blocked by auth issue above
 
----
+### Finance
+- March 30 close was scheduled — check calendar for status
+- Salesforce field creation (Cycle_Month__c, Cycle_Year__c, Receipt_Captured__c) may still be needed
 
-### Family Relations
-**Last active:** Unknown (role not yet formalized)
-**Current focus:** FM-OPS-002 (supporter messages) running. Anniversary outreach cadence active.
-**Open flags:** Family Relations knowledge file needs first session to establish baseline state.
-**Next session:** Schedule a Family block — anniversary preview and knowledge file initialization.
-**Knowledge file:** FAMREL_CONTEXT.md
-
----
-
-## Cross-Role Flags
-
-| Date | Source | Target | Flag | Status |
-|------|--------|--------|------|--------|
-| 2026-03-27 | CFO | ED | Create SF fields before March 30 close | 🔴 Open |
-| 2026-03-27 | CFO | ED | Create Expense__c object in SF | 🔴 Open |
-| 2026-03-27 | CFO | COO | FIN-RECON-002: 184 partner orgs need reconciliation — COO knows the orgs | ⚪ Queued |
+### Governance & Compliance
+- SC Charitable Solicitation renewal: May 15, 2026
+- Board governance policy adoption: April 2, 2026
+- 990-EZ filing in progress with CPA Tracy Hutter
+- Insurance gaps: zero D&O, zero General Liability
 
 ---
 
 ## Upcoming Calendar
 
-| Date | Role | Session | Duration |
-|------|------|---------|----------|
-| 2026-03-30 | CFO | Monthly Close | 2 hrs |
-| 2026-04-01 | CFO | Historical Reconciliation | 2 hrs |
-| 2026-04-03 | ED | Architecture Session (continued) | 2 hrs |
-| 2026-04-08 | CFO | Weekly Reconciliation (series, 16 sessions) | 1.5 hrs |
+| Date | Domain | Session | Duration |
+|------|--------|---------|----------|
+| 2026-04-01 | Finance | Historical Reconciliation | 2 hrs |
+| 2026-04-02 | Governance | Board Policy Adoption | - |
+| 2026-04-03 | Architecture | HonorBase Design Session | 2 hrs |
 
 ---
 
-## Decision Log
+## Decision Log (Recent)
 
-| Date | Role | Decision | Reasoning |
-|------|------|----------|-----------|
-| 2026-03-27 | ED/CFO | Delete Donorbox integration | Requires $17/month premium API access. Stripe stub ready for when new website is live. |
-| 2026-03-27 | ED | Build SHOS role-based architecture | 7 roles (ED, COS, CFO, COO, Comms, Dev, Family). Each role = calendar block = knowledge file = app section. |
-| 2026-03-27 | ED | Chief of Staff is a separate role | Even though ED currently does COS work, building it out now creates a clean future handoff. |
-| 2026-03-27 | ED | Family Relations owns volunteers | 90% of volunteer activity is family outreach. COO/Comms get their own volunteer resources if needed later. |
-| 2026-03-27 | ED | Anniversaries owned by Family Relations | Family Relations owns the data and outreach. Communications subscribes for post scheduling. One source, two consumers. |
-| 2026-03-27 | ED | Memorial Pages primary to Communications | COO intake creates the hero record; Communications owns the page once live. |
+| Date | Decision | Reasoning |
+|------|----------|-----------|
+| 2026-03-30 | Switch to Operator + Architect model | 8-agent model was overhead. Single Operator handles all domains. Architect handles builds. Domains remain as calendar/task categories. |
+| 2026-03-30 | Supabase is primary DB | Salesforce demoted to nightly backup. All new features target Supabase. |
+| 2026-03-30 | Meta Graph API integrated | Live FB + IG data in SHOS app. Metrics persist to social_media_posts table. |
+| 2026-03-30 | Calendars stay functional | Even with 2 agents, calendars split by work domain (ops, finance, comms, etc.) for organization. |
+| 2026-03-28 | Notion and Zapier deprecated | Direct API integrations in SHOS app replaced both. |
 
 ---
 
-## Handoff Test
-*At any time, all of the following must be true:*
+## Session Log (2026-03-30 CTO/Architect)
 
-- [ ] A new Executive Director can read this document and understand everything in 30 minutes
-- [ ] A real CFO can open CFO_CONTEXT.md and the finance section and be operational in a day
-- [ ] A board member can find every significant decision and why it was made
-- [ ] A volunteer can read an SOP and execute a process without talking to anyone
+### Accomplished
+- Voice interface (STT/TTS) built for Operator chat
+- Social media persistence layer (tables + auto-persist on API calls)
+- System dossiers created (Supabase, Meta, Salesforce backup)
+- 8 stale knowledge files archived
+- Slack Canvas created: "Steel Hearts Ecosystem Audit & Strategic Roadmap"
+- Operator system prompt rewritten for 2-agent model
+- shos_role enum updated: added 'operator' and 'architect'
+- Calendar tool descriptions updated (functional calendars)
+- Vercel env vars added: CRON_SECRET, META_*, IG_USER_ID
+- Security: SESSION_SECRET + CRON_SECRET set properly
+- Supabase: social_media_posts + social_media_profile_snapshots tables created
 
-*If any of these fails — something is undocumented. That's the gap to fill.*
+### Still Needed
+- Google Workspace domain-wide delegation setup
+- Local `.env.local` needs Google service account credentials
+- Order triage API schema fix
+- Architect knowledge file in Supabase
+- Screenshot/error capture capability for Operator
 
 ---
 
