@@ -2,10 +2,13 @@ export const dynamic = "force-dynamic";
 
 import { getSessionUser } from "@/lib/auth";
 import { loadQueueItems, loadRecentDomains, loadScoreboardStats, loadAccomplishments } from "@/lib/data/dashboard";
+import { getLearningMetrics } from "@/lib/data/learning";
 import { buildQueue } from "@/lib/priority-engine";
+import { getTodayEvents } from "@/lib/calendar";
 import PriorityQueue from "@/components/PriorityQueue";
 import Scoreboard from "@/components/Scoreboard";
 import Accomplishments from "@/components/Accomplishments";
+import CalendarWidget from "@/components/CalendarWidget";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -34,11 +37,21 @@ export default async function DashboardPage() {
     recentDomains,
     stats,
     accomplishments,
+    calendarEvents,
+    learning,
   ] = await Promise.all([
     loadQueueItems(user),
     loadRecentDomains(),
     loadScoreboardStats(user),
     loadAccomplishments(user),
+    getTodayEvents().catch((err) => {
+      console.error("[dashboard] Calendar fetch failed:", err.message);
+      return [];
+    }),
+    getLearningMetrics().catch((err) => {
+      console.error("[dashboard] Learning metrics failed:", err.message);
+      return null;
+    }),
   ]);
 
   // Build the priority queue
@@ -60,9 +73,22 @@ export default async function DashboardPage() {
         </p>
       </div>
 
+      {/* Today's Calendar */}
+      {calendarEvents.length > 0 && (
+        <div className="data-card" style={{ marginBottom: 24 }}>
+          <div className="data-card-header">
+            <h2 className="data-card-title">Today</h2>
+            <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
+              {calendarEvents.filter((e) => !e.allDay).length} events
+            </span>
+          </div>
+          <CalendarWidget initialEvents={calendarEvents} />
+        </div>
+      )}
+
       {/* Scoreboard */}
       <div style={{ marginBottom: 24 }}>
-        <Scoreboard stats={stats} isAdmin={isAdmin} />
+        <Scoreboard stats={stats} learning={learning} isAdmin={isAdmin} />
       </div>
 
       {/* The Queue */}

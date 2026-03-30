@@ -1,5 +1,6 @@
 import { getSopById } from "@/lib/data/sops";
 import SopChecklist from "@/components/SopChecklist";
+import SocialDashboard from "@/components/SocialDashboard";
 import Link from "next/link";
 
 export const metadata = {
@@ -21,14 +22,14 @@ export default async function SocialMediaPage() {
         <div className="stat-block" style={{ borderTop: "3px solid #8e44ad" }}>
           <div className="stat-label">SOP</div>
           <div className="stat-value" style={{ fontSize: 18 }}>SOP-001</div>
-          <div className="stat-sub">v{sop.version}</div>
+          <div className="stat-sub">{sop.version}</div>
         </div>
         <div className="stat-block" style={{ borderTop: "3px solid #8e44ad" }}>
           <div className="stat-label">Cadence</div>
           <div className="stat-value" style={{ fontSize: 18 }}>Daily</div>
           <div className="stat-sub">15-20 minutes</div>
         </div>
-        <div className="stat-block" style={{ borderTop: "3px solid #8e44ad" }}>
+        <div className="stat-block" style={{ borderTop: "3px solid #E1306C" }}>
           <div className="stat-label">Platform</div>
           <div className="stat-value" style={{ fontSize: 18 }}>Meta</div>
           <div className="stat-sub">Facebook + Instagram</div>
@@ -40,10 +41,10 @@ export default async function SocialMediaPage() {
         </div>
       </div>
 
-      {/* Today's Engagement Checklist */}
+      {/* Live Social Dashboard */}
       <div className="data-card" style={{ marginBottom: 24 }}>
         <div className="data-card-header">
-          <h2 className="data-card-title">Today&apos;s Engagement</h2>
+          <h2 className="data-card-title">Engagement Dashboard</h2>
           <a
             href="https://business.facebook.com/latest/inbox"
             target="_blank"
@@ -61,6 +62,14 @@ export default async function SocialMediaPage() {
           >
             Open Meta Business Suite &rarr;
           </a>
+        </div>
+        <SocialDashboard />
+      </div>
+
+      {/* Today's Engagement Checklist */}
+      <div className="data-card" style={{ marginBottom: 24 }}>
+        <div className="data-card-header">
+          <h2 className="data-card-title">Today&apos;s Checklist</h2>
         </div>
         <SopChecklist
           sopId={sop.id}

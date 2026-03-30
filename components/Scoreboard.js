@@ -1,10 +1,14 @@
 "use client";
 
-export default function Scoreboard({ stats, isAdmin }) {
+export default function Scoreboard({ stats, learning, isAdmin }) {
+  const accuracyPct = learning?.estimationAccuracy;
+  const velocity = learning?.velocityTrend;
+  const perDay = learning?.completionsPerDay;
+
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: isAdmin ? "repeat(auto-fit, minmax(140px, 1fr))" : "repeat(auto-fit, minmax(160px, 1fr))",
+      gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
       gap: 12,
     }}>
       {/* Anniversaries progress */}
@@ -40,6 +44,34 @@ export default function Scoreboard({ stats, isAdmin }) {
         color="#8e44ad"
       />
 
+      {/* Estimation accuracy — the learning metric */}
+      {accuracyPct != null && (
+        <ScoreCard
+          label="Accuracy"
+          value={`${accuracyPct}%`}
+          sub={accuracyPct > 115
+            ? "estimates too low"
+            : accuracyPct < 85
+              ? "finishing early"
+              : "estimates on target"}
+          color={accuracyPct > 85 && accuracyPct < 115 ? "#27ae60" : "#e67e22"}
+        />
+      )}
+
+      {/* Velocity trend */}
+      {velocity && velocity !== "unknown" && (
+        <ScoreCard
+          label="Velocity"
+          value={perDay ? `${perDay}/d` : "--"}
+          sub={velocity === "accelerating"
+            ? "speeding up"
+            : velocity === "slowing"
+              ? "slowing down"
+              : "steady pace"}
+          color={velocity === "accelerating" ? "#27ae60" : velocity === "slowing" ? "#e74c3c" : "#3498db"}
+        />
+      )}
+
       {/* Admin: heroes */}
       {isAdmin && (
         <ScoreCard
@@ -47,6 +79,16 @@ export default function Scoreboard({ stats, isAdmin }) {
           value={stats.heroesHonored}
           sub="active listings"
           color="#c4a237"
+        />
+      )}
+
+      {/* Neglected domains warning */}
+      {learning?.neglectedDomains?.length > 0 && (
+        <ScoreCard
+          label="Needs Attention"
+          value={learning.neglectedDomains.length}
+          sub={learning.neglectedDomains.slice(0, 2).join(", ")}
+          color="#e74c3c"
         />
       )}
     </div>

@@ -3,6 +3,9 @@ import { join } from "path";
 import { isAuthenticated } from "@/lib/auth";
 import { readKnowledge, writeKnowledge, logFriction as storageLogFriction } from "@/lib/storage/index.js";
 import { supabaseQuery, createTask, updateTask, queryTasks, logCloseout, logEngagement } from "@/lib/storage/supabase-tools.js";
+import { getTodayEvents, createEvent, updateEvent } from "@/lib/calendar";
+import { getHistoricalAverages, getLearningMetrics } from "@/lib/data/learning";
+import { getFacebookPosts, getInstagramPosts, getInstagramProfile, getPostComments, checkTokenHealth } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -268,6 +271,81 @@ Always confirm with the user before making bulk mutations (e.g., assigning 20 he
       required: ["type", "subject"],
     },
   },
+  {
+    name: "query_calendar",
+    description: "Get today's calendar events across all Steel Hearts role calendars (Primary, Ops, CTO, ED, COS, CFO, COO, Comms, Dev, Family). Use this to see what's scheduled, find context from event descriptions, or check availability.",
+    input_schema: {
+      type: "object",
+      properties: {
+        roles: {
+          type: "array",
+          items: { type: "string", enum: ["primary", "ops", "cto", "ed", "cos", "cfo", "coo", "comms", "dev", "family"] },
+          description: "Which role calendars to check (default: all)",
+        },
+        date: {
+          type: "string",
+          description: "Date to query in YYYY-MM-DD format (default: today)",
+        },
+      },
+    },
+  },
+  {
+    name: "create_calendar_event",
+    description: "Create a calendar event on a role calendar. Use this to schedule tasks, sessions, follow-ups, or ideas. Every task and idea should get a calendar slot.",
+    input_schema: {
+      type: "object",
+      properties: {
+        role: {
+          type: "string",
+          enum: ["primary", "ops", "cto", "ed", "cos", "cfo", "coo", "comms", "dev", "family"],
+          description: "Which role calendar to create the event on",
+        },
+        summary: { type: "string", description: "Event title" },
+        description: { type: "string", description: "Event description — include full context, dependencies, files, and follow-ups" },
+        startTime: { type: "string", description: "Start time as ISO datetime (e.g. 2026-04-01T10:00:00-04:00) or YYYY-MM-DD for all-day" },
+        endTime: { type: "string", description: "End time as ISO datetime or YYYY-MM-DD for all-day" },
+        colorId: { type: "string", description: "Color: 1=Lavender, 2=Sage, 3=Grape, 4=Flamingo, 5=Banana, 6=Tangerine, 7=Peacock, 8=Graphite, 9=Blueberry, 10=Basil, 11=Tomato" },
+      },
+      required: ["role", "summary", "startTime", "endTime"],
+    },
+  },
+  {
+    name: "query_learning",
+    description: "Get learning metrics from the execution history. Shows estimation accuracy (are estimates too high/low?), velocity trends (speeding up or slowing?), domain coverage (which areas are neglected?), and recency-weighted time averages by task type. Use this when asked about performance, patterns, or how the system is learning.",
+    input_schema: {
+      type: "object",
+      properties: {
+        detail: {
+          type: "string",
+          enum: ["summary", "averages", "accuracy", "full"],
+          description: "Level of detail: summary (key metrics), averages (time estimates by type), accuracy (estimation accuracy per type), full (everything)",
+        },
+      },
+    },
+  },
+  {
+    name: "query_social_media",
+    description: "Get real engagement data from Steel Hearts Facebook and Instagram accounts. Use this when asked about social media performance, recent posts, engagement, followers, or when doing daily SOP-001 engagement. NEVER use browser automation for Instagram — API only.",
+    input_schema: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: ["ig_profile", "ig_posts", "fb_posts", "comments", "token_health", "dashboard"],
+          description: "What to fetch: ig_profile (follower stats), ig_posts (recent IG posts with engagement), fb_posts (recent FB posts), comments (comments on a specific post), token_health (check if token expires soon), dashboard (combined overview)",
+        },
+        postId: {
+          type: "string",
+          description: "Post ID — required when action is 'comments'",
+        },
+        limit: {
+          type: "number",
+          description: "Number of posts to fetch (default 10)",
+        },
+      },
+      required: ["action"],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -430,6 +508,66 @@ async function handleToolCall(role, toolName, toolInput) {
       return await logCloseout({ role, ...toolInput });
     case "log_engagement":
       return await logEngagement(toolInput);
+    case "query_calendar": {
+      const options = {};
+      if (toolInput.roles) options.roles = toolInput.roles;
+      if (toolInput.date) {
+        options.timeMin = `${toolInput.date}T00:00:00`;
+        options.timeMax = `${toolInput.date}T23:59:59`;
+      }
+      const events = await getTodayEvents(options);
+      return JSON.stringify(events.map(e => ({
+        time: e.allDay ? "All day" : new Date(e.start).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }),
+        role: e.role,
+        title: e.summary,
+        description: e.description?.slice(0, 200) || "",
+      })), null, 2);
+    }
+    case "create_calendar_event": {
+      const event = await createEvent(toolInput);
+      return `Calendar event created: "${event.summary}" on ${event.role} calendar. Link: ${event.htmlLink}`;
+    }
+    case "query_learning": {
+      const detail = toolInput.detail || "summary";
+      if (detail === "summary" || detail === "full") {
+        const metrics = await getLearningMetrics();
+        if (detail === "summary") return JSON.stringify(metrics, null, 2);
+        const { averages, accuracy, domainVelocity } = await getHistoricalAverages();
+        return JSON.stringify({ metrics, averages, accuracy, domainVelocity }, null, 2);
+      }
+      const { averages, accuracy, domainVelocity } = await getHistoricalAverages();
+      if (detail === "averages") return JSON.stringify({ averages, domainVelocity }, null, 2);
+      if (detail === "accuracy") return JSON.stringify({ accuracy }, null, 2);
+      return JSON.stringify({ averages, accuracy }, null, 2);
+    }
+    case "query_social_media": {
+      const action = toolInput.action || "dashboard";
+      const limit = toolInput.limit || 10;
+      switch (action) {
+        case "ig_profile":
+          return JSON.stringify(await getInstagramProfile(), null, 2);
+        case "ig_posts":
+          return JSON.stringify(await getInstagramPosts(limit), null, 2);
+        case "fb_posts":
+          return JSON.stringify(await getFacebookPosts(limit), null, 2);
+        case "comments": {
+          if (!toolInput.postId) return "Error: postId is required for comments action";
+          return JSON.stringify(await getPostComments(toolInput.postId, limit), null, 2);
+        }
+        case "token_health":
+          return JSON.stringify(await checkTokenHealth(), null, 2);
+        case "dashboard": {
+          const [profile, fb, ig] = await Promise.all([
+            getInstagramProfile().catch(() => null),
+            getFacebookPosts(5).catch(() => []),
+            getInstagramPosts(5).catch(() => []),
+          ]);
+          return JSON.stringify({ instagram: profile, recentFacebook: fb, recentInstagram: ig }, null, 2);
+        }
+        default:
+          return `Unknown social media action: ${action}`;
+      }
+    }
     default:
       return `Unknown tool: ${toolName}`;
   }

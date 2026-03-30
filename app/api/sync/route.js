@@ -53,10 +53,16 @@ async function sfUpsertBatch(auth, objectName, records) {
 }
 
 export async function GET(request) {
-  // Auth: API key or Vercel cron key
-  const { searchParams } = new URL(request.url);
-  const key = searchParams.get("key") || request.headers.get("x-api-key");
-  if (key !== process.env.SHOS_API_KEY) {
+  // Auth: Vercel CRON_SECRET header or SHOS_API_KEY
+  const authHeader = request.headers.get("authorization");
+  const cronSecret = process.env.CRON_SECRET;
+  const apiKey = process.env.SHOS_API_KEY;
+  const key = new URL(request.url).searchParams.get("key") || request.headers.get("x-api-key");
+
+  const isVercelCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
+  const isApiKey = apiKey && key === apiKey;
+
+  if (!isVercelCron && !isApiKey) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -89,6 +95,12 @@ export async function GET(request) {
     { sb: "organizations", sf: "Account", map: r => r.sf_id ? { Id: r.sf_id, Name: r.name } : null },
     { sb: "donations", sf: "Donation__c", map: r => r.sf_id ? { Id: r.sf_id, Donation_Amount__c: r.amount, Source__c: r.source } : null },
     { sb: "knowledge_files", sf: "SHOS_Knowledge__c", map: r => r.sf_id ? { Id: r.sf_id, Content__c: r.content?.slice(0, 131072), Session_Count__c: r.session_count } : null },
+    // Financial tables (added for full backup coverage)
+    { sb: "disbursements", sf: "Disbursement__c", map: r => r.sf_id ? { Id: r.sf_id, Amount__c: r.amount, Status__c: r.status, Hero_Name__c: r.hero_name, Disbursement_Date__c: r.disbursement_date } : null },
+    { sb: "expenses", sf: "Expense__c", map: r => r.sf_id ? { Id: r.sf_id, Amount__c: r.amount, Category__c: r.category, Description__c: r.description, Expense_Date__c: r.expense_date } : null },
+    { sb: "obligations", sf: "Obligation__c", map: r => r.sf_id ? { Id: r.sf_id, Amount__c: r.amount, Status__c: r.status, Description__c: r.description, Due_Date__c: r.due_date } : null },
+    { sb: "order_items", sf: "Order_Item__c", map: r => r.sf_id ? { Id: r.sf_id, SKU__c: r.sku, Quantity__c: r.quantity, Status__c: r.status, Hero_Name__c: r.hero_name } : null },
+    { sb: "engagements", sf: "Engagement__c", map: r => r.sf_id ? { Id: r.sf_id, Type__c: r.type, Subject__c: r.subject, Engagement_Date__c: r.engagement_date } : null },
   ];
 
   for (const t of tables) {
