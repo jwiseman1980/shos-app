@@ -49,7 +49,7 @@
 | Priority | Issue | Status |
 |----------|-------|--------|
 | CRITICAL | Gmail/Calendar API auth: `unauthorized_client` — domain-wide delegation not configured in Google Workspace Admin | Open |
-| HIGH | Order triage API broken — schema mismatch on `order_items.memorial_bracelet_id` | Open |
+| HIGH | Order triage API broken — schema mismatch on `order_items.memorial_bracelet_id` | ✅ Fixed (hero_id) |
 | HIGH | Squarespace → Supabase routing — orders only reach Supabase via nightly SF sync, consider dual-write | Open |
 | MEDIUM | Screenshot/error capture — Operator can't see user's screen or capture errors | Open |
 | MEDIUM | Friction log schema — now fixed (operator/architect added to shos_role enum) | ✅ Done |
