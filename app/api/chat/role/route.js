@@ -273,7 +273,7 @@ Always confirm with the user before making bulk mutations (e.g., assigning 20 he
   },
   {
     name: "query_calendar",
-    description: "Get today's calendar events across all Steel Hearts role calendars (Primary, Ops, CTO, ED, COS, CFO, COO, Comms, Dev, Family). Use this to see what's scheduled, find context from event descriptions, or check availability.",
+    description: "Get today's calendar events across all Steel Hearts functional calendars (Primary, Ops, CTO, Finance, Operations, Comms, Dev, Family). Each calendar tracks a domain of work, not a separate agent. Use this to see what's scheduled, find context from event descriptions, or check availability.",
     input_schema: {
       type: "object",
       properties: {
@@ -291,7 +291,7 @@ Always confirm with the user before making bulk mutations (e.g., assigning 20 he
   },
   {
     name: "create_calendar_event",
-    description: "Create a calendar event on a role calendar. Use this to schedule tasks, sessions, follow-ups, or ideas. Every task and idea should get a calendar slot.",
+    description: "Create a calendar event on a functional calendar. Use this to schedule tasks, sessions, follow-ups, or ideas. EVERY task, idea, and plan gets a calendar slot — no exceptions. Pick the calendar that matches the domain of work.",
     input_schema: {
       type: "object",
       properties: {
