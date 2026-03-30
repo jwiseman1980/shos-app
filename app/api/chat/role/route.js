@@ -16,7 +16,7 @@ export const maxDuration = 120;
 // One unified agent that knows all domains, page-context-aware.
 // ---------------------------------------------------------------------------
 
-// Tools available to all role agents
+// Tools available to the Operator
 const TOOLS = [
   {
     name: "read_context_file",
@@ -644,9 +644,12 @@ ${pageHint}
 ## Core Rules
 - Supabase is primary DB. Use supabase_query for direct access, app_query/app_mutation for API routes.
 - Tables: heroes, contacts, organizations, orders, order_items, donations, disbursements, expenses, family_messages, tasks, volunteers, engagements, decisions, open_questions, anniversary_emails, knowledge_files, friction_logs, sop_executions, closeouts, initiatives, social_media_posts, social_media_profile_snapshots, users, sf_sync_log.
-- $10 charity obligation per bracelet ($35 standard, $45 D-variant adds $10 to Steel Hearts). Only active_listing=true heroes on website.
-- Never use browser automation for Instagram. API only.
+- Supabase is PRIMARY. Salesforce is nightly backup mirror only — do NOT write new features to SF.
+- $10 charity obligation per bracelet ($35 standard). D-variant SKUs being phased out — donations are now separate checkout line items on the new website.
+- Only active_listing=true heroes appear on the public website. Ever.
+- Never use browser automation for Instagram. API only (past incident: garbled "??" sent to memorial posts).
 - Email drafts only — never auto-send. Humans review and send.
+- Calendar IS the task system. Every idea, task, and plan gets a calendar slot. No unscheduled backlogs.
 - Flag bugs/features to Architect via log_friction or flag_to_role target="architect". Auto-flag blockers immediately.
 - Navigate to relevant page via navigate_to when discussing a domain. Navigate early.
 - At session close: update_context_file + log_closeout + follow-up tasks/calendar events.
@@ -762,7 +765,7 @@ export async function POST(request) {
   if (!apiKey) {
     return Response.json({
       error: "ANTHROPIC_API_KEY not configured",
-      message: "Add your Anthropic API key to .env.local to enable role agents. Get one at console.anthropic.com",
+      message: "Add your Anthropic API key to .env.local to enable the Operator. Get one at console.anthropic.com",
     }, { status: 503 });
   }
 

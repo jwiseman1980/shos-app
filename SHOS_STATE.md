@@ -34,7 +34,7 @@
 
 - **Supabase** — Primary database (replaced Salesforce 2026-03-28)
 - **Salesforce** — Nightly backup mirror only. DO NOT write new features to SF.
-- **Squarespace** — Current storefront. Orders → Salesforce (via Zapier) → Supabase (nightly sync)
+- **Squarespace** — Current storefront (transitioning to new Next.js website on Vercel). Orders → Salesforce → Supabase (nightly sync). Zapier deprecated — direct API integrations replace it.
 - **Meta Graph API** — Facebook + Instagram data, live in SHOS app. Metrics auto-persist to Supabase.
 - **Google Calendar** — Functional calendars per domain. Every session, task, and idea gets a slot.
 - **Gmail** — Anniversary email drafts via domain-wide delegation
@@ -51,7 +51,7 @@
 | CRITICAL | Gmail/Calendar API auth: `unauthorized_client` — domain-wide delegation not configured in Google Workspace Admin | ✅ Fixed |
 | HIGH | Order triage API broken — schema mismatch on `order_items.memorial_bracelet_id` | ✅ Fixed (hero_id) |
 | HIGH | Orders data layer — Salesforce column names (`name`, `manufactured`, `fulfillment_status`, etc.) referenced across orders.js | ✅ Fixed (all mapped to Supabase columns) |
-| HIGH | Squarespace → Supabase routing — orders only reach Supabase via nightly SF sync, consider dual-write | ✅ Built (`/api/webhooks/squarespace`) — needs Zapier config + Vercel env var |
+| HIGH | Squarespace → Supabase routing — orders only reach Supabase via nightly SF sync | ✅ Built (`/api/webhooks/squarespace`) + new website Stripe webhook writes Supabase directly |
 | MEDIUM | Screenshot/error capture — Operator can't see user's screen or capture errors | Open |
 | MEDIUM | Deep links — Operator chat navigates app via `navigate_to` tool | ✅ Done |
 | MEDIUM | Calendar API "Bad Request" — timestamps missing RFC3339 timezone offset | ✅ Fixed |
@@ -69,8 +69,9 @@
 ## Operational Status
 
 ### Orders & Production
-- Squarespace orders come in via Salesforce (Zapier integration)
-- Army Rugby design orders (USMA-ARMYRUGBY) — design_needed, 2 paid orders waiting
+- Current: Squarespace orders reach Supabase via Salesforce nightly sync
+- New website (steel-hearts-site): Stripe webhook writes directly to Supabase + sends automated emails
+- SHOS app webhook at `/api/webhooks/squarespace` available for direct order ingest
 - Query via `/api/orders/triage` or `supabase_query` on orders/order_items tables
 
 ### Anniversaries
@@ -137,7 +138,7 @@
 - ~~Calendar API "Bad Request" errors~~ ✅ Fixed (RFC3339 timezone offset)
 - ~~Rate limit 429 errors~~ ✅ Fixed (Sonnet model + retry + truncation + slim prompt)
 - WEBHOOK_SECRET needs adding to Vercel env vars
-- Zapier needs second action configured for `/api/webhooks/squarespace`
+- Website go-live: Stripe live keys, DNS cutover (Squarespace → Vercel), Google service account env vars on website
 
 ---
 

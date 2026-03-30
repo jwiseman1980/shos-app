@@ -1,12 +1,12 @@
 /**
  * Squarespace Order Webhook → Supabase
  *
- * Receives order data from Zapier (or direct Squarespace webhook) and writes
- * directly to Supabase. This eliminates the 24-hour delay from the
- * Squarespace → Salesforce → nightly sync → Supabase pipeline.
+ * Receives order data and writes directly to Supabase. This eliminates the
+ * delay from the Squarespace → Salesforce → nightly sync → Supabase pipeline.
  *
- * Zapier setup: Add a second action to the existing Squarespace → SF zap
- * that POSTs the same data to this endpoint with the webhook secret.
+ * Can be called by any source that sends order data in the expected format.
+ * Once the new website (steel-hearts-site) goes live with Stripe, this endpoint
+ * handles legacy Squarespace orders during transition.
  *
  * Auth: WEBHOOK_SECRET header or query param
  */
@@ -79,7 +79,7 @@ export async function POST(request) {
   const sb = getServerClient();
 
   try {
-    // Normalize field names — Zapier may send Salesforce-style or Squarespace-style
+    // Normalize field names — accept Supabase-style, Salesforce-style, or camelCase
     const orderNumber = body.orderNumber || body.order_number || body.Name || "";
     const orderDate = body.orderDate || body.order_date || body.Order_Date__c || new Date().toISOString().slice(0, 10);
     const billingName = body.billingName || body.billing_name || body.Billing_Name__c || "";

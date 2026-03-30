@@ -31,7 +31,7 @@ The calendar block is the atomic unit of work.
 
 ### Executive Director — Joseph Wiseman
 **Owns:** Direction, external relationships, board, final approvals
-**Supported by:** Chief of Staff (daily ops), all role agents (domain outputs)
+**Supported by:** The Operator (all domains) and the Architect (system builds)
 **Cadence:** Morning briefing daily, approves outputs, routes cross-role flags
 
 ---
@@ -239,7 +239,7 @@ Steel Hearts proves it works. HonorBase sells it.
 
 - [ ] Architecture session (2 hours) — design full role structure, knowledge file hierarchy, app navigation, agent system
 - [ ] Configure session closeout hook (stop hook via update-config)
-- [ ] Rename FINANCE_TODO.md → CFO_CONTEXT.md (expand to full format)
+- [x] Rename FINANCE_TODO.md → CFO_CONTEXT.md (expand to full format) — Done 2026-03-27
 - [ ] Create SHOS_STATE.md (master state document)
 - [ ] Redesign app navigation around roles
 - [ ] Build in-app "Talk to [Role]" agent panel (Claude API)

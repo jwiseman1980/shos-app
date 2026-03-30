@@ -1,18 +1,17 @@
 # Friction Log
-> Any role agent can append here via the `log_friction` tool.
-> Chief of Staff reviews and triages during COS sessions.
-> Triaged items move to a Claude Code build session.
+> The Operator appends here via the `log_friction` tool.
+> Architect reviews and triages during build sessions.
+> Triaged items move to Claude Code (Architect) for implementation.
 
-**Owner:** Chief of Staff
-**Last reviewed:** Never (initialized 2026-03-27)
+**Owner:** Operator + Architect
+**Last reviewed:** 2026-03-30
 
 ---
 
 ## How This Works
 
-- **Role agents** log friction mid-conversation — missing features, bugs, annoyances, ideas
-- **COS** reviews during governance sessions — triages priority, marks status
-- **Claude Code sessions** pull from this file to know what to build next
+- **Operator** logs friction mid-conversation — missing features, bugs, annoyances, ideas
+- **Architect** reviews during build sessions — triages priority, implements fixes
 - Items move: `open` → `triaged` → `queued` → `done`
 
 ---

@@ -4,8 +4,8 @@
  * Polls SF for Squarespace orders newer than the latest in Supabase
  * and inserts them. Runs hourly via Vercel cron.
  *
- * This bridges the gap: Squarespace → Zapier → SF → (this cron) → Supabase
- * until the new website replaces Squarespace entirely.
+ * This bridges the gap: Squarespace → SF → (this cron) → Supabase
+ * until the new website (steel-hearts-site) replaces Squarespace entirely.
  */
 
 import { getServerClient } from "@/lib/supabase";

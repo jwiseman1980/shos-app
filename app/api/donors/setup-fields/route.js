@@ -7,7 +7,6 @@ import { NextResponse } from "next/server";
  * Uses the SF Metadata API (composite) to create custom fields.
  * Safe to run multiple times — skips fields that already exist.
  *
- * DOES NOT touch any existing fields the Zapier Zap maps to.
  * All new fields are app-managed only.
  */
 

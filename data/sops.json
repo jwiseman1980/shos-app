@@ -265,7 +265,7 @@
       {
         "step": 4,
         "title": "Volunteer Assignment (Days 3-5)",
-        "detail": "Chris assigns volunteers in Notion (set Assigned To, Status → Assigned). Balance workload. Post assignment summary in Slack #anniversary-cycle. Tag volunteers.",
+        "detail": "Chris assigns volunteers in the SHOS app Anniversaries page. Balance workload. Post assignment summary in Slack #anniversary-cycle. Tag volunteers.",
         "who": "chris"
       },
       {
@@ -528,33 +528,33 @@
       {
         "step": 4,
         "title": "Laser Production",
-        "detail": "Pull blank bracelet in correct size. Open design file from SF. Laser engrave. Update Order Queue to Produced or Ready to Ship.",
+        "detail": "Pull blank bracelet in correct size. Open design file from Google Drive (via SHOS app Laser page). Laser engrave. Update production status to Ready to Ship in SHOS app.",
         "who": "joseph"
       },
       {
         "step": 5,
         "title": "Ready to Ship → Automation",
-        "detail": "Setting Ready to Ship triggers Zap 1 (Notion→ShipStation). Kristin prints labels, packages, ships. Zap 2 updates tracking. Zap 3 syncs to Salesforce.",
-        "who": "automated"
+        "detail": "Setting Ready to Ship in SHOS app auto-pushes to ShipStation (for donated orders). Kristin prints labels, packages, ships. Shipping notification email auto-sends to customer. Slack notifies ops hub.",
+        "who": "kristin"
       },
       {
         "step": 6,
         "title": "Verify completion",
-        "detail": "Confirm Order Queue shows Synced to Salesforce. Check SF order shows Fulfilled. Mark weekly hub task complete when all orders in batch are done.",
+        "detail": "Confirm order status shows Shipped in SHOS app. Verify ShipStation tracking number populated. Mark weekly hub task complete when all orders in batch are done.",
         "who": "operator"
       }
     ]
   },
   {
     "id": "SOP-SYNC-001",
-    "title": "Automated Notion-SF Reconciliation",
+    "title": "Automated Notion-SF Reconciliation (DEPRECATED)",
     "version": "v1.0",
     "domain": "System Core",
     "cadence": "Weekly",
-    "status": "active",
+    "status": "deprecated",
     "owner": "Joseph Wiseman",
     "type": "procedure",
-    "summary": "Sync and reconcile data between Notion work surface and Salesforce",
+    "summary": "DEPRECATED — Notion and Zapier retired 2026-03-28. Supabase is primary DB with nightly SF sync via /api/sync cron.",
     "steps": [
       {
         "step": 1,

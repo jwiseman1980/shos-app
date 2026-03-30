@@ -45,8 +45,8 @@ The Chief of Staff owns everything that makes the Executive Director effective:
 ## Active Todos
 
 **🔴 HIGH PRIORITY**
-- [ ] Rename FINANCE_TODO.md → CFO_CONTEXT.md (expand to full knowledge file format)
-- [ ] Schedule COO, Comms, Family knowledge-file initialization sessions
+- [x] Rename FINANCE_TODO.md → CFO_CONTEXT.md — Done 2026-03-27
+- [x] Schedule COO, Comms, Family knowledge-file initialization sessions — Consolidated to single Operator 2026-03-30
 
 **🟡 MEDIUM PRIORITY**
 - [ ] Create compliance calendar — 990 deadline, state registration renewals, board minutes schedule
