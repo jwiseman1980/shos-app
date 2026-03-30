@@ -4,6 +4,8 @@ import PageShell from "@/components/PageShell";
 import DataCard from "@/components/DataCard";
 import StatBlock from "@/components/StatBlock";
 import { sfQuery } from "@/lib/salesforce";
+import { promises as fs } from "fs";
+import path from "path";
 
 const tdStyle = { padding: "6px 10px", fontSize: 12, verticalAlign: "middle" };
 const thStyle = {
@@ -11,6 +13,15 @@ const thStyle = {
   textTransform: "uppercase", letterSpacing: "0.05em",
   color: "var(--text-dim)", textAlign: "left",
 };
+
+async function getBlankStock() {
+  try {
+    const raw = await fs.readFile(path.join(process.cwd(), "data", "blank-stock.json"), "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return { blanks_7in: 0, blanks_6in: 0, updated_at: null };
+  }
+}
 
 async function getInventoryData() {
   if (process.env.SF_LIVE !== "true") return { heroes: [], totals: {} };
@@ -27,7 +38,6 @@ async function getInventoryData() {
   const totalValue = heroes.reduce((s, h) => s + (h.Total_Inventory_Value__c || 0), 0);
   const skuCount = heroes.length;
   const lowStock = heroes.filter((h) => (h.Total_On_Hand__c || 0) <= 3).length;
-  const outOfStock = heroes.filter((h) => (h.Total_On_Hand__c || 0) === 0).length;
 
   return {
     heroes: heroes.map((h) => ({
@@ -46,16 +56,21 @@ async function getInventoryData() {
 }
 
 export default async function InventoryPage() {
-  const { heroes, totals } = await getInventoryData();
+  const [{ heroes, totals }, blanks] = await Promise.all([
+    getInventoryData(),
+    getBlankStock(),
+  ]);
 
-  // Sort by last name (extract from hero name or SKU)
+  const totalBlanks = (blanks.blanks_7in || 0) + (blanks.blanks_6in || 0);
+  const blanksUpdated = blanks.updated_at
+    ? new Date(blanks.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : "Never";
+
   const getLastName = (h) => {
     const sku = h.sku || "";
-    const parts = sku.split("-");
-    // Group bracelets don't have a simple last name — they have keywords like CLASS, SOAR, RUGBY, etc.
     const isGroup = /CLASS|SOAR|RUGBY|NIGHTSTALKERS|HKIA|NYNG|BP|SPRINT|MEMORIAL|FALLEN/i.test(sku);
     if (isGroup) return null;
-    // Last segment before size suffix is the name
+    const parts = sku.split("-");
     const namePart = parts.length >= 2 ? parts[parts.length - 1].replace(/^(7|6|D)$/, "") || parts[parts.length - 2] : "";
     return namePart || h.name;
   };
@@ -70,41 +85,77 @@ export default async function InventoryPage() {
   const highStock = individualHeroes.filter((h) => h.total >= 10);
 
   return (
-    <PageShell title="Inventory Burnout" subtitle="Legacy pre-made bracelet stock — burns down to zero">
-      <div className="stat-grid">
-        <StatBlock
-          label="Total Bracelets"
-          value={totals.totalAll?.toLocaleString() || 0}
-          note={`${totals.total7?.toLocaleString()} x 7" + ${totals.total6?.toLocaleString()} x 6"`}
-          accent="var(--gold)"
-        />
-        <StatBlock
-          label="Unique SKUs"
-          value={totals.skuCount || 0}
-          note="With inventory on hand"
-          accent="var(--status-blue)"
-        />
-        <StatBlock
-          label="Low Stock"
-          value={totals.lowStock || 0}
-          note="3 or fewer remaining"
-          accent="var(--status-orange)"
-        />
-        <StatBlock
-          label="Inventory Value"
-          value={totals.totalValue ? `$${totals.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "$0"}
-          note="At cost"
-          accent="var(--status-green)"
-        />
+    <PageShell title="Inventory" subtitle="Blank stock + legacy burnout inventory">
+      {/* === BLANK STOCK SECTION === */}
+      <div className="section">
+        <DataCard title="Blank Bracelets On Hand">
+          <div style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.7, marginBottom: 16 }}>
+            Ungraved blank bracelets ready for laser engraving. These are the raw materials
+            &mdash; every new bracelet starts here. Counts decrement as orders are produced.
+          </div>
+          <div className="stat-grid">
+            <StatBlock
+              label="Total Blanks"
+              value={totalBlanks.toLocaleString()}
+              note={`${blanks.blanks_7in?.toLocaleString() || 0} x 7" + ${blanks.blanks_6in?.toLocaleString() || 0} x 6"`}
+              accent="var(--gold)"
+            />
+            <StatBlock
+              label='7" Blanks'
+              value={blanks.blanks_7in?.toLocaleString() || 0}
+              note="Standard size"
+              accent="var(--status-blue)"
+            />
+            <StatBlock
+              label='6" Blanks'
+              value={blanks.blanks_6in?.toLocaleString() || 0}
+              note="Small size"
+              accent="var(--status-blue)"
+            />
+            <StatBlock
+              label="Last Updated"
+              value={blanksUpdated}
+              note="Manual count"
+              accent="var(--text-dim)"
+            />
+          </div>
+        </DataCard>
       </div>
 
+      {/* === BURNOUT STOCK SECTION === */}
       <div className="section">
-        <DataCard title="About This Inventory">
-          <div style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.7 }}>
-            This is legacy pre-made inventory from Bracelets For America. These bracelets are already manufactured and ready to ship.
-            Once stock hits zero for a SKU, all future orders are manufactured on-demand using the xTool F2 Ultra.
-            This page tracks the burnout — the transition from purchased inventory to in-house production.
-            <strong style={{ color: "var(--text-bright)" }}> No restocking. When they're gone, they're gone.</strong>
+        <DataCard title="Burnout Stock — Legacy Pre-Made Inventory">
+          <div style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.7, marginBottom: 16 }}>
+            Pre-made bracelets from Bracelets For America. Already manufactured and ready to ship
+            &mdash; no design or laser needed. Once stock hits zero for a SKU, all future orders
+            are manufactured on-demand using the xTool F2 Ultra.
+            <strong style={{ color: "var(--text-bright)" }}> No restocking. When they&apos;re gone, they&apos;re gone.</strong>
+          </div>
+          <div className="stat-grid">
+            <StatBlock
+              label="Total Burnout"
+              value={totals.totalAll?.toLocaleString() || 0}
+              note={`${totals.total7?.toLocaleString() || 0} x 7" + ${totals.total6?.toLocaleString() || 0} x 6"`}
+              accent="var(--status-orange)"
+            />
+            <StatBlock
+              label="Unique SKUs"
+              value={totals.skuCount || 0}
+              note="With inventory on hand"
+              accent="var(--status-blue)"
+            />
+            <StatBlock
+              label="Low Stock"
+              value={totals.lowStock || 0}
+              note="3 or fewer remaining"
+              accent="var(--status-orange)"
+            />
+            <StatBlock
+              label="Inventory Value"
+              value={totals.totalValue ? `$${totals.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "$0"}
+              note="At cost"
+              accent="var(--status-green)"
+            />
           </div>
         </DataCard>
       </div>
@@ -137,7 +188,7 @@ export default async function InventoryPage() {
         <div className="section">
           <DataCard title={`Group / Unit Bracelets (${groupBracelets.length})`}>
             <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
-              Class, unit, and memorial event bracelets — not individual heroes.
+              Class, unit, and memorial event bracelets &mdash; not individual heroes.
             </div>
             <InventoryTable items={groupBracelets} />
           </DataCard>
@@ -155,8 +206,8 @@ function InventoryTable({ items }) {
           <tr style={{ borderBottom: "1px solid var(--card-border)" }}>
             <th style={thStyle}>Hero</th>
             <th style={thStyle}>SKU</th>
-            <th style={{ ...thStyle, textAlign: "center" }}>7"</th>
-            <th style={{ ...thStyle, textAlign: "center" }}>6"</th>
+            <th style={{ ...thStyle, textAlign: "center" }}>7&quot;</th>
+            <th style={{ ...thStyle, textAlign: "center" }}>6&quot;</th>
             <th style={{ ...thStyle, textAlign: "center" }}>Total</th>
             <th style={thStyle}>Status</th>
           </tr>

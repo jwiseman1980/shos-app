@@ -4,6 +4,7 @@ import { triageNeedsDecision } from "@/lib/data/orders";
 const SLACK_WEBHOOK = process.env.SLACK_SOP_WEBHOOK;
 const SLACK_DM_JOSEPH = process.env.SLACK_DM_JOSEPH;
 const SLACK_DM_RYAN = process.env.SLACK_DM_RYAN;
+const SLACK_DM_KRISTIN = process.env.SLACK_DM_KRISTIN;
 
 async function postToSlack(text, webhook = SLACK_WEBHOOK) {
   if (!webhook) return;
@@ -64,6 +65,12 @@ async function handler(request) {
             `🔥 ${item.name} bracelet auto-advanced to Ready to Laser (design found)`,
             SLACK_DM_JOSEPH
           );
+        } else if (item.action === "fromStock") {
+          // Burnout stock exists, ready to ship → ops hub + DM Kristin
+          await notifyPerson(
+            `📦 ${item.name} bracelet fulfilled from burnout stock → Ready to Ship (${item.stockAfter} remaining)`,
+            SLACK_DM_KRISTIN
+          );
         } else if (item.action === "needsDesign") {
           // No design → ops hub + DM Ryan
           await notifyPerson(
@@ -77,7 +84,7 @@ async function handler(request) {
     return NextResponse.json({
       success: true,
       ...result,
-      message: `Triage complete: ${result.advanced} advanced, ${result.needsDesign} need design, ${result.skipped} need manual review`,
+      message: `Triage complete: ${result.advanced} to laser, ${result.fromStock || 0} from stock, ${result.needsDesign} need design, ${result.skipped} need manual review`,
     });
   } catch (error) {
     console.error("Triage error:", error.message);
