@@ -69,11 +69,13 @@ export async function POST(request) {
 
     // Build a warm, human email — not a form letter.
     // Volunteers review and personalize before sending.
+    // Use first name after the initial full-name mention.
     const { buildEmailSignature } = await import("@/lib/email-signature");
+    const heroFirstName = heroName.replace(/^([\w.]+\s+)/, "").split(" ")[0];
 
     let emailBody = `Hi ${displayFamily},\n\n`;
     emailBody += `I just wanted you to know that we're thinking of you today, on the ${ordinal} anniversary of ${heroName}'s passing.\n\n`;
-    emailBody += `People across the country wear ${heroName}'s memorial bracelet — and through them, ${heroName}'s name is carried forward every single day. That matters, and it's because of your family's willingness to let us honor ${heroName} that it's possible.\n\n`;
+    emailBody += `${heroFirstName}'s name is carried forward every single day by people across the country, and that's because of your family's willingness to let us be part of honoring ${heroFirstName}'s legacy.\n\n`;
     emailBody += `If you ever want to share a memory, update us on anything, or just say hi — we'd love to hear from you.\n\n`;
     emailBody += `Thinking of you,\n`;
     emailBody += buildEmailSignature(senderName, senderEmail);
