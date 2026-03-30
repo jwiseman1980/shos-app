@@ -73,10 +73,10 @@ export async function POST(request) {
     const { buildEmailSignature } = await import("@/lib/email-signature");
     const heroFirstName = heroName.replace(/^([\w.]+\s+)/, "").split(" ")[0];
 
-    let emailBody = `Hi ${displayFamily},\n\n`;
-    emailBody += `I wanted to reach out today because ${heroFirstName} has been on my mind. The ${ordinal} anniversary of ${heroName}'s passing is a day we hold close here at Steel Hearts, and I wanted you to know that your family is in our thoughts and prayers.\n\n`;
-    emailBody += `${heroFirstName} is not forgotten — not today, and not any day. It is a genuine honor to help keep ${heroFirstName}'s memory alive, and we are grateful to be a small part of that.\n\n`;
-    emailBody += `Please don't hesitate to reach out if there's ever anything we can do, or if you just want to talk. We're here.\n\n`;
+    let emailBody = `Dear ${displayFamily},\n\n\n`;
+    emailBody += `I wanted to reach out today because ${heroFirstName} has been on my mind. The ${ordinal} anniversary of ${heroName}'s passing is a day we hold close here at Steel Hearts, and I wanted you to know that your family is in our thoughts and prayers.\n\n\n`;
+    emailBody += `${heroFirstName} is not forgotten — not today, and not any day. It is a genuine honor to help keep ${heroFirstName}'s memory alive, and we are grateful to be a small part of that.\n\n\n`;
+    emailBody += `Please don't hesitate to reach out if there's ever anything we can do, or if you just want to talk. We're here.\n\n\n`;
     emailBody += `With love and respect,\n`;
     emailBody += buildEmailSignature(senderName, senderEmail);
 
