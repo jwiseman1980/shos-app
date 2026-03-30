@@ -82,7 +82,7 @@ CREATE TYPE friction_status AS ENUM (
 );
 
 CREATE TYPE shos_role AS ENUM (
-  'ed', 'cos', 'cfo', 'coo', 'comms', 'dev', 'family'
+  'operator', 'architect', 'ed', 'cos', 'cfo', 'coo', 'comms', 'dev', 'family'
 );
 
 CREATE TYPE disbursement_fund_type AS ENUM (
