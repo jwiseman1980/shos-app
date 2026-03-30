@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { updateItemStatus, createDonatedOrder, getActiveOrderItems, getOrderStats } from "@/lib/data/orders";
 import { sfQuery } from "@/lib/salesforce";
 import { createOrder } from "@/lib/shipstation";
+import { getServerClient } from "@/lib/supabase";
+import { sendGmailMessage } from "@/lib/gmail";
 
 const SLACK_WEBHOOK = process.env.SLACK_SOP_WEBHOOK;
 // Per-person DM webhooks — notifications go to BOTH ops hub AND the person's DM
@@ -131,6 +133,33 @@ export async function GET() {
 }
 
 /**
+ * Send shipping notification email to customer when a bracelet ships.
+ * Looks up the order/customer info from Supabase via the item ID.
+ */
+async function sendShippingEmail(itemId, heroName) {
+  const sb = getServerClient();
+  const { data: item } = await sb
+    .from("order_items")
+    .select("order:orders!order_id(billing_email, billing_name, shipping_name)")
+    .eq("id", itemId)
+    .single();
+
+  const email = item?.order?.billing_email;
+  if (!email) return;
+
+  const customerName = item.order.shipping_name || item.order.billing_name || "there";
+  const firstName = customerName.split(" ")[0];
+
+  await sendGmailMessage({
+    senderEmail: "joseph.wiseman@steel-hearts.org",
+    senderName: "Steel Hearts Foundation",
+    to: email,
+    subject: `Shipped — ${heroName} Memorial Bracelet`,
+    body: `Your bracelet is on its way, ${firstName}.\n\nThe memorial bracelet honoring ${heroName} has shipped. You should receive it within a few business days.\n\nThank you for carrying this name forward. Every bracelet is a promise that their sacrifice will not be forgotten.\n\nWith gratitude,\nJoseph Wiseman\nFounder, Steel Hearts Foundation\nsteel-hearts.org | EIN: 47-2511085`,
+  });
+}
+
+/**
  * PATCH /api/orders — Update a line item's production status
  * Body: { itemId, status }
  */
@@ -166,6 +195,10 @@ export async function PATCH(request) {
         }
       } else if (status === "shipped") {
         await postToSlack(`✅ ${name} bracelet shipped`);
+        // Send shipping notification email to customer
+        sendShippingEmail(itemId, name).catch((err) =>
+          console.warn("Shipping email failed:", err.message)
+        );
       }
     }
 
