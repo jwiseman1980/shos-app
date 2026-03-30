@@ -74,9 +74,8 @@ export async function POST(request) {
     const heroFirstName = heroName.replace(/^([\w.]+\s+)/, "").split(" ")[0];
 
     let emailBody = `Hi ${displayFamily},\n\n`;
-    emailBody += `I just wanted you to know that we're thinking of you today, on the ${ordinal} anniversary of ${heroName}'s passing.\n\n`;
-    emailBody += `${heroFirstName}'s name is carried forward every single day by people across the country. That means something, and we just wanted you to know.\n\n`;
-    emailBody += `If you ever want to share a memory, update us on anything, or just say hi — we'd love to hear from you.\n\n`;
+    emailBody += `Just wanted you to know that we are thinking of you and praying for your family today, on the ${ordinal} anniversary of ${heroName}'s passing.\n\n`;
+    emailBody += `${heroFirstName} is not forgotten.\n\n`;
     emailBody += `Thinking of you,\n`;
     emailBody += buildEmailSignature(senderName, senderEmail);
 
