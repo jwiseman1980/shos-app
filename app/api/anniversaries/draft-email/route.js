@@ -60,22 +60,25 @@ export async function POST(request) {
     const { createGmailDraft } = await import("@/lib/gmail");
 
     const displayFamily = familyName || "Family";
+    const firstName = senderName ? senderName.split(" ")[0] : "A volunteer";
     const ordinal =
       years === 1 ? "1st" :
       years === 2 ? "2nd" :
       years === 3 ? "3rd" :
       `${years}th`;
 
-    let emailBody = `Dear ${displayFamily},\n\n`;
-    emailBody += `On behalf of everyone at Steel Hearts, we wanted to reach out to you on the ${ordinal} anniversary of ${heroName}'s passing. We want you to know that ${heroName} is not forgotten, and that their sacrifice continues to be honored.\n\n`;
-    emailBody += `Steel Hearts was founded to ensure that the memory of our fallen heroes lives on. Through our memorial bracelet program, supporters across the country carry ${heroName}'s name with them every day.\n\n`;
-    emailBody += `We are thinking of you and your family during this time. If there is anything we can do, or if you would like to share any memories or updates, please don't hesitate to reach out.\n\n`;
-    emailBody += `With deepest respect,\n`;
-
+    // Build a warm, human email — not a form letter.
+    // Volunteers review and personalize before sending.
     const { buildEmailSignature } = await import("@/lib/email-signature");
+
+    let emailBody = `Hi ${displayFamily},\n\n`;
+    emailBody += `I just wanted you to know that we're thinking of you today, on the ${ordinal} anniversary of ${heroName}'s passing.\n\n`;
+    emailBody += `People across the country wear ${heroName}'s memorial bracelet — and through them, ${heroName}'s name is carried forward every single day. That matters, and it's because of your family's willingness to let us honor ${heroName} that it's possible.\n\n`;
+    emailBody += `If you ever want to share a memory, update us on anything, or just say hi — we'd love to hear from you.\n\n`;
+    emailBody += `Thinking of you,\n`;
     emailBody += buildEmailSignature(senderName, senderEmail);
 
-    const subject = `Remembering ${heroName} — Steel Hearts`;
+    const subject = `Thinking of you — ${heroName}`;
 
     const draft = await createGmailDraft({
       senderEmail,
