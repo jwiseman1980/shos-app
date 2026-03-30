@@ -54,7 +54,7 @@ const TOOLS = [
   },
   {
     name: "log_friction",
-    description: "Log a friction point, bug, missing feature, or improvement idea to the friction log for the COS to triage and route to a build session. Use this any time you notice something that would make the system better.",
+    description: "Log a friction point, bug, missing feature, or improvement idea. The Architect reads these during build sessions. Use this any time you notice something that would make the system better.",
     input_schema: {
       type: "object",
       properties: {
@@ -89,7 +89,7 @@ const TOOLS = [
   },
   {
     name: "flag_to_role",
-    description: "Surface a cross-role flag in SHOS_STATE.md — something another role needs to know or act on. Do not fix issues outside your domain; flag them.",
+    description: "Flag an issue for the Architect (build/code needs) or log a cross-domain note. Creates a task tagged to the target. Primary use: flag bugs or feature needs for the Architect to handle in Claude Code.",
     input_schema: {
       type: "object",
       properties: {
@@ -197,14 +197,14 @@ Always confirm with the user before making bulk mutations (e.g., assigning 20 he
   },
   {
     name: "create_task",
-    description: "Create a task and assign it to a role. Use this to delegate work. For example: create a task for COS to research VA registration, or for COO to check inventory levels.",
+    description: "Create a task tagged to a domain. Use role='operator' for operational work you'll handle, role='architect' for build/code work Joseph handles in Claude Code. The role field is a domain tag, not a separate agent.",
     input_schema: {
       type: "object",
       properties: {
         title: { type: "string", description: "Task title — clear and actionable" },
         description: { type: "string", description: "Detailed description of what needs to be done" },
         priority: { type: "string", enum: ["critical", "high", "medium", "low"] },
-        role: { type: "string", enum: ["operator", "architect", "ed", "cos", "cfo", "coo", "comms", "dev", "family"], description: "Which role owns this task (prefer 'operator' or 'architect' for new tasks)" },
+        role: { type: "string", enum: ["operator", "architect", "ed", "cos", "cfo", "coo", "comms", "dev", "family"], description: "Domain tag: use 'operator' for ops work, 'architect' for build work. Legacy values (ed, cos, etc.) are still valid for categorization." },
         due_date: { type: "string", description: "Due date in YYYY-MM-DD format" },
         domain: { type: "string", description: "Domain area: finance, operations, comms, governance, compliance, etc." },
         sop_ref: { type: "string", description: "Reference to SOP if task is SOP-driven (e.g. SOP-FIN-001)" },
