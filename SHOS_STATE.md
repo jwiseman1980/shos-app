@@ -48,7 +48,7 @@
 
 | Priority | Issue | Status |
 |----------|-------|--------|
-| CRITICAL | Gmail/Calendar API auth: `unauthorized_client` — domain-wide delegation not configured in Google Workspace Admin | Open |
+| CRITICAL | Gmail/Calendar API auth: `unauthorized_client` — domain-wide delegation not configured in Google Workspace Admin | ✅ Fixed |
 | HIGH | Order triage API broken — schema mismatch on `order_items.memorial_bracelet_id` | ✅ Fixed (hero_id) |
 | HIGH | Squarespace → Supabase routing — orders only reach Supabase via nightly SF sync, consider dual-write | Open |
 | MEDIUM | Screenshot/error capture — Operator can't see user's screen or capture errors | Open |
@@ -123,8 +123,8 @@
 - Supabase: social_media_posts + social_media_profile_snapshots tables created
 
 ### Still Needed
-- Google Workspace domain-wide delegation setup
-- Local `.env.local` needs Google service account credentials
+- ~~Google Workspace domain-wide delegation setup~~ ✅ Done
+- ~~Local `.env.local` needs Google service account credentials~~ ✅ Done
 - Order triage API schema fix
 - Architect knowledge file in Supabase
 - Screenshot/error capture capability for Operator
