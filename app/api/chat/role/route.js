@@ -593,8 +593,23 @@ function getPageContext(pathname) {
 
 async function buildSystemPrompt(pathname) {
   const contextContent = await readKnowledge("operator");
-
   const pageHint = getPageContext(pathname);
+
+  // Load learning context for smarter suggestions
+  let learningContext = "";
+  try {
+    const metrics = await getLearningMetrics();
+    if (metrics) {
+      const parts = [];
+      if (metrics.estimationAccuracy) parts.push(`Estimation accuracy: ${metrics.estimationAccuracy}%`);
+      if (metrics.velocity) parts.push(`Velocity: ${metrics.velocity} completions/day (${metrics.velocityTrend || "stable"})`);
+      if (metrics.neglectedDomains?.length) parts.push(`Neglected domains: ${metrics.neglectedDomains.join(", ")}`);
+      if (metrics.totalCompleted) parts.push(`Total completed: ${metrics.totalCompleted} tasks`);
+      if (parts.length) {
+        learningContext = `\n## Learning Metrics (last 30 days)\n${parts.join("\n")}\nUse these to calibrate time estimates and flag domains that need attention.`;
+      }
+    }
+  } catch {}
 
   return `You are the Steel Hearts Operator — the operational brain of Steel Hearts, a Gold Star family memorial bracelet nonprofit. You operate inside the Steel Hearts Operating System (SHOS).
 
@@ -655,9 +670,10 @@ CRITICAL: Never use browser automation for Instagram. API only.
 You cannot write code. When something needs to be built or fixed in the app, use log_friction to document it. Joseph handles builds in Claude Code/Cowork sessions.
 
 ## Supabase (Primary Database)
-Use supabase_query to pull live data. Tables: heroes, contacts, organizations, orders, order_items, donations, disbursements, expenses, family_messages, tasks, volunteers, engagements, decisions, open_questions, anniversary_emails, knowledge_files, friction_logs, sop_executions, closeouts, initiatives.
+Use supabase_query to pull live data. Tables: heroes, contacts, organizations, orders, order_items, donations, disbursements, expenses, family_messages, tasks, volunteers, engagements, decisions, open_questions, anniversary_emails, knowledge_files, friction_logs, sop_executions, closeouts, initiatives, social_media_posts, social_media_profile_snapshots.
 
 Prefer app_query/app_mutation for data available via API routes. Use supabase_query for direct table access when needed.
+${learningContext}
 
 ## How Sessions Work
 1. BOOT: Read context file + check open tasks + brief based on current page

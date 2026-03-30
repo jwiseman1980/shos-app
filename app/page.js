@@ -45,7 +45,9 @@ export default async function DashboardPage() {
     loadScoreboardStats(user),
     loadAccomplishments(user),
     getTodayEvents().catch((err) => {
-      console.error("[dashboard] Calendar fetch failed:", err.message);
+      if (!err.message?.includes("not configured")) {
+        console.error("[dashboard] Calendar fetch failed:", err.message);
+      }
       return [];
     }),
     getLearningMetrics().catch((err) => {
