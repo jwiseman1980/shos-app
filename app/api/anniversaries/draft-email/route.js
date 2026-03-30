@@ -75,7 +75,7 @@ export async function POST(request) {
 
     let emailBody = `Hi ${displayFamily},\n\n`;
     emailBody += `I just wanted you to know that we're thinking of you today, on the ${ordinal} anniversary of ${heroName}'s passing.\n\n`;
-    emailBody += `${heroFirstName}'s name is carried forward every single day by people across the country, and that's because of your family's willingness to let us be part of honoring ${heroFirstName}'s legacy.\n\n`;
+    emailBody += `${heroFirstName}'s name is carried forward every single day by people across the country. That means something, and we just wanted you to know.\n\n`;
     emailBody += `If you ever want to share a memory, update us on anything, or just say hi — we'd love to hear from you.\n\n`;
     emailBody += `Thinking of you,\n`;
     emailBody += buildEmailSignature(senderName, senderEmail);
