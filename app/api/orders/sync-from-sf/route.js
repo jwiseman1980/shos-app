@@ -10,7 +10,6 @@
 
 import { getServerClient } from "@/lib/supabase";
 import { sfQuery } from "@/lib/salesforce";
-import { triageNeedsDecision } from "@/lib/data/orders";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -182,28 +181,15 @@ export async function GET(request) {
     synced++;
   }
 
-  // Auto-triage: immediately classify new orders into design_needed or ready_to_laser
-  let triageResult = null;
-  if (synced > 0) {
-    try {
-      triageResult = await triageNeedsDecision();
-    } catch (e) {
-      console.error("Auto-triage failed:", e.message);
-    }
-  }
-
   // Post to Slack
   const slackWebhook = process.env.SLACK_SOP_WEBHOOK;
   if (slackWebhook && synced > 0) {
-    const triageMsg = triageResult
-      ? ` | Triage: ${triageResult.advanced} → laser, ${triageResult.needsDesign} → design`
-      : "";
     try {
       await fetch(slackWebhook, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text: `Order sync: ${synced} new order(s) from Squarespace via SF${triageMsg}`,
+          text: `Order sync: ${synced} new order(s) from Squarespace via SF`,
         }),
       });
     } catch {}
@@ -214,7 +200,6 @@ export async function GET(request) {
     synced,
     skipped,
     errors,
-    triaged: triageResult,
     latestOrderNumber: latestNum,
     sfOrdersFound: sfOrders.length,
   });
