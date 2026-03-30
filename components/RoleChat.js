@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import useVoice from "@/hooks/useVoice";
 
 const COLOR = "#c4a237";
 const NAME = "Operator";
@@ -22,6 +23,36 @@ export default function RoleChat({ pathname, onClose }) {
   const [sessionStarted, setSessionStarted] = useState(false);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
+  const lastSpokenRef = useRef(null);
+
+  // Voice interface
+  const onFinalTranscript = useCallback((text) => {
+    setInput("");
+    sendMessage(text);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, loading]);
+
+  const onInterimTranscript = useCallback((text) => {
+    setInput(text);
+  }, []);
+
+  const voice = useVoice({ onFinalTranscript, onInterimTranscript });
+
+  // Auto-read new assistant messages when voice mode is on
+  useEffect(() => {
+    if (!voice.voiceMode) return;
+    const lastMsg = displayMessages[displayMessages.length - 1];
+    if (
+      lastMsg?.type === "assistant" &&
+      !lastMsg.isStreaming &&
+      lastMsg.text &&
+      lastMsg.id !== lastSpokenRef.current
+    ) {
+      lastSpokenRef.current = lastMsg.id;
+      voice.speak(lastMsg.text);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayMessages, voice.voiceMode]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -188,7 +219,18 @@ export default function RoleChat({ pathname, onClose }) {
               <div className="role-chat-subtitle">Steel Hearts Operating System</div>
             </div>
           </div>
-          <button className="role-chat-close" onClick={onClose}>✕</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {voice.supported && (
+              <button
+                className={`voice-mode-toggle ${voice.voiceMode ? "active" : ""}`}
+                onClick={voice.toggleVoiceMode}
+                title={voice.voiceMode ? "Voice mode on — auto-reads responses" : "Voice mode off"}
+              >
+                {voice.voiceMode ? "🔊" : "🔇"}
+              </button>
+            )}
+            <button className="role-chat-close" onClick={onClose}>✕</button>
+          </div>
         </div>
 
         {/* Messages */}
@@ -224,6 +266,15 @@ export default function RoleChat({ pathname, onClose }) {
                     <span key={j}>{line}{j < msg.text.split("\n").length - 1 && <br />}</span>
                   ))}
                   {msg.isStreaming && <span className="role-chat-cursor" style={{ background: COLOR }} />}
+                  {!msg.isStreaming && voice.supported && (
+                    <button
+                      className="voice-speak-btn"
+                      onClick={() => voice.speaking ? voice.stopSpeaking() : voice.speak(msg.text)}
+                      title={voice.speaking ? "Stop reading" : "Read aloud"}
+                    >
+                      {voice.speaking ? "⏹" : "▶"}
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -291,14 +342,31 @@ export default function RoleChat({ pathname, onClose }) {
         )}
 
         {/* Input */}
+        {voice.listening && (
+          <div className="voice-listening-bar">
+            <span className="voice-pulse" />
+            <span className="voice-listening-text">Listening{voice.transcript ? "..." : " — speak now"}</span>
+            <button className="voice-stop-btn" onClick={voice.stopListening}>Done</button>
+          </div>
+        )}
         <div className="role-chat-input-row">
+          {voice.supported && (
+            <button
+              className={`voice-mic-btn ${voice.listening ? "active" : ""}`}
+              onClick={() => voice.listening ? voice.stopListening() : voice.startListening()}
+              disabled={loading}
+              title={voice.listening ? "Stop listening" : "Voice input"}
+            >
+              🎙
+            </button>
+          )}
           <textarea
             ref={inputRef}
             className="role-chat-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Message Operator..."
+            placeholder={voice.listening ? "Listening..." : "Message Operator..."}
             rows={2}
             disabled={loading}
           />
@@ -312,7 +380,10 @@ export default function RoleChat({ pathname, onClose }) {
           </button>
         </div>
         <div className="role-chat-footer">
-          Enter to send · Shift+Enter for newline · Session auto-closes out when you&apos;re done
+          {voice.supported
+            ? "Enter to send · 🎙 for voice · Session auto-closes out when you're done"
+            : "Enter to send · Shift+Enter for newline · Session auto-closes out when you're done"
+          }
         </div>
 
       </div>
