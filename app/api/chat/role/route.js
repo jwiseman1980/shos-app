@@ -3,7 +3,8 @@ import { join } from "path";
 import { isAuthenticated } from "@/lib/auth";
 import { readKnowledge, writeKnowledge, logFriction as storageLogFriction } from "@/lib/storage/index.js";
 import { supabaseQuery, createTask, updateTask, queryTasks, logCloseout, logEngagement } from "@/lib/storage/supabase-tools.js";
-import { getTodayEvents, createEvent, updateEvent } from "@/lib/calendar";
+import { getTodayEvents, createEvent, updateEvent, getCalendarId } from "@/lib/calendar";
+import { listInbox, getMessage, archiveMessage, archiveMessages, createGmailDraft } from "@/lib/gmail";
 import { getHistoricalAverages, getLearningMetrics } from "@/lib/data/learning";
 import { getFacebookPosts, getInstagramPosts, getInstagramProfile, getPostComments, checkTokenHealth } from "@/lib/meta";
 
@@ -347,6 +348,68 @@ Always confirm with the user before making bulk mutations (e.g., assigning 20 he
     },
   },
   {
+    name: "query_email",
+    description: "Search and list emails from Joseph's Gmail inbox. Use Gmail search syntax in the query field (e.g. 'is:unread', 'from:someone@example.com', 'subject:bracelets', 'newer_than:3d'). Returns message metadata + snippets. Use read_email to get the full body of a specific message.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Gmail search query (e.g. 'is:unread', 'from:tracy@hutter-cpa.com', 'subject:order newer_than:7d'). Default: inbox messages." },
+        maxResults: { type: "number", description: "Max messages to return (default: 20, max: 50)" },
+      },
+    },
+  },
+  {
+    name: "read_email",
+    description: "Read the full content of a specific email by message ID. Returns headers, body text, labels. Use query_email first to find message IDs.",
+    input_schema: {
+      type: "object",
+      properties: {
+        messageId: { type: "string", description: "The Gmail message ID to read" },
+      },
+      required: ["messageId"],
+    },
+  },
+  {
+    name: "archive_email",
+    description: "Archive one or more emails (removes from inbox). Use this to help triage the inbox. Provide a single messageId or an array of messageIds for bulk archiving.",
+    input_schema: {
+      type: "object",
+      properties: {
+        messageId: { type: "string", description: "Single message ID to archive" },
+        messageIds: { type: "array", items: { type: "string" }, description: "Array of message IDs to archive in bulk" },
+      },
+    },
+  },
+  {
+    name: "draft_email",
+    description: "Create a Gmail draft email from joseph.wiseman@steel-hearts.org. The draft will appear in Gmail for Joseph to review and send. NEVER auto-send — always draft. For anniversary emails, donor emails, or family message packets, use the specialized app_mutation endpoints instead.",
+    input_schema: {
+      type: "object",
+      properties: {
+        to: { type: "string", description: "Recipient email address" },
+        subject: { type: "string", description: "Email subject line" },
+        body: { type: "string", description: "Email body text" },
+        cc: { type: "string", description: "CC recipients (comma-separated)" },
+      },
+      required: ["to", "subject", "body"],
+    },
+  },
+  {
+    name: "update_calendar_event",
+    description: "Update an existing calendar event — change the title, description, or color. Use query_calendar first to find the event ID and calendar ID.",
+    input_schema: {
+      type: "object",
+      properties: {
+        calendarId: { type: "string", description: "The calendar ID (from the event's role field in query_calendar results, or use the full calendar ID)" },
+        eventId: { type: "string", description: "The event ID to update" },
+        summary: { type: "string", description: "New event title" },
+        description: { type: "string", description: "New event description" },
+        colorId: { type: "string", description: "Color: 1=Lavender, 2=Sage(completed), 3=Grape, 4=Flamingo, 5=Banana, 6=Tangerine, 7=Peacock, 8=Graphite, 9=Blueberry, 10=Basil, 11=Tomato" },
+      },
+      required: ["calendarId", "eventId"],
+    },
+  },
+  {
     name: "navigate_to",
     description: "Navigate the user's browser to a page in the SHOS app. Use this whenever your response is about a specific domain so the user sees the relevant data. For example: discussing orders → navigate to /orders, asking about anniversaries → /anniversaries, finance questions → /finance, family messages → /families, hero details → /heroes, social media → /comms, designs → /designs. Always navigate when the conversation topic maps to a page.",
     input_schema: {
@@ -531,6 +594,8 @@ async function handleToolCall(role, toolName, toolInput) {
       }
       const events = await getTodayEvents(options);
       return JSON.stringify(events.map(e => ({
+        id: e.id,
+        calendarId: e.role,
         time: e.allDay ? "All day" : new Date(e.start).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }),
         role: e.role,
         title: e.summary,
@@ -581,6 +646,66 @@ async function handleToolCall(role, toolName, toolInput) {
         default:
           return `Unknown social media action: ${action}`;
       }
+    }
+    case "query_email": {
+      const options = {};
+      if (toolInput.query) options.query = toolInput.query;
+      if (toolInput.maxResults) options.maxResults = Math.min(toolInput.maxResults, 50);
+      const inbox = await listInbox(options);
+      return JSON.stringify(inbox.map(m => ({
+        id: m.id,
+        from: m.from,
+        subject: m.subject,
+        date: m.date,
+        snippet: m.snippet,
+        labels: m.labelIds,
+      })), null, 2);
+    }
+    case "read_email": {
+      const msg = await getMessage(toolInput.messageId);
+      return JSON.stringify({
+        id: msg.id,
+        from: msg.from,
+        to: msg.to,
+        subject: msg.subject,
+        date: msg.date,
+        body: msg.body?.slice(0, 6000) || "",
+        labels: msg.labelIds,
+      }, null, 2);
+    }
+    case "archive_email": {
+      if (toolInput.messageIds && toolInput.messageIds.length > 0) {
+        await archiveMessages(toolInput.messageIds);
+        return `Archived ${toolInput.messageIds.length} messages.`;
+      }
+      if (toolInput.messageId) {
+        await archiveMessage(toolInput.messageId);
+        return `Archived message ${toolInput.messageId}.`;
+      }
+      return "Error: provide messageId or messageIds to archive.";
+    }
+    case "draft_email": {
+      const draft = await createGmailDraft({
+        senderEmail: "joseph.wiseman@steel-hearts.org",
+        senderName: "Joseph Wiseman",
+        to: toolInput.to,
+        subject: toolInput.subject,
+        body: toolInput.body,
+        cc: toolInput.cc,
+      });
+      return `Draft created: "${toolInput.subject}" to ${toolInput.to}. Draft ID: ${draft.id}`;
+    }
+    case "update_calendar_event": {
+      // Resolve role shorthand to full calendar ID if needed
+      let calId = toolInput.calendarId;
+      const resolved = getCalendarId(calId);
+      if (resolved) calId = resolved;
+      const updates = {};
+      if (toolInput.summary) updates.summary = toolInput.summary;
+      if (toolInput.description) updates.description = toolInput.description;
+      if (toolInput.colorId) updates.colorId = toolInput.colorId;
+      const result = await updateEvent({ calendarId: calId, eventId: toolInput.eventId, updates });
+      return `Event updated: "${result.summary || toolInput.eventId}"`;
     }
     case "navigate_to":
       // Navigation is handled by the stream layer — just acknowledge here
