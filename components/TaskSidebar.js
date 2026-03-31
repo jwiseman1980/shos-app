@@ -114,6 +114,25 @@ export default function TaskSidebar({
         </button>
       )}
 
+      {/* Nav */}
+      <div className="task-sidebar-nav">
+        {NAV_LINKS.map((link) => {
+          const isActive = link.href === "/"
+            ? pathname === "/" || pathname === ""
+            : pathname.startsWith(link.href);
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={`task-sidebar-nav-item${isActive ? " active" : ""}`}
+            >
+              <span className="task-sidebar-nav-icon">{link.icon}</span>
+              <span>{link.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+
       {/* Today */}
       <div className="task-sidebar-section">Today</div>
 
@@ -179,24 +198,6 @@ export default function TaskSidebar({
         </>
       )}
 
-      {/* Nav */}
-      <div className="task-sidebar-nav">
-        {NAV_LINKS.map((link) => {
-          const isActive = link.href === "/"
-            ? pathname === "/" || pathname === ""
-            : pathname.startsWith(link.href);
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`task-sidebar-nav-item${isActive ? " active" : ""}`}
-            >
-              <span className="task-sidebar-nav-icon">{link.icon}</span>
-              <span>{link.label}</span>
-            </Link>
-          );
-        })}
-      </div>
     </div>
   );
 }
