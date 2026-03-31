@@ -15,7 +15,21 @@ export default function DesignWorkQueue({ items: initialItems = [] }) {
   const [advancing, setAdvancing] = useState({});
   const fileInputRefs = useRef({});
 
-  const needDesign = items.filter((i) => !i.hasDesign);
+  // Group "needs design" items by SKU so Ryan sees one task per design, not per order
+  const needDesignRaw = items.filter((i) => !i.hasDesign);
+  const skuGroups = new Map();
+  for (const item of needDesignRaw) {
+    const key = item.sku;
+    if (!skuGroups.has(key)) {
+      skuGroups.set(key, { ...item, orderCount: 1, totalQty: item.quantity || 1, allItemIds: [item.itemId] });
+    } else {
+      const g = skuGroups.get(key);
+      g.orderCount++;
+      g.totalQty += item.quantity || 1;
+      g.allItemIds.push(item.itemId);
+    }
+  }
+  const needDesign = Array.from(skuGroups.values());
   const hasDesign = items.filter((i) => i.hasDesign);
 
   const handleUpload = useCallback(async (item, file) => {
@@ -42,27 +56,31 @@ export default function DesignWorkQueue({ items: initialItems = [] }) {
       if (data.error) {
         setUploadResult((prev) => ({ ...prev, [item.itemId]: { error: data.error } }));
       } else {
-        // Auto-advance to ready_to_laser now that design exists
-        try {
-          await fetch("/api/orders", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              itemId: item.itemId,
-              status: "ready_to_laser",
-              heroName: item.heroName || item.sku,
-            }),
-          });
-        } catch (advErr) {
-          console.warn("Auto-advance failed:", advErr.message);
+        // Auto-advance ALL order items with this SKU to ready_to_laser
+        const idsToAdvance = item.allItemIds || [item.itemId];
+        for (const id of idsToAdvance) {
+          try {
+            await fetch("/api/orders", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                itemId: id,
+                status: "ready_to_laser",
+                heroName: item.heroName || item.sku,
+              }),
+            });
+          } catch (advErr) {
+            console.warn("Auto-advance failed for", id, advErr.message);
+          }
         }
 
         setUploadResult((prev) => ({
           ...prev,
           [item.itemId]: { success: true, url: data.url, advanced: true },
         }));
-        // Remove from queue — it's been advanced
-        setItems((prev) => prev.filter((i) => i.itemId !== item.itemId));
+        // Remove all items with this SKU from queue
+        const advancedIds = new Set(idsToAdvance);
+        setItems((prev) => prev.filter((i) => !advancedIds.has(i.itemId)));
       }
     } catch (err) {
       setUploadResult((prev) => ({ ...prev, [item.itemId]: { error: err.message } }));
@@ -148,12 +166,23 @@ export default function DesignWorkQueue({ items: initialItems = [] }) {
                     <span style={{ fontSize: 12, color: "var(--text-dim)" }}>
                       #{item.orderNumber}
                     </span>
+                    {item.orderCount > 1 && (
+                      <span style={{
+                        fontSize: 9, padding: "1px 5px", borderRadius: 4, marginLeft: 6,
+                        background: "var(--status-blue)33", color: "var(--status-blue)", fontWeight: 700,
+                      }}>
+                        +{item.orderCount - 1} more
+                      </span>
+                    )}
                     <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
-                      {item.orderDate ? new Date(item.orderDate).toLocaleDateString() : ""}
+                      {item.totalQty > 1 ? `${item.totalQty} bracelets total` : item.orderDate ? new Date(item.orderDate).toLocaleDateString() : ""}
                     </div>
                   </td>
                   <td style={{ ...tdStyle, fontSize: 12, color: "var(--text-dim)" }}>
                     {item.customerName}
+                    {item.orderCount > 1 && (
+                      <span style={{ fontSize: 10, color: "var(--text-dim)" }}> + {item.orderCount - 1} other{item.orderCount > 2 ? "s" : ""}</span>
+                    )}
                     {item.orderType === "donated" && (
                       <span style={{
                         fontSize: 9, padding: "1px 4px", borderRadius: 4, marginLeft: 6,
