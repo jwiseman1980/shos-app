@@ -23,11 +23,13 @@ export default function RoleChat({ pathname, onClose, currentUser, bottomMode })
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [sessionStarted, setSessionStarted] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState([]);
   const sessionIdRef = useRef(null);
   const allToolsRef = useRef([]);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
   const lastSpokenRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Voice interface
   const onFinalTranscript = useCallback((text) => {
@@ -133,18 +135,98 @@ export default function RoleChat({ pathname, onClose, currentUser, bottomMode })
     );
   }
 
-  async function sendMessage(text, isAuto = false) {
-    if (!text.trim() || loading) return;
+  function handleFileSelect(e) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
 
-    const userMsg = { role: "user", content: text.trim() };
+    for (const file of files) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result.split(",")[1];
+        setAttachedFiles(prev => [...prev, {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          base64,
+        }]);
+      };
+      reader.readAsDataURL(file);
+    }
+    // Reset input so the same file can be re-attached
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function removeFile(index) {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  }
+
+  async function sendMessage(text, isAuto = false) {
+    if ((!text.trim() && !attachedFiles.length) || loading) return;
+
+    // Build content blocks for the Anthropic API
+    const contentBlocks = [];
+
+    // Add file content blocks first
+    for (const file of attachedFiles) {
+      if (file.type.startsWith("image/")) {
+        contentBlocks.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: file.type,
+            data: file.base64,
+          },
+        });
+      } else if (file.type === "application/pdf") {
+        contentBlocks.push({
+          type: "document",
+          source: {
+            type: "base64",
+            media_type: "application/pdf",
+            data: file.base64,
+          },
+        });
+      } else {
+        // For other files (CSV, TXT, etc.), send as text
+        try {
+          const decoded = atob(file.base64);
+          contentBlocks.push({
+            type: "text",
+            text: `[File: ${file.name}]\n${decoded}`,
+          });
+        } catch {
+          contentBlocks.push({
+            type: "text",
+            text: `[File: ${file.name} — could not decode, ${(file.size / 1024).toFixed(1)}KB ${file.type}]`,
+          });
+        }
+      }
+    }
+
+    // Add text content
+    if (text.trim()) {
+      contentBlocks.push({ type: "text", text: text.trim() });
+    }
+
+    // Use array content if files attached, string if text-only
+    const userContent = attachedFiles.length > 0 ? contentBlocks : text.trim();
+    const userMsg = { role: "user", content: userContent };
     const newMessages = [...messages, userMsg];
 
+    // Display text for the UI
+    const displayText = [
+      ...attachedFiles.map(f => `[${f.name}]`),
+      text.trim(),
+    ].filter(Boolean).join(" ");
+
+    setAttachedFiles([]);
+
     // Persist user message
-    saveMessage("user", text.trim(), null, isAuto);
+    saveMessage("user", displayText || text.trim(), null, isAuto);
 
     setMessages(newMessages);
     if (!isAuto) {
-      setDisplayMessages((prev) => [...prev, { type: "user", text: text.trim() }]);
+      setDisplayMessages((prev) => [...prev, { type: "user", text: displayText || text.trim() }]);
     } else {
       setDisplayMessages((prev) => [...prev, {
         type: "system",
@@ -417,7 +499,44 @@ export default function RoleChat({ pathname, onClose, currentUser, bottomMode })
             <button className="voice-stop-btn" onClick={voice.stopListening}>Done</button>
           </div>
         )}
+        {/* Attached files preview */}
+        {attachedFiles.length > 0 && (
+          <div style={{ padding: "6px 20px 0", display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {attachedFiles.map((f, i) => (
+              <span key={i} style={{
+                display: "inline-flex", alignItems: "center", gap: 4,
+                fontSize: 11, padding: "3px 8px", borderRadius: 4,
+                background: "var(--bg-3)", color: "var(--text-bright)",
+                border: "1px solid var(--border)",
+              }}>
+                {f.type.startsWith("image/") ? "\uD83D\uDDBC" : "\uD83D\uDCC4"} {f.name}
+                <button onClick={() => removeFile(i)} style={{
+                  background: "none", border: "none", color: "var(--text-dim)",
+                  cursor: "pointer", fontSize: 12, padding: "0 2px",
+                }}>&times;</button>
+              </span>
+            ))}
+          </div>
+        )}
         <div className="role-chat-input-row">
+          {/* File attach button */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,.pdf,.csv,.txt,.json,.xlsx,.svg"
+            style={{ display: "none" }}
+            onChange={handleFileSelect}
+          />
+          <button
+            className="voice-mic-btn"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading}
+            title="Attach file"
+            style={{ fontSize: 16 }}
+          >
+            +
+          </button>
           {voice.supported && (
             <button
               className={`voice-mic-btn ${voice.listening ? "active" : ""}`}
@@ -442,7 +561,7 @@ export default function RoleChat({ pathname, onClose, currentUser, bottomMode })
             className="role-chat-send"
             style={{ background: COLOR }}
             onClick={() => sendMessage(input)}
-            disabled={loading || !input.trim()}
+            disabled={loading || (!input.trim() && !attachedFiles.length)}
           >
             ↑
           </button>
