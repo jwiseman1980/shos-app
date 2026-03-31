@@ -3,17 +3,19 @@ export const dynamic = "force-dynamic";
 import PageShell from "@/components/PageShell";
 import DataCard from "@/components/DataCard";
 import StatBlock from "@/components/StatBlock";
-import { getOrderDesignQueue, getDesignStats } from "@/lib/data/designs";
+import { getOrderDesignQueue, getDesignStats, getProactiveQueue } from "@/lib/data/designs";
 import DesignWorkQueue from "@/components/DesignWorkQueue";
 
 export default async function DesignsPage() {
   let items = [];
   let stats = {};
+  let proactiveItems = [];
 
   try {
-    [items, stats] = await Promise.all([
+    [items, stats, proactiveItems] = await Promise.all([
       getOrderDesignQueue(),
       getDesignStats(),
+      getProactiveQueue(),
     ]);
   } catch (err) {
     console.error("Design page load error:", err.message);
@@ -55,7 +57,7 @@ export default async function DesignsPage() {
       </div>
 
       <div className="section">
-        <DesignWorkQueue items={items} />
+        <DesignWorkQueue items={items} proactiveItems={proactiveItems} />
       </div>
     </PageShell>
   );

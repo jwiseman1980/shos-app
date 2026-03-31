@@ -27,6 +27,22 @@ export async function GET(request) {
       return Response.json({ success: true, count: heroes.length, data: heroes });
     }
 
+    // Search heroes by name or SKU
+    const searchQuery = searchParams.get('search');
+    if (searchQuery) {
+      const { getServerClient } = await import('@/lib/supabase');
+      const sb = getServerClient();
+      const limit = parseInt(searchParams.get('limit') || '10');
+      const { data, error: searchErr } = await sb
+        .from('heroes')
+        .select('id, name, lineitem_sku, branch, rank')
+        .or(`name.ilike.%${searchQuery}%,lineitem_sku.ilike.%${searchQuery}%`)
+        .order('name')
+        .limit(limit);
+      if (searchErr) throw searchErr;
+      return Response.json(data || []);
+    }
+
     // Default: list all heroes
     const heroes = await getHeroes();
     return Response.json({ success: true, count: heroes.length, data: heroes });
