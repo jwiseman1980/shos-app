@@ -1,5 +1,6 @@
 import { getTodayEvents } from "@/lib/calendar";
 import { listInbox } from "@/lib/gmail";
+import { classifyEmail } from "@/lib/email-classifier";
 
 export async function GET(request) {
   // Verify API key
@@ -32,32 +33,14 @@ export async function GET(request) {
   // Process email results
   if (emailResult.status === "fulfilled") {
     const { messages } = emailResult.value;
-    // Filter out promos/social (already done by listInbox) and classify
-    const classified = (messages || []).map(msg => {
-      const from = msg.from || "";
-      const subject = msg.subject || "";
-      let category = "OTHER";
-
-      if (/tracy|hutter-cpa/i.test(from)) category = "FINANCIAL-CPA";
-      else if (/sara|bookkeeper/i.test(from)) category = "FINANCIAL-BOOKKEEPER";
-      else if (/rentvine|tailored|abshure|rpm/i.test(from)) category = "PROPERTY";
-      else if (/bracelet|memorial.*order/i.test(subject)) category = "BRACELET-REQUEST";
-      else if (/gold.star|family.*contact|remembrance/i.test(subject)) category = "FAMILY";
-      else if (/squarespace.*donat|donor/i.test(subject)) category = "DONOR";
-      else if (/quickbooks|payroll|intuit/i.test(from)) category = "FINANCIAL";
-      else if (/usps|ups|fedex|shipstation/i.test(from)) category = "SHIPPING";
-      else if (/sagesure|insurance|mortgage|freedom.*mortgage|chase.*mortgage/i.test(from)) category = "INSURANCE-MORTGAGE";
-      else if (/york.*electric|utility/i.test(from)) category = "UTILITY";
-
-      return {
-        id: msg.id,
-        from: from.replace(/<[^>]+>/, "").trim(),
-        subject,
-        date: msg.date,
-        category,
-        labels: msg.labels,
-      };
-    });
+    const classified = (messages || []).map(msg => ({
+      id: msg.id,
+      from: (msg.from || "").replace(/<[^>]+>/, "").trim(),
+      subject: msg.subject || "",
+      date: msg.date,
+      category: classifyEmail(msg.from, msg.subject),
+      labels: msg.labels,
+    }));
 
     emails = {
       totalUnread: messages?.length || 0,

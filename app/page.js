@@ -5,10 +5,12 @@ import { loadQueueItems, loadRecentDomains, loadScoreboardStats, loadAccomplishm
 import { getLearningMetrics } from "@/lib/data/learning";
 import { buildQueue } from "@/lib/priority-engine";
 import { getTodayEvents } from "@/lib/calendar";
+import { listInbox } from "@/lib/gmail";
+import { classifyEmail } from "@/lib/email-classifier";
 import PriorityQueue from "@/components/PriorityQueue";
 import Scoreboard from "@/components/Scoreboard";
 import Accomplishments from "@/components/Accomplishments";
-import CalendarWidget from "@/components/CalendarWidget";
+import CommandCenter from "@/components/CommandCenter";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -39,6 +41,7 @@ export default async function DashboardPage() {
     accomplishments,
     calendarEvents,
     learning,
+    inboxResult,
   ] = await Promise.all([
     loadQueueItems(user),
     loadRecentDomains(),
@@ -54,7 +57,22 @@ export default async function DashboardPage() {
       console.error("[dashboard] Learning metrics failed:", err.message);
       return null;
     }),
+    listInbox({ maxResults: 15 }).catch((err) => {
+      console.error("[dashboard] Inbox fetch failed:", err.message);
+      return { messages: [] };
+    }),
   ]);
+
+  // Classify inbox emails
+  const inboxEmails = (inboxResult.messages || []).map((m) => ({
+    id: m.id,
+    from: m.from,
+    subject: m.subject,
+    snippet: m.snippet,
+    date: m.date,
+    isUnread: m.isUnread,
+    category: classifyEmail(m.from, m.subject),
+  }));
 
   // Build the priority queue
   const queue = buildQueue(items, recentDomains, historicalAverages);
@@ -75,18 +93,12 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      {/* Today's Calendar */}
-      {calendarEvents.length > 0 && (
-        <div className="data-card" style={{ marginBottom: 24 }}>
-          <div className="data-card-header">
-            <h2 className="data-card-title">Today</h2>
-            <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
-              {calendarEvents.filter((e) => !e.allDay).length} events
-            </span>
-          </div>
-          <CalendarWidget initialEvents={calendarEvents} />
-        </div>
-      )}
+      {/* Command Center: Calendar + Queue + Inbox */}
+      <CommandCenter
+        events={calendarEvents}
+        queue={queue}
+        emails={inboxEmails}
+      />
 
       {/* Scoreboard */}
       <div style={{ marginBottom: 24 }}>
