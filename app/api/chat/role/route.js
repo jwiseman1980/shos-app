@@ -156,6 +156,7 @@ Available mutation endpoints:
 - POST /api/anniversaries/draft-email — create a Gmail draft for an anniversary email. Body: { heroName, branch, years, memorialDate, familyEmail, familyName, senderEmail, senderName, sfId }
 - POST /api/tasks — create a task. Body: { title, description, status, priority, role, domain, hero_id, due_date, tags }
 - POST /api/engagements — log an engagement. Body: { type, subject, description, outcome, follow_up_needed, follow_up_date }
+- POST /api/messages/draft-batch — create Gmail drafts for all eligible families with messages. Body: { heroIds?: string[] } (optional: specific heroes, omit for all eligible)
 
 Always confirm with the user before making bulk mutations (e.g., assigning 20 heroes at once). Single updates are fine without confirmation.`,
     input_schema: {

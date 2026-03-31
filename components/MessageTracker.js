@@ -161,6 +161,8 @@ function HeroGroup({ group, senderEmail, senderName, onStatusChange, savingMap, 
   const [expanded, setExpanded] = useState(false);
   const [draftState, setDraftState] = useState(null); // null | "creating" | { draftId } | { error }
   const [approveAllState, setApproveAllState] = useState(null); // null | "approving" | "done"
+  const [outreachState, setOutreachState] = useState(null); // null | "loading" | "sending" | { draftsCreated, eligible } | { error }
+  const [outreachStats, setOutreachStats] = useState(null); // { customers, alreadyMessaged, eligible }
 
   const noContact = !group.familyContactEmail;
 
@@ -169,6 +171,43 @@ function HeroGroup({ group, senderEmail, senderName, onStatusChange, savingMap, 
   const readyCount = group.messages.filter((m) => m.status === "Ready to Send").length;
   const sentCount = group.messages.filter((m) => m.status === "Sent").length;
   const heldCount = group.messages.filter((m) => m.status === "Held").length;
+
+  // Fetch outreach stats when group expands
+  useEffect(() => {
+    if (expanded && !outreachStats && group.braceletId) {
+      fetch(`/api/messages/outreach?heroId=${group.braceletId}`)
+        .then((r) => r.json())
+        .then((data) => setOutreachStats(data))
+        .catch(() => {});
+    }
+  }, [expanded, outreachStats, group.braceletId]);
+
+  // Send outreach drafts to bracelet customers
+  const handleOutreach = useCallback(async () => {
+    if (!group.braceletId) return;
+    setOutreachState("sending");
+    try {
+      const res = await fetch("/api/messages/outreach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          heroId: group.braceletId,
+          senderEmail,
+          senderName,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOutreachState({ draftsCreated: data.draftsCreated, eligible: data.eligibleCustomers });
+      } else if (data.mock) {
+        setOutreachState({ draftsCreated: 0, mock: true });
+      } else {
+        setOutreachState({ error: data.error || "Failed" });
+      }
+    } catch (err) {
+      setOutreachState({ error: err.message });
+    }
+  }, [group.braceletId, senderEmail, senderName]);
 
   // Approve all "New" messages
   const handleApproveAll = useCallback(async () => {
@@ -415,6 +454,49 @@ function HeroGroup({ group, senderEmail, senderName, onStatusChange, savingMap, 
                   </button>
                 )}
 
+                {/* Request Messages — outreach to bracelet customers */}
+                {group.braceletId && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleOutreach(); }}
+                    disabled={
+                      outreachState === "sending" ||
+                      (outreachState && outreachState.draftsCreated != null) ||
+                      (outreachStats && outreachStats.eligible === 0)
+                    }
+                    style={{
+                      ...BTN_STYLE,
+                      padding: "5px 12px",
+                      fontSize: 11,
+                      background: outreachState && outreachState.draftsCreated != null
+                        ? "var(--status-green)22"
+                        : "var(--status-blue)18",
+                      color: outreachState && outreachState.draftsCreated != null
+                        ? "var(--status-green)"
+                        : outreachStats && outreachStats.eligible === 0
+                        ? "var(--text-dim)"
+                        : "var(--status-blue)",
+                      border: outreachState && outreachState.draftsCreated != null
+                        ? "1px solid var(--status-green)44"
+                        : "1px solid var(--status-blue)44",
+                      opacity: outreachState === "sending" ? 0.5
+                        : outreachStats && outreachStats.eligible === 0 ? 0.4
+                        : 1,
+                      cursor: outreachStats && outreachStats.eligible === 0 ? "not-allowed" : "pointer",
+                    }}
+                    title={outreachStats
+                      ? `${outreachStats.eligible} customers haven't left a message yet`
+                      : "Email bracelet customers asking them to leave a tribute message"}
+                  >
+                    {outreachState === "sending"
+                      ? "Creating Drafts..."
+                      : outreachState && outreachState.draftsCreated != null
+                      ? `✓ ${outreachState.draftsCreated} Outreach Drafts`
+                      : outreachStats
+                      ? `Request Messages (${outreachStats.eligible})`
+                      : "Request Messages"}
+                  </button>
+                )}
+
                 {/* Draft feedback */}
                 {draftState && draftState.error && (
                   <span style={{ fontSize: 11, color: "var(--status-red)" }}>
@@ -424,6 +506,16 @@ function HeroGroup({ group, senderEmail, senderName, onStatusChange, savingMap, 
                 {draftState && draftState.message && (
                   <span style={{ fontSize: 11, color: "var(--status-green)" }}>
                     {draftState.message}
+                  </span>
+                )}
+                {outreachState && outreachState.error && (
+                  <span style={{ fontSize: 11, color: "var(--status-red)" }}>
+                    Outreach error: {outreachState.error}
+                  </span>
+                )}
+                {outreachState && outreachState.mock && (
+                  <span style={{ fontSize: 11, color: "var(--gold)" }}>
+                    Mock mode — Gmail not configured
                   </span>
                 )}
 
@@ -480,6 +572,9 @@ export default function MessageTracker({ heroGroups, volunteers }) {
   // Per-message saving state
   const [savingMap, setSavingMap] = useState({});
   const [lastSavedMap, setLastSavedMap] = useState({});
+
+  // Batch draft state
+  const [batchState, setBatchState] = useState(null); // null | "drafting" | { drafted, errors } | { error }
 
   // Local message status overrides (optimistic updates)
   const [statusOverrides, setStatusOverrides] = useState({});
@@ -563,6 +658,13 @@ export default function MessageTracker({ heroGroups, volunteers }) {
     );
   }
 
+  // Eligible families with contact info (for batch draft)
+  const eligibleWithContact = groupsWithOverrides.filter(g =>
+    g.familyContactEmail && (
+      g.messages.filter(m => m.status === "Ready to Send" || m.status === "New").length >= 1
+    ) && !g.isUnmatched
+  );
+
   // Build volunteer options for sender picker
   const volunteerOptions = (volunteers || [])
     .filter((v) => v.email && v.email.endsWith("@steel-hearts.org"))
@@ -611,6 +713,80 @@ export default function MessageTracker({ heroGroups, volunteers }) {
           ))}
         </select>
       </div>
+
+      {/* Batch Draft Button */}
+      {eligibleWithContact.length > 0 && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 12, marginBottom: 16,
+          padding: "10px 14px",
+          background: "var(--gold-soft)",
+          border: "1px solid var(--gold-border)",
+          borderRadius: "var(--radius-md)",
+        }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--gold-bright)" }}>
+              {eligibleWithContact.length} {eligibleWithContact.length === 1 ? "family" : "families"} ready for message delivery
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>
+              {eligibleWithContact.map(g => g.braceletName || g.braceletSku).join(", ")}
+            </div>
+          </div>
+          <button
+            onClick={async () => {
+              setBatchState("drafting");
+              try {
+                const res = await fetch("/api/messages/draft-batch", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({}),
+                });
+                const data = await res.json();
+                if (data.success) {
+                  // Mark all drafted messages as Sent locally
+                  for (const r of (data.results || [])) {
+                    const group = groupsWithOverrides.find(g =>
+                      g.messages.some(m => m.braceletId === r.heroId || g.braceletId === r.heroId)
+                    );
+                    if (group) {
+                      group.messages.forEach(m => {
+                        if (m.status === "Ready to Send" || m.status === "New") {
+                          setStatusOverrides(prev => ({ ...prev, [m.sfId]: "Sent" }));
+                        }
+                      });
+                    }
+                  }
+                  setBatchState({
+                    drafted: data.drafted,
+                    totalMessages: data.totalMessages,
+                    errors: data.errors,
+                  });
+                } else {
+                  setBatchState({ error: data.error || "Failed" });
+                }
+              } catch (err) {
+                setBatchState({ error: err.message });
+              }
+            }}
+            disabled={batchState === "drafting"}
+            style={{
+              background: "var(--gold)", color: "#000", border: "none", cursor: "pointer",
+              padding: "8px 16px", borderRadius: 6, fontSize: 12, fontWeight: 700,
+              opacity: batchState === "drafting" ? 0.6 : 1, flexShrink: 0,
+            }}
+          >
+            {batchState === "drafting" ? "Creating drafts..." : `Draft All (${eligibleWithContact.length} families)`}
+          </button>
+          {batchState && batchState !== "drafting" && !batchState.error && (
+            <span style={{ fontSize: 11, color: "var(--status-green)" }}>
+              {batchState.drafted} drafts created ({batchState.totalMessages} messages)
+              {batchState.errors?.length > 0 && `, ${batchState.errors.length} errors`}
+            </span>
+          )}
+          {batchState?.error && (
+            <span style={{ fontSize: 11, color: "var(--status-red)" }}>{batchState.error}</span>
+          )}
+        </div>
+      )}
 
       {/* Hero Groups Table */}
       <div style={{ overflowX: "auto" }}>
