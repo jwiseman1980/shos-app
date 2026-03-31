@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
 import { getServerClient } from "@/lib/supabase";
+import {
+  buildAnniversaryAssignedMessage,
+  buildAnniversaryCompletedMessage,
+  getVolunteerDm,
+  notifyWithChannelAndDm,
+  postWebhook,
+} from "@/lib/slack-actions";
 
 /**
  * PATCH /api/heroes/update
@@ -222,20 +229,20 @@ export async function PATCH(request) {
         }
       }
 
-      // Slack notification
-      if (slackWebhook) {
-        try {
-          await fetch(slackWebhook, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              text: `:memo: Anniversary assigned — *${displayName}* → ${assignedToName}`,
-              unfurl_links: false,
-            }),
-          });
-        } catch {
-          // Best effort
-        }
+      // Slack notification — rich message with action links
+      try {
+        const familyName = null; // TODO: look up family contact name if needed
+        const msg = buildAnniversaryAssignedMessage(
+          displayName,
+          heroRecord?.memorial_date,
+          familyName,
+          heroRecord?.id || sfId,
+        );
+        const anniversaryChannel = process.env.SLACK_ANNIVERSARY_CHANNEL;
+        const volunteerDm = assignedUser?.email ? getVolunteerDm(assignedUser.email) : null;
+        await notifyWithChannelAndDm(msg, anniversaryChannel, volunteerDm);
+      } catch {
+        // Best effort
       }
     }
 
@@ -257,22 +264,20 @@ export async function PATCH(request) {
       }
     }
 
-    // --- Slack notification on completion ---
+    // --- Slack notification on completion — rich message ---
     if (
-      slackWebhook &&
       status &&
       ["Complete", "Completed", "Sent", "complete", "sent"].includes(status)
     ) {
       try {
-        const dateStr = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        await fetch(slackWebhook, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: `:white_check_mark: Anniversary complete — *${displayName}* marked ${status} (${dateStr})`,
-            unfurl_links: false,
-          }),
-        });
+        const completedBy = assignedToName || "Volunteer";
+        const msg = buildAnniversaryCompletedMessage(
+          completedBy,
+          displayName,
+          heroRecord?.memorial_date,
+        );
+        const anniversaryChannel = process.env.SLACK_ANNIVERSARY_CHANNEL;
+        await notifyWithChannelAndDm(msg, anniversaryChannel, null);
       } catch {
         // Slack is best-effort
       }

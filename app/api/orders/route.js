@@ -4,6 +4,13 @@ import { sfQuery } from "@/lib/salesforce";
 import { createOrder } from "@/lib/shipstation";
 import { getServerClient } from "@/lib/supabase";
 import { sendGmailMessage } from "@/lib/gmail";
+import {
+  buildDesignNeededMessage,
+  buildReadyToLaserMessage,
+  buildReadyToShipMessage,
+  buildShippedMessage,
+  createActionUrl,
+} from "@/lib/slack-actions";
 
 const SLACK_WEBHOOK = process.env.SLACK_SOP_WEBHOOK;
 // Per-person DM webhooks — notifications go to BOTH ops hub AND the person's DM
@@ -179,14 +186,17 @@ export async function PATCH(request) {
     if (result.success) {
       const name = heroName || "Order item";
       if (status === "ready_to_laser") {
-        // Notify Joseph — he runs the laser
-        await notifyPerson(`🔥 ${name} bracelet ready for laser production`, SLACK_DM_JOSEPH);
+        // Notify Joseph with download + action links
+        const msg = buildReadyToLaserMessage(name, heroName || "", null, [itemId]);
+        await notifyPerson(msg, SLACK_DM_JOSEPH);
       } else if (status === "design_needed") {
-        // Notify Ryan — he creates designs
-        await notifyPerson(`🎨 New design task: ${name} bracelet needs a design`, SLACK_DM_RYAN);
+        // Notify Ryan with upload link
+        const msg = buildDesignNeededMessage(name, heroName || "", null, 1);
+        await notifyPerson(msg, SLACK_DM_RYAN);
       } else if (status === "ready_to_ship") {
-        // Notify Kristin — she handles shipping
-        await notifyPerson(`📦 ${name} bracelet ready to ship`, SLACK_DM_KRISTIN);
+        // Notify Kristin with ship action link
+        const msg = buildReadyToShipMessage("", name, [itemId]);
+        await notifyPerson(msg, SLACK_DM_KRISTIN);
         // Auto-push to ShipStation if ALL items in this order are now Ready to Ship
         try {
           await autoPushToShipStation(itemId);
@@ -194,7 +204,7 @@ export async function PATCH(request) {
           console.warn("ShipStation auto-push failed:", ssErr.message);
         }
       } else if (status === "shipped") {
-        await postToSlack(`✅ ${name} bracelet shipped`);
+        await postToSlack(buildShippedMessage(name));
         // Send shipping notification email to customer
         sendShippingEmail(itemId, name).catch((err) =>
           console.warn("Shipping email failed:", err.message)
