@@ -17,6 +17,10 @@ export default async function RootLayout({ children }) {
   const authenticated = await isAuthenticated();
   const showSidebar = authenticated && !isLoginPage;
 
+  // Don't show FloatingRoleChat on dashboard — it has the inline OperatorStrip
+  const isDashboard = url === "/" || url === "" || url.endsWith("/shos-app");
+  const showFloatingChat = showSidebar && !isDashboard;
+
   let user = null;
   if (showSidebar) {
     user = await getSessionUser();
@@ -29,7 +33,9 @@ export default async function RootLayout({ children }) {
           <div className="app-layout">
             <Sidebar user={user} />
             <main className="app-content">{children}</main>
-            <FloatingRoleChat currentUser={user ? { name: user.name, email: user.email } : null} />
+            {showFloatingChat && (
+              <FloatingRoleChat currentUser={user ? { name: user.name, email: user.email } : null} />
+            )}
           </div>
         ) : (
           children

@@ -7,6 +7,8 @@ import {
   markAsRead,
   starMessage,
 } from "@/lib/gmail";
+import { createTask } from "@/lib/storage/supabase-tools.js";
+import { createEvent } from "@/lib/calendar";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +72,63 @@ export async function PATCH(request) {
     console.error("Email action error:", err.message);
     return NextResponse.json(
       { error: "Email action failed", message: err.message },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST /api/email — convert email to task
+ * Body: { action: "convert_to_task", messageId, subject, from, snippet }
+ */
+export async function POST(request) {
+  try {
+    const body = await request.json();
+    const { action, messageId, subject, from, snippet } = body;
+
+    if (action !== "convert_to_task") {
+      return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
+    }
+
+    // Create task in Supabase
+    const taskData = {
+      title: subject || "Email task",
+      description: `From: ${from || "unknown"}\n${snippet || ""}`.trim(),
+      domain: "general",
+      status: "todo",
+      priority: "medium",
+      item_type: "task",
+      source: "email",
+      source_id: messageId,
+      due_date: new Date().toISOString().split("T")[0], // Due today
+    };
+
+    const result = await createTask(taskData);
+
+    // Archive the email after converting
+    if (messageId) {
+      await archiveMessage(messageId).catch(() => {});
+      await markAsRead(messageId).catch(() => {});
+    }
+
+    // Return task data for the sidebar
+    const task = {
+      id: `email-task-${messageId}`,
+      title: taskData.title,
+      description: taskData.description,
+      date: taskData.due_date,
+      source: "email",
+      sourceType: "task",
+      domain: "general",
+      status: "pending",
+      estimatedMinutes: 10,
+    };
+
+    return NextResponse.json({ success: true, task, result });
+  } catch (err) {
+    console.error("Email convert-to-task error:", err.message);
+    return NextResponse.json(
+      { error: "Convert to task failed", message: err.message },
       { status: 500 }
     );
   }
