@@ -652,7 +652,8 @@ async function handleToolCall(role, toolName, toolInput) {
       if (toolInput.query) options.query = toolInput.query;
       if (toolInput.maxResults) options.maxResults = Math.min(toolInput.maxResults, 50);
       const inbox = await listInbox(options);
-      return JSON.stringify(inbox.map(m => ({
+      const messages = inbox.messages || inbox;
+      return JSON.stringify(messages.map(m => ({
         id: m.id,
         from: m.from,
         subject: m.subject,
