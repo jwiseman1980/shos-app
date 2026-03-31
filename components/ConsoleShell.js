@@ -70,7 +70,7 @@ export default function ConsoleShell({ user, tasks, emails, greeting, children }
   // Live email refresh — triggered by Operator completing email-related tool calls
   const refreshEmails = useCallback(async () => {
     try {
-      const res = await fetch("/api/email?query=is:unread&maxResults=30");
+      const res = await fetch("/api/email?query=in:inbox&maxResults=30");
       if (res.ok) {
         const data = await res.json();
         setEmailList(data.messages || []);

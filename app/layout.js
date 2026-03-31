@@ -69,7 +69,7 @@ export default async function RootLayout({ children }) {
         }
         return [];
       }),
-      listInbox({ maxResults: 30, query: "is:unread" }).catch((err) => {
+      listInbox({ maxResults: 30, query: "in:inbox" }).catch((err) => {
         console.error("[layout] Email fetch failed:", err.message);
         return { messages: [] };
       }),
