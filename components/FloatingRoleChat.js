@@ -6,7 +6,7 @@ import RoleChat from "@/components/RoleChat";
 
 const OPERATOR_COLOR = "#c4a237";
 
-export default function FloatingRoleChat() {
+export default function FloatingRoleChat({ currentUser }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -49,7 +49,7 @@ export default function FloatingRoleChat() {
       )}
 
       {/* Chat Panel */}
-      {open && <RoleChat pathname={pathname} onClose={() => setOpen(false)} />}
+      {open && <RoleChat pathname={pathname} onClose={() => setOpen(false)} currentUser={currentUser} />}
     </>
   );
 }

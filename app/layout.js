@@ -29,7 +29,7 @@ export default async function RootLayout({ children }) {
           <div className="app-layout">
             <Sidebar user={user} />
             <main className="app-content">{children}</main>
-            <FloatingRoleChat />
+            <FloatingRoleChat currentUser={user ? { name: user.name, email: user.email } : null} />
           </div>
         ) : (
           children

@@ -15,7 +15,7 @@ const QUICK_ACTIONS = [
   { label: "Create task", text: "I need to create a task:" },
 ];
 
-export default function RoleChat({ pathname, onClose }) {
+export default function RoleChat({ pathname, onClose, currentUser }) {
   const router = useRouter();
   const [messages, setMessages] = useState([]);
   const [displayMessages, setDisplayMessages] = useState([]);
@@ -23,6 +23,8 @@ export default function RoleChat({ pathname, onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [sessionStarted, setSessionStarted] = useState(false);
+  const sessionIdRef = useRef(null);
+  const allToolsRef = useRef([]);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
   const lastSpokenRef = useRef(null);
@@ -64,10 +66,61 @@ export default function RoleChat({ pathname, onClose }) {
     inputRef.current?.focus();
   }, [loading]);
 
+  // --- Chat persistence helpers ---
+  async function startChatSession() {
+    try {
+      const res = await fetch("/api/chat/history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userName: currentUser?.name || "Unknown",
+          userEmail: currentUser?.email || "",
+          pageContext: pathname,
+        }),
+      });
+      if (res.ok) {
+        const { session } = await res.json();
+        sessionIdRef.current = session.id;
+      }
+    } catch {}
+  }
+
+  async function saveMessage(role, content, toolCalls = null, isAuto = false) {
+    if (!sessionIdRef.current || !content) return;
+    try {
+      await fetch("/api/chat/history/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: sessionIdRef.current,
+          role,
+          content,
+          toolCalls,
+          isAuto,
+        }),
+      });
+    } catch {}
+  }
+
+  async function endChatSession() {
+    if (!sessionIdRef.current) return;
+    try {
+      await fetch("/api/chat/history", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: sessionIdRef.current,
+          toolsUsed: [...new Set(allToolsRef.current)],
+        }),
+      });
+    } catch {}
+  }
+
   // Auto-start session
   useEffect(() => {
     if (!sessionStarted) {
       setSessionStarted(true);
+      startChatSession();
       const openingPrompt = `Brief me. Read the operator context file. Check open tasks. I'm currently viewing ${pathname} — lead with what's relevant to this page, but you can cover anything that needs attention. Then ask what I want to work on.`;
       sendMessage(openingPrompt, true);
     }
@@ -85,6 +138,9 @@ export default function RoleChat({ pathname, onClose }) {
 
     const userMsg = { role: "user", content: text.trim() };
     const newMessages = [...messages, userMsg];
+
+    // Persist user message
+    saveMessage("user", text.trim(), null, isAuto);
 
     setMessages(newMessages);
     if (!isAuto) {
@@ -165,6 +221,7 @@ export default function RoleChat({ pathname, onClose }) {
               activeTools = activeTools.filter((t) => t !== event.name);
               if (!completedTools.includes(event.name)) {
                 completedTools = [...completedTools, event.name];
+                allToolsRef.current = [...allToolsRef.current, event.name];
               }
               updateStreamMsg(streamId, {
                 toolsUsed: [...completedTools],
@@ -197,6 +254,8 @@ export default function RoleChat({ pathname, onClose }) {
 
       if (fullText) {
         setMessages((prev) => [...prev, { role: "assistant", content: fullText }]);
+        // Persist assistant response
+        saveMessage("assistant", fullText, completedTools.length ? completedTools : null);
       }
     } catch (e) {
       setError(`Connection failed: ${e.message}`);
@@ -236,7 +295,7 @@ export default function RoleChat({ pathname, onClose }) {
                 {voice.voiceMode ? "🔊" : "🔇"}
               </button>
             )}
-            <button className="role-chat-close" onClick={onClose}>✕</button>
+            <button className="role-chat-close" onClick={() => { endChatSession(); onClose(); }}>✕</button>
           </div>
         </div>
 

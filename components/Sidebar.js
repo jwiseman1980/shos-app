@@ -36,6 +36,7 @@ const NAV_ROLES = [
       { href: "/email", label: "Inbox" },
       { href: "/email/composer", label: "Email Composer" },
       { href: "/org", label: "Org Chart" },
+      { href: "/chat-history", label: "Chat History" },
       { href: "/settings", label: "Settings" },
     ],
   },
