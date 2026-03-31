@@ -9,6 +9,8 @@ export async function middleware(request) {
   // Allow public routes
   if (
     pathname === "/login" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password" ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/sf-test") ||
     pathname.startsWith("/_next") ||
