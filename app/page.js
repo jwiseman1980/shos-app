@@ -1,16 +1,13 @@
 export const dynamic = "force-dynamic";
 
 import { getSessionUser } from "@/lib/auth";
-import { loadQueueItems, loadRecentDomains, loadScoreboardStats, loadAccomplishments } from "@/lib/data/dashboard";
-import { getLearningMetrics } from "@/lib/data/learning";
+import { loadQueueItems, loadRecentDomains } from "@/lib/data/dashboard";
 import { buildQueue } from "@/lib/priority-engine";
 import { getTodayEvents } from "@/lib/calendar";
 import { listInbox } from "@/lib/gmail";
 import { classifyEmail } from "@/lib/email-classifier";
-import PriorityQueue from "@/components/PriorityQueue";
-import Scoreboard from "@/components/Scoreboard";
-import Accomplishments from "@/components/Accomplishments";
 import CommandCenter from "@/components/CommandCenter";
+import DashboardChat from "@/components/DashboardChat";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -28,40 +25,58 @@ function getDateString() {
   });
 }
 
+/** Compute 3-day date range in ET */
+function get3DayRange() {
+  const now = new Date();
+  const tz = "America/New_York";
+  const todayStr = now.toLocaleDateString("en-CA", { timeZone: tz });
+
+  const endDate = new Date(now);
+  endDate.setDate(endDate.getDate() + 2);
+  const endStr = endDate.toLocaleDateString("en-CA", { timeZone: tz });
+
+  // Get current ET offset
+  const etOffset = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    timeZoneName: "shortOffset",
+  }).formatToParts(now).find(p => p.type === "timeZoneName")?.value || "GMT-5";
+  const m = etOffset.match(/GMT([+-])(\d+)/);
+  const tzSuffix = m ? `${m[1]}${m[2].padStart(2, "0")}:00` : "-05:00";
+
+  return {
+    timeMin: `${todayStr}T00:00:00${tzSuffix}`,
+    timeMax: `${endStr}T23:59:59${tzSuffix}`,
+  };
+}
+
 export default async function DashboardPage() {
   const user = await getSessionUser();
-  const isAdmin = user?.domains?.includes("All") || user?.isFounder;
   const firstName = user?.name?.split(" ")[0] || "Operator";
+  const { timeMin, timeMax } = get3DayRange();
 
   // Load all data in parallel
   const [
     { items, historicalAverages },
     recentDomains,
-    stats,
-    accomplishments,
     calendarEvents,
-    learning,
     inboxResult,
   ] = await Promise.all([
     loadQueueItems(user),
     loadRecentDomains(),
-    loadScoreboardStats(user),
-    loadAccomplishments(user),
-    getTodayEvents().catch((err) => {
+    getTodayEvents({ timeMin, timeMax }).catch((err) => {
       if (!err.message?.includes("not configured")) {
         console.error("[dashboard] Calendar fetch failed:", err.message);
       }
       return [];
-    }),
-    getLearningMetrics().catch((err) => {
-      console.error("[dashboard] Learning metrics failed:", err.message);
-      return null;
     }),
     listInbox({ maxResults: 15 }).catch((err) => {
       console.error("[dashboard] Inbox fetch failed:", err.message);
       return { messages: [] };
     }),
   ]);
+
+  // Build the priority queue
+  const queue = buildQueue(items, recentDomains, historicalAverages);
 
   // Classify inbox emails
   const inboxEmails = (inboxResult.messages || []).map((m) => ({
@@ -74,55 +89,29 @@ export default async function DashboardPage() {
     category: classifyEmail(m.from, m.subject),
   }));
 
-  // Build the priority queue
-  const queue = buildQueue(items, recentDomains, historicalAverages);
-
   return (
-    <main className="page-shell">
+    <main className="dashboard-cockpit">
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ padding: "16px 24px 0", flexShrink: 0 }}>
         <div style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 4 }}>
           {getDateString()}
         </div>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: "var(--text-bright)", margin: 0 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-bright)", margin: "0 0 16px" }}>
           {getGreeting()}, {firstName}
         </h1>
-        <p style={{ fontSize: 13, color: "var(--text-dim)", marginTop: 4 }}>
-          {queue.length} items in your queue
-          {stats.streak > 0 && ` \u00b7 ${stats.streak} day streak`}
-        </p>
       </div>
 
-      {/* Command Center: Calendar + Queue + Inbox */}
-      <CommandCenter
-        events={calendarEvents}
-        queue={queue}
-        emails={inboxEmails}
-      />
-
-      {/* Scoreboard */}
-      <div style={{ marginBottom: 24 }}>
-        <Scoreboard stats={stats} learning={learning} isAdmin={isAdmin} />
+      {/* Command Center fills available space */}
+      <div style={{ flex: 1, padding: "0 24px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <CommandCenter
+          events={calendarEvents}
+          queue={queue}
+          emails={inboxEmails}
+        />
       </div>
 
-      {/* The Queue */}
-      <div className="data-card" style={{ marginBottom: 24 }}>
-        <div className="data-card-header">
-          <h2 className="data-card-title">Your Queue</h2>
-          <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
-            Ranked by urgency, impact, and what needs attention
-          </span>
-        </div>
-        <PriorityQueue items={queue} userName={user?.name} />
-      </div>
-
-      {/* Accomplishments */}
-      <div className="data-card">
-        <div className="data-card-header">
-          <h2 className="data-card-title">Recent Accomplishments</h2>
-        </div>
-        <Accomplishments items={accomplishments} />
-      </div>
+      {/* Operator chat docked to bottom */}
+      <DashboardChat currentUser={user} />
     </main>
   );
 }

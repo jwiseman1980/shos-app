@@ -15,7 +15,7 @@ const QUICK_ACTIONS = [
   { label: "Create task", text: "I need to create a task:" },
 ];
 
-export default function RoleChat({ pathname, onClose, currentUser }) {
+export default function RoleChat({ pathname, onClose, currentUser, bottomMode }) {
   const router = useRouter();
   const [messages, setMessages] = useState([]);
   const [displayMessages, setDisplayMessages] = useState([]);
@@ -273,8 +273,8 @@ export default function RoleChat({ pathname, onClose, currentUser }) {
   }
 
   return (
-    <div className="role-chat-overlay">
-      <div className="role-chat-panel" style={{ "--chat-color": COLOR }}>
+    <div className={bottomMode ? "role-chat-bottom" : "role-chat-overlay"}>
+      <div className={bottomMode ? "role-chat-panel-bottom" : "role-chat-panel"} style={{ "--chat-color": COLOR }}>
 
         {/* Header */}
         <div className="role-chat-header">
@@ -282,7 +282,7 @@ export default function RoleChat({ pathname, onClose, currentUser }) {
             <div className="role-chat-dot" style={{ background: COLOR }} />
             <div>
               <div className="role-chat-title">{NAME}</div>
-              <div className="role-chat-subtitle">Steel Hearts Operating System</div>
+              {!bottomMode && <div className="role-chat-subtitle">Steel Hearts Operating System</div>}
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -295,7 +295,9 @@ export default function RoleChat({ pathname, onClose, currentUser }) {
                 {voice.voiceMode ? "🔊" : "🔇"}
               </button>
             )}
-            <button className="role-chat-close" onClick={() => { endChatSession(); onClose(); }}>✕</button>
+            {!bottomMode && onClose && (
+              <button className="role-chat-close" onClick={() => { endChatSession(); onClose(); }}>✕</button>
+            )}
           </div>
         </div>
 

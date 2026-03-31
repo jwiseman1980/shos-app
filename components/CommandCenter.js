@@ -10,11 +10,9 @@ const ROLE_COLORS = {
   dev: "#9b59b6", family: "#e91e63",
 };
 
-const MAX_ITEMS = 8;
-
 export default function CommandCenter({ events = [], queue = [], emails = [] }) {
   return (
-    <div className="data-card" style={{ marginBottom: 24 }}>
+    <div className="data-card" style={{ marginBottom: 0, flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div className="data-card-header">
         <h2 className="data-card-title">Command Center</h2>
       </div>
@@ -24,6 +22,7 @@ export default function CommandCenter({ events = [], queue = [], emails = [] }) 
         gap: 1,
         background: "var(--card-border)",
         borderRadius: "0 0 8px 8px",
+        flex: 1,
         overflow: "hidden",
       }}>
         <ScheduleColumn events={events} />
@@ -35,49 +34,87 @@ export default function CommandCenter({ events = [], queue = [], emails = [] }) 
 }
 
 // ---------------------------------------------------------------------------
-// Schedule Column
+// Schedule Column — 3-day grouped view
 // ---------------------------------------------------------------------------
 
+function getDayLabel(dateStr) {
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const todayStr = now.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+
+    const eventDateStr = date.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+    if (eventDateStr === todayStr) return "Today";
+    if (eventDateStr === tomorrowStr) return "Tomorrow";
+    return date.toLocaleDateString("en-US", { weekday: "long", timeZone: "America/New_York" });
+  } catch {
+    return "Today";
+  }
+}
+
+function groupEventsByDay(events) {
+  const groups = new Map();
+  for (const e of events) {
+    const dateStr = e.allDay ? e.start : e.start;
+    const label = getDayLabel(dateStr);
+    if (!groups.has(label)) groups.set(label, { timed: [], allDay: [] });
+    const group = groups.get(label);
+    if (e.allDay) group.allDay.push(e);
+    else group.timed.push(e);
+  }
+  return groups;
+}
+
 function ScheduleColumn({ events }) {
-  const timedEvents = events
-    .filter(e => !e.allDay)
-    .sort((a, b) => new Date(a.start) - new Date(b.start));
-  const allDayEvents = events.filter(e => e.allDay);
-  const shown = timedEvents.slice(0, MAX_ITEMS);
+  const sorted = [...events].sort((a, b) => new Date(a.start) - new Date(b.start));
+  const dayGroups = groupEventsByDay(sorted);
+  const totalTimed = events.filter(e => !e.allDay).length;
 
   return (
-    <Column title="Schedule" count={timedEvents.length} href="/" accent="var(--status-blue)">
-      {allDayEvents.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, padding: "0 12px 8px", borderBottom: "1px solid var(--card-border)" }}>
-          {allDayEvents.slice(0, 3).map((e, i) => (
-            <span key={i} style={{
-              fontSize: 9, padding: "2px 6px", borderRadius: 3, fontWeight: 600,
-              background: `${ROLE_COLORS[e.role] || "#666"}22`,
-              color: ROLE_COLORS[e.role] || "#666",
-            }}>
-              {e.summary?.length > 30 ? e.summary.slice(0, 30) + "..." : e.summary}
-            </span>
+    <Column title="Schedule" count={`${totalTimed} events`} accent="var(--status-blue)">
+      {dayGroups.size === 0 && <EmptyState text="No events" />}
+      {Array.from(dayGroups.entries()).map(([dayLabel, { timed, allDay }]) => (
+        <div key={dayLabel}>
+          <div style={{
+            padding: "6px 12px 4px", fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+            letterSpacing: "0.05em", color: dayLabel === "Today" ? "var(--text-bright)" : "var(--text-dim)",
+            borderBottom: "1px solid var(--card-border)",
+            background: dayLabel === "Today" ? "rgba(255,255,255,0.02)" : "transparent",
+          }}>
+            {dayLabel}
+          </div>
+          {allDay.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4, padding: "6px 12px", borderBottom: "1px solid var(--card-border)22" }}>
+              {allDay.map((e, i) => (
+                <span key={i} style={{
+                  fontSize: 9, padding: "2px 6px", borderRadius: 3, fontWeight: 600,
+                  background: `${ROLE_COLORS[e.role] || "#666"}22`,
+                  color: ROLE_COLORS[e.role] || "#666",
+                }}>
+                  {e.summary?.length > 28 ? e.summary.slice(0, 28) + "..." : e.summary}
+                </span>
+              ))}
+            </div>
+          )}
+          {timed.map((e, i) => (
+            <Row key={e.id || i}>
+              <span style={{ fontSize: 11, color: "var(--text-dim)", fontFamily: "monospace", minWidth: 52 }}>
+                {formatTime(e.start)}
+              </span>
+              <span style={{
+                width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+                background: ROLE_COLORS[e.role] || "#666",
+              }} />
+              <span style={{ fontSize: 12, color: "var(--text-bright)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {e.summary}
+              </span>
+            </Row>
           ))}
         </div>
-      )}
-      {shown.length === 0 && <EmptyState text="No events today" />}
-      {shown.map((e, i) => (
-        <Row key={e.id || i}>
-          <span style={{ fontSize: 11, color: "var(--text-dim)", fontFamily: "monospace", minWidth: 52 }}>
-            {formatTime(e.start)}
-          </span>
-          <span style={{
-            width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
-            background: ROLE_COLORS[e.role] || "#666",
-          }} />
-          <span style={{ fontSize: 12, color: "var(--text-bright)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {e.summary}
-          </span>
-        </Row>
       ))}
-      {timedEvents.length > MAX_ITEMS && (
-        <ViewAll href="/" count={timedEvents.length - MAX_ITEMS} />
-      )}
     </Column>
   );
 }
@@ -87,12 +124,10 @@ function ScheduleColumn({ events }) {
 // ---------------------------------------------------------------------------
 
 function QueueColumn({ items }) {
-  const shown = items.slice(0, MAX_ITEMS);
-
   return (
     <Column title="Queue" count={items.length} href="/tasks" accent="#f59e0b">
-      {shown.length === 0 && <EmptyState text="Queue clear" />}
-      {shown.map((item, i) => (
+      {items.length === 0 && <EmptyState text="Queue clear" />}
+      {items.map((item, i) => (
         <Row key={item.id || i}>
           <span style={{
             fontSize: 10, fontWeight: 700, minWidth: 20, textAlign: "center",
@@ -113,8 +148,8 @@ function QueueColumn({ items }) {
           )}
         </Row>
       ))}
-      {items.length > MAX_ITEMS && (
-        <ViewAll href="/tasks" count={items.length - MAX_ITEMS} />
+      {items.length > 0 && (
+        <ViewAll href="/tasks" label="View all" />
       )}
     </Column>
   );
@@ -127,7 +162,6 @@ function QueueColumn({ items }) {
 function InboxColumn({ emails: initialEmails }) {
   const [emails, setEmails] = useState(initialEmails);
   const [archiving, setArchiving] = useState({});
-  const shown = emails.slice(0, MAX_ITEMS);
 
   const handleArchive = useCallback(async (id) => {
     setArchiving(prev => ({ ...prev, [id]: true }));
@@ -150,8 +184,8 @@ function InboxColumn({ emails: initialEmails }) {
 
   return (
     <Column title="Inbox" count={emails.length} href="/email" accent="#22c55e">
-      {shown.length === 0 && <EmptyState text="Inbox zero" />}
-      {shown.map((email) => {
+      {emails.length === 0 && <EmptyState text="Inbox zero" />}
+      {emails.map((email) => {
         const cat = CATEGORY_STYLES[email.category];
         return (
           <Row key={email.id} style={{ alignItems: "flex-start" }}>
@@ -190,8 +224,8 @@ function InboxColumn({ emails: initialEmails }) {
           </Row>
         );
       })}
-      {emails.length > MAX_ITEMS && (
-        <ViewAll href="/email" count={emails.length - MAX_ITEMS} />
+      {emails.length > 0 && (
+        <ViewAll href="/email" label="View all" />
       )}
     </Column>
   );
@@ -203,10 +237,10 @@ function InboxColumn({ emails: initialEmails }) {
 
 function Column({ title, count, href, accent, children }) {
   return (
-    <div style={{ background: "var(--card-bg)", minHeight: 200 }}>
+    <div style={{ background: "var(--card-bg)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{
         padding: "10px 12px", borderBottom: "1px solid var(--card-border)",
-        display: "flex", justifyContent: "space-between", alignItems: "center",
+        display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0,
       }}>
         <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: accent }}>
           {title}
@@ -215,7 +249,7 @@ function Column({ title, count, href, accent, children }) {
           {count}
         </span>
       </div>
-      <div style={{ padding: "4px 0" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "4px 0" }}>
         {children}
       </div>
     </div>
@@ -234,11 +268,11 @@ function Row({ children, style }) {
   );
 }
 
-function ViewAll({ href, count }) {
+function ViewAll({ href, label, count }) {
   return (
     <div style={{ padding: "8px 12px", textAlign: "center" }}>
       <Link href={href} style={{ fontSize: 11, color: "var(--text-dim)", textDecoration: "none" }}>
-        +{count} more &rarr;
+        {count ? `+${count} more` : label} &rarr;
       </Link>
     </div>
   );
@@ -267,9 +301,7 @@ function formatTime(dateStr) {
 }
 
 function extractSenderName(from = "") {
-  // "Joseph Wiseman <joseph@example.com>" → "Joseph Wiseman"
   const match = from.match(/^"?([^"<]+)"?\s*</);
   if (match) return match[1].trim();
-  // "joseph@example.com" → "joseph"
   return from.replace(/<[^>]+>/, "").trim().split("@")[0];
 }

@@ -10,6 +10,9 @@ export default function FloatingRoleChat({ currentUser }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  // Dashboard has its own inline chat — hide the floating button there
+  if (pathname === "/") return null;
+
   return (
     <>
       {/* Floating Button */}
