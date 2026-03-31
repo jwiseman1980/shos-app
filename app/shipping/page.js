@@ -5,8 +5,8 @@ import DataCard from "@/components/DataCard";
 import StatBlock from "@/components/StatBlock";
 import ShippingQueue from "@/components/ShippingQueue";
 import { getAwaitingShipment, getRecentlyShipped } from "@/lib/shipstation";
+import { getServerClient } from "@/lib/supabase";
 import { getSessionUser } from "@/lib/auth";
-import { sfQuery } from "@/lib/salesforce";
 
 export default async function ShippingPage() {
   const user = await getSessionUser();
@@ -15,79 +15,107 @@ export default async function ShippingPage() {
   let error = null;
 
   try {
-    // Get ShipStation orders awaiting shipment
-    const awaitingRes = await getAwaitingShipment();
-    const awaitingOrders = awaitingRes?.orders || awaitingRes || [];
+    const sb = getServerClient();
 
-    // Safety net: cross-reference with SF to only show orders where all items are Ready to Ship
-    let readyOrderNumbers = new Set();
+    // --- Source 1: ShipStation orders awaiting shipment ---
+    let ssOrders = [];
     try {
-      if (process.env.SF_LIVE === "true") {
-        // Get all order names that have at least one item NOT yet Ready to Ship or Shipped
-        const notReady = await sfQuery(`
-          SELECT Squarespace_Order__r.Name
-          FROM Squarespace_Order_Item__c
-          WHERE Production_Status__c NOT IN ('Ready to Ship', 'Shipped')
-            AND Production_Status__c != null
-        `);
-        const notReadyNames = new Set(notReady.map((r) => r.Squarespace_Order__r?.Name).filter(Boolean));
+      const awaitingRes = await getAwaitingShipment();
+      ssOrders = awaitingRes?.orders || awaitingRes || [];
+      if (!Array.isArray(ssOrders)) ssOrders = [];
+    } catch (ssErr) {
+      console.warn("ShipStation fetch failed:", ssErr.message);
+    }
+    const ssOrderNumbers = new Set(ssOrders.map((o) => o.orderNumber).filter(Boolean));
 
-        // An order is "ready" if it's NOT in the notReady set
-        // Filter ShipStation orders against this
-        awaiting = (Array.isArray(awaitingOrders) ? awaitingOrders : [])
-          .filter((o) => !notReadyNames.has(o.orderNumber))
-          .map((o) => ({
-            orderId: o.orderId,
-            orderNumber: o.orderNumber,
-            orderDate: o.orderDate,
-            orderTotal: o.orderTotal,
-            shipTo: o.shipTo,
-            items: (o.items || []).map((i) => ({
-              sku: i.sku,
-              name: i.name,
-              quantity: i.quantity,
-            })),
-            customerEmail: o.customerEmail || "",
-            internalNotes: o.internalNotes || "",
-            orderStatus: o.orderStatus,
-          }));
-      } else {
-        // SF not live — just show all ShipStation orders
-        awaiting = (Array.isArray(awaitingOrders) ? awaitingOrders : []).map((o) => ({
+    // --- Source 2: Supabase items at ready_to_ship (includes burnout stock fulfillment) ---
+    const { data: sbReadyItems } = await sb
+      .from("order_items")
+      .select(`
+        id, lineitem_sku, quantity, bracelet_size, production_status,
+        order:orders!order_id(order_number, order_date, billing_name, shipping_name,
+          shipping_address1, shipping_city, shipping_state, shipping_postal, shipping_country,
+          billing_email, order_type),
+        hero:heroes!hero_id(name)
+      `)
+      .eq("production_status", "ready_to_ship")
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    // Build a unified awaiting list
+    // ShipStation orders that have ALL items ready in Supabase
+    const { data: allSbItems } = await sb
+      .from("order_items")
+      .select("production_status, order:orders!order_id(order_number)")
+      .not("production_status", "in", '("ready_to_ship","shipped")')
+      .limit(500);
+    const notReadyOrderNumbers = new Set(
+      (allSbItems || []).map((r) => r.order?.order_number).filter(Boolean)
+    );
+
+    // ShipStation orders filtered by Supabase readiness
+    for (const o of ssOrders) {
+      if (!notReadyOrderNumbers.has(o.orderNumber)) {
+        awaiting.push({
           orderId: o.orderId,
           orderNumber: o.orderNumber,
           orderDate: o.orderDate,
           orderTotal: o.orderTotal,
           shipTo: o.shipTo,
-          items: (o.items || []).map((i) => ({
-            sku: i.sku,
-            name: i.name,
-            quantity: i.quantity,
-          })),
+          items: (o.items || []).map((i) => ({ sku: i.sku, name: i.name, quantity: i.quantity })),
           customerEmail: o.customerEmail || "",
           internalNotes: o.internalNotes || "",
           orderStatus: o.orderStatus,
-        }));
+          source: "shipstation",
+        });
       }
-    } catch (sfErr) {
-      console.warn("SF cross-reference failed, showing all ShipStation orders:", sfErr.message);
-      awaiting = (Array.isArray(awaitingOrders) ? awaitingOrders : []).map((o) => ({
-        orderId: o.orderId,
-        orderNumber: o.orderNumber,
-        orderDate: o.orderDate,
-        orderTotal: o.orderTotal,
-        shipTo: o.shipTo,
-        items: (o.items || []).map((i) => ({
-          sku: i.sku,
-          name: i.name,
-          quantity: i.quantity,
-        })),
-        customerEmail: o.customerEmail || "",
-        internalNotes: o.internalNotes || "",
-        orderStatus: o.orderStatus,
-      }));
     }
 
+    // Supabase ready_to_ship orders NOT in ShipStation (e.g., burnout stock fulfillment)
+    const sbOrderMap = new Map();
+    for (const item of (sbReadyItems || [])) {
+      const orderNum = item.order?.order_number;
+      if (!orderNum || ssOrderNumbers.has(orderNum)) continue;
+      if (!sbOrderMap.has(orderNum)) {
+        const o = item.order;
+        sbOrderMap.set(orderNum, {
+          orderId: item.id,
+          orderNumber: orderNum,
+          orderDate: o.order_date,
+          orderTotal: 0,
+          shipTo: {
+            name: o.shipping_name || o.billing_name || "",
+            street1: o.shipping_address1 || "",
+            city: o.shipping_city || "",
+            state: o.shipping_state || "",
+            postalCode: o.shipping_postal || "",
+            country: o.shipping_country || "US",
+          },
+          items: [],
+          customerEmail: o.billing_email || "",
+          internalNotes: "From burnout stock — not in ShipStation",
+          orderStatus: "awaiting_shipment",
+          source: "supabase",
+          orderType: o.order_type,
+        });
+      }
+      sbOrderMap.get(orderNum).items.push({
+        sku: item.lineitem_sku,
+        name: item.hero?.name || item.lineitem_sku,
+        quantity: item.quantity || 1,
+      });
+    }
+    // Only add Supabase orders where ALL items are ready
+    for (const [orderNum, order] of sbOrderMap) {
+      if (!notReadyOrderNumbers.has(orderNum)) {
+        awaiting.push(order);
+      }
+    }
+
+    // Sort by order date ascending (oldest first)
+    awaiting.sort((a, b) => new Date(a.orderDate) - new Date(b.orderDate));
+
+    // Recently shipped from ShipStation
     const recentRes = await getRecentlyShipped(10);
     const recentOrders = recentRes?.orders || recentRes || [];
     recent = (Array.isArray(recentOrders) ? recentOrders : []).map((o) => ({
@@ -97,22 +125,16 @@ export default async function ShippingPage() {
       trackingNumber: o.shipments?.[0]?.trackingNumber || "",
       carrier: o.shipments?.[0]?.carrierCode || "",
       orderTotal: o.orderTotal,
-      items: (o.items || []).map((i) => ({
-        sku: i.sku,
-        name: i.name,
-        quantity: i.quantity,
-      })),
+      items: (o.items || []).map((i) => ({ sku: i.sku, name: i.name, quantity: i.quantity })),
     }));
   } catch (err) {
     error = err.message;
   }
 
-  const firstName = user?.name?.split(" ")[0] || "there";
-
   return (
     <PageShell
       title="Shipping Queue"
-      subtitle="Print labels, pack, and ship — live from ShipStation"
+      subtitle="Print labels, pack, and ship — live from ShipStation + Supabase"
     >
       <div className="stat-grid">
         <StatBlock
@@ -135,7 +157,7 @@ export default async function ShippingPage() {
         <StatBlock
           label="Oldest Waiting"
           value={awaiting.length > 0
-            ? Math.floor((Date.now() - new Date(awaiting[awaiting.length - 1]?.orderDate).getTime()) / 86400000) + "d"
+            ? Math.floor((Date.now() - new Date(awaiting[0]?.orderDate).getTime()) / 86400000) + "d"
             : "\u2014"}
           note={awaiting.length > 0 ? "Needs attention" : "All clear"}
           accent={awaiting.length > 0 ? "var(--status-red)" : "var(--status-green)"}
@@ -143,7 +165,7 @@ export default async function ShippingPage() {
         <StatBlock
           label="Source"
           value="Live"
-          note="ShipStation API"
+          note="ShipStation + Supabase"
           accent="var(--gold)"
         />
       </div>
@@ -152,7 +174,7 @@ export default async function ShippingPage() {
         <div className="section">
           <DataCard title="Connection Error">
             <div style={{ color: "var(--status-red)", fontSize: 13 }}>
-              ShipStation: {error}
+              {error}
             </div>
           </DataCard>
         </div>
