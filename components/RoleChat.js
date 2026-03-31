@@ -83,6 +83,8 @@ export default function RoleChat({ pathname, onClose, currentUser, bottomMode })
       if (res.ok) {
         const { session } = await res.json();
         sessionIdRef.current = session.id;
+        sessionStorage.setItem("shos_op_session_id", session.id);
+        sessionStorage.setItem("shos_op_session_at", Date.now().toString());
       }
     } catch {}
   }
@@ -123,15 +125,26 @@ export default function RoleChat({ pathname, onClose, currentUser, bottomMode })
         }),
       });
     } catch {}
+    sessionStorage.removeItem("shos_op_session_id");
+    sessionStorage.removeItem("shos_op_session_at");
   }
 
-  // Auto-start session
+  // Auto-start session (or restore if navigated away and back within 4 hours)
   useEffect(() => {
     if (!sessionStarted) {
       setSessionStarted(true);
-      startChatSession();
-      const openingPrompt = `Brief me. Read the operator context file. Check open tasks. I'm currently viewing ${pathname} — lead with what's relevant to this page, but you can cover anything that needs attention. Then ask what I want to work on.`;
-      sendMessage(openingPrompt, true);
+      const storedId = sessionStorage.getItem("shos_op_session_id");
+      const storedAt = parseInt(sessionStorage.getItem("shos_op_session_at") || "0");
+      const isRecent = storedId && (Date.now() - storedAt) < 4 * 60 * 60 * 1000;
+      if (isRecent) {
+        // Restore existing session — no auto-brief, no API call
+        sessionIdRef.current = storedId;
+      } else {
+        // Fresh start — create session and fire opening brief
+        startChatSession();
+        const openingPrompt = `Brief me. Read the operator context file. Check open tasks. I'm currently viewing ${pathname} — lead with what's relevant to this page, but you can cover anything that needs attention. Then ask what I want to work on.`;
+        sendMessage(openingPrompt, true);
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -332,6 +345,9 @@ export default function RoleChat({ pathname, onClose, currentUser, bottomMode })
                 toolsUsed: event.toolsUsed || completedTools,
                 toolsActive: [],
               });
+              window.dispatchEvent(new CustomEvent("operator:done", {
+                detail: { toolsUsed: event.toolsUsed || completedTools },
+              }));
               break;
             case "error":
               setError(event.message);

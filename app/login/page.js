@@ -1,16 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("error")
+      ? "Invalid email or password"
+      : ""
+  );
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   async function handleSubmit(e) {
+    // Only intercept if JS is fully ready
+    if (!e.preventDefault) return;
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -23,8 +27,7 @@ export default function LoginPage() {
       });
 
       if (res.ok) {
-        router.push("/");
-        router.refresh();
+        window.location.href = "/";
       } else {
         const data = await res.json();
         setError(data.error || "Invalid credentials");
@@ -38,7 +41,12 @@ export default function LoginPage() {
 
   return (
     <div className="login-page">
-      <form className="login-box" onSubmit={handleSubmit}>
+      <form
+        className="login-box"
+        onSubmit={handleSubmit}
+        action="/api/auth/form"
+        method="post"
+      >
         <img src="/brand/steel-hearts-logo-gold.svg" alt="Steel Hearts" style={{ width: 64, height: 64, margin: "0 auto 12px", display: "block" }} />
         <h1>SHOS</h1>
         <p className="login-subtitle">Steel Hearts Operating System</p>

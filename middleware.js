@@ -1,32 +1,7 @@
 import { NextResponse } from "next/server";
+import { verifyHmac } from "@/lib/hmac";
 
 const SESSION_COOKIE = "shos_session";
-
-async function verifyAndExtract(signed, secret) {
-  const idx = signed.lastIndexOf(".");
-  if (idx === -1) return null;
-  const value = signed.slice(0, idx);
-  const providedSig = signed.slice(idx + 1);
-
-  const encoder = new TextEncoder();
-  const key = await globalThis.crypto.subtle.importKey(
-    "raw",
-    encoder.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const sig = await globalThis.crypto.subtle.sign("HMAC", key, encoder.encode(value));
-  const expectedSig = Array.from(new Uint8Array(sig))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-
-  if (expectedSig !== providedSig) return null;
-
-  // Extract email from payload (email:timestamp:random)
-  const email = value.split(":")[0];
-  return email || null;
-}
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
@@ -38,6 +13,7 @@ export async function middleware(request) {
     pathname.startsWith("/api/sf-test") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
+    pathname.startsWith("/brand") ||
     pathname === "/public"
   ) {
     return NextResponse.next();
@@ -58,7 +34,8 @@ export async function middleware(request) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  const userEmail = await verifyAndExtract(session.value, secret);
+  const payload = await verifyHmac(secret, session.value);
+  const userEmail = payload ? payload.split(":")[0] : null;
   if (!userEmail || !userEmail.includes("@")) {
     // Invalid or old-format session — force re-login
     const response = NextResponse.redirect(new URL("/login", request.url));

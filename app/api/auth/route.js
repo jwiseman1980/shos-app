@@ -18,7 +18,7 @@ export async function POST(request) {
     );
   }
 
-  const session = createSession(volunteer.email);
+  const session = await createSession(volunteer.email);
   const response = NextResponse.json({
     ok: true,
     user: {

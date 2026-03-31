@@ -864,6 +864,30 @@ p {
   overflow: hidden;
 }
 
+/* Non-dashboard pages: Sidebar + page content side-by-side inside console-content */
+.app-layout-inner {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Override fixed positioning when Sidebar is inside the console shell */
+.app-layout-inner .sidebar {
+  position: sticky;
+  top: 0;
+  height: 100%;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.app-content-inner {
+  flex: 1;
+  padding: 24px 32px;
+  overflow-y: auto;
+  min-width: 0;
+}
+
 .console-main {
   flex: 1;
   display: flex;

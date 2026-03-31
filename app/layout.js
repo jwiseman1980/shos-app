@@ -1,13 +1,39 @@
 import "./globals.css";
-import Sidebar from "@/components/Sidebar";
-import FloatingRoleChat from "@/components/FloatingRoleChat";
+import ConsoleShell from "@/components/ConsoleShell";
 import { isAuthenticated, getSessionUser } from "@/lib/auth";
 import { headers } from "next/headers";
+import { loadQueueItems, loadRecentDomains, mergeCalendarAndQueue } from "@/lib/data/dashboard";
+import { buildQueue } from "@/lib/priority-engine";
+import { getTodayEvents } from "@/lib/calendar";
+import { listInbox } from "@/lib/gmail";
 
 export const metadata = {
   title: "SHOS — Steel Hearts Operating System",
   description: "Internal operations dashboard for Steel Hearts Foundation",
 };
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function getTodayRange() {
+  const tz = "America/New_York";
+  const now = new Date();
+  const todayStr = now.toLocaleDateString("en-CA", { timeZone: tz });
+  const etOffset = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    timeZoneName: "shortOffset",
+  }).formatToParts(now).find((p) => p.type === "timeZoneName")?.value || "GMT-5";
+  const m = etOffset.match(/GMT([+-])(\d+)/);
+  const tzSuffix = m ? `${m[1]}${m[2].padStart(2, "0")}:00` : "-05:00";
+  return {
+    timeMin: `${todayStr}T00:00:00${tzSuffix}`,
+    timeMax: `${todayStr}T23:59:59${tzSuffix}`,
+  };
+}
 
 export default async function RootLayout({ children }) {
   const headersList = await headers();
@@ -15,28 +41,68 @@ export default async function RootLayout({ children }) {
   const isLoginPage = url.includes("/login");
 
   const authenticated = await isAuthenticated();
-  const showSidebar = authenticated && !isLoginPage;
-
-  // Don't show FloatingRoleChat on dashboard — it has the inline OperatorStrip
-  const isDashboard = url === "/" || url === "" || url.endsWith("/shos-app");
-  const showFloatingChat = showSidebar && !isDashboard;
+  const showShell = authenticated && !isLoginPage;
 
   let user = null;
-  if (showSidebar) {
+  let tasks = [];
+  let emails = [];
+  let greeting = "Good morning";
+
+  if (showShell) {
     user = await getSessionUser();
+    const firstName = user?.name?.split(" ")[0] || "Operator";
+    greeting = `${getGreeting()}, ${firstName}`;
+
+    const { timeMin, timeMax } = getTodayRange();
+
+    const [
+      { items, historicalAverages },
+      recentDomains,
+      calendarEvents,
+      emailResult,
+    ] = await Promise.all([
+      loadQueueItems(user).catch(() => ({ items: [], historicalAverages: {} })),
+      loadRecentDomains().catch(() => []),
+      getTodayEvents({ timeMin, timeMax }).catch((err) => {
+        if (!err.message?.includes("not configured")) {
+          console.error("[layout] Calendar fetch failed:", err.message);
+        }
+        return [];
+      }),
+      listInbox({ maxResults: 30, query: "is:unread" }).catch((err) => {
+        console.error("[layout] Email fetch failed:", err.message);
+        return { messages: [] };
+      }),
+    ]);
+
+    const queue = buildQueue(items, recentDomains, historicalAverages);
+    tasks = mergeCalendarAndQueue(calendarEvents, queue);
+
+    emails = (emailResult.messages || []).map((msg) => ({
+      id: msg.id,
+      threadId: msg.threadId,
+      subject: msg.subject || "(no subject)",
+      from: msg.from || "",
+      fromName: msg.from?.match(/^"?([^"<]*)"?\s*</)?.[1]?.trim() || msg.from,
+      snippet: msg.snippet || "",
+      date: msg.date,
+      isUnread: msg.labelIds?.includes("UNREAD"),
+      category: msg.category,
+    }));
   }
 
   return (
     <html lang="en">
       <body>
-        {showSidebar ? (
-          <div className="app-layout">
-            <Sidebar user={user} />
-            <main className="app-content">{children}</main>
-            {showFloatingChat && (
-              <FloatingRoleChat currentUser={user ? { name: user.name, email: user.email } : null} />
-            )}
-          </div>
+        {showShell ? (
+          <ConsoleShell
+            user={user}
+            tasks={tasks}
+            emails={emails}
+            greeting={greeting}
+          >
+            {children}
+          </ConsoleShell>
         ) : (
           children
         )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import TaskDetail from "@/components/TaskDetail";
 
 /**
@@ -79,6 +79,11 @@ function parseFromName(from) {
 function EmailTriagePanel({ initialEmails, onEmailTriaged, onEmailToTask, currentUser }) {
   const [emails, setEmails] = useState(initialEmails || []);
   const [openEmail, setOpenEmail] = useState(null);
+
+  // Sync when parent refreshes email list (e.g. after Operator archives via tool)
+  useEffect(() => {
+    if (initialEmails) setEmails(initialEmails);
+  }, [initialEmails]);
   const [loadingId, setLoadingId] = useState(null);
   const [archiving, setArchiving] = useState(new Set());
 

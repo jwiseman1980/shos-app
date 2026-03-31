@@ -1,18 +1,28 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import TaskSidebar from "@/components/TaskSidebar";
 import MainPanel from "@/components/MainPanel";
 import OperatorStrip from "@/components/OperatorStrip";
+import Sidebar from "@/components/Sidebar";
 
 /**
- * Console Layout — the single-surface operating view.
+ * ConsoleShell — the persistent app-wide operating surface.
  *
- * Left: Task sidebar (collapsible, unified calendar + queue)
- * Right top: Main content panel (resizable — drag the divider)
- * Right bottom: Operator chat strip (resizable)
+ * Wraps every authenticated page. Mounts once and never remounts
+ * during navigation, keeping the Operator and task sidebar alive.
+ *
+ * Dashboard (/): shows MainPanel (email triage / task detail)
+ * All other pages: shows nav Sidebar + {children}
  */
-export default function ConsoleLayout({ tasks, emails, currentUser, greeting }) {
+export default function ConsoleShell({ user, tasks, emails, greeting, children }) {
+  const pathname = usePathname();
+  const isDashboard = pathname === "/" || pathname === "";
+
+  // Trimmed user for Operator and MainPanel
+  const currentUser = user ? { name: user.name, email: user.email } : null;
+
   const [activeView, setActiveView] = useState(
     emails?.length > 0 ? "email-triage" : "welcome"
   );
@@ -22,28 +32,23 @@ export default function ConsoleLayout({ tasks, emails, currentUser, greeting }) 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [operatorHeight, setOperatorHeight] = useState(280);
 
-  // Drag state (refs to avoid stale closures in event listeners)
+  // Drag state for resizable operator
   const isDragging = useRef(false);
   const dragStartY = useRef(0);
   const dragStartHeight = useRef(0);
 
-  // --- Resize handle ---
-  const handleResizerMouseDown = useCallback(
-    (e) => {
-      e.preventDefault();
-      isDragging.current = true;
-      dragStartY.current = e.clientY;
-      dragStartHeight.current = operatorHeight;
-      document.body.style.cursor = "row-resize";
-      document.body.style.userSelect = "none";
-    },
-    [operatorHeight]
-  );
+  const handleResizerMouseDown = useCallback((e) => {
+    e.preventDefault();
+    isDragging.current = true;
+    dragStartY.current = e.clientY;
+    dragStartHeight.current = operatorHeight;
+    document.body.style.cursor = "row-resize";
+    document.body.style.userSelect = "none";
+  }, [operatorHeight]);
 
   useEffect(() => {
     const onMove = (e) => {
       if (!isDragging.current) return;
-      // Dragging up → bigger operator, dragging down → smaller
       const delta = dragStartY.current - e.clientY;
       const next = Math.max(140, Math.min(700, dragStartHeight.current + delta));
       setOperatorHeight(next);
@@ -62,7 +67,7 @@ export default function ConsoleLayout({ tasks, emails, currentUser, greeting }) 
     };
   }, []);
 
-  // --- Live email refresh ---
+  // Live email refresh — triggered by Operator completing email-related tool calls
   const refreshEmails = useCallback(async () => {
     try {
       const res = await fetch("/api/email?query=is:unread&maxResults=30");
@@ -85,7 +90,7 @@ export default function ConsoleLayout({ tasks, emails, currentUser, greeting }) 
     return () => window.removeEventListener("operator:done", handler);
   }, [refreshEmails]);
 
-  // --- Task handlers ---
+  // Task handlers
   const handleTaskClick = useCallback((task) => {
     setActiveTaskId(task.id);
     setActiveView("task-detail");
@@ -122,40 +127,48 @@ export default function ConsoleLayout({ tasks, emails, currentUser, greeting }) 
 
   return (
     <div className="console-layout">
-      {/* Task Sidebar (collapsible) */}
+      {/* Task Sidebar — persistent left panel */}
       <TaskSidebar
         tasks={taskList}
         activeTaskId={activeTaskId}
         onTaskClick={handleTaskClick}
         onViewChange={handleViewChange}
-        activeView={activeView}
+        activeView={isDashboard ? activeView : null}
         emailCount={emailList.length}
         greeting={greeting}
         collapsed={!sidebarOpen}
         onToggleCollapse={() => setSidebarOpen((v) => !v)}
       />
 
-      {/* Main Area (content + resizer + operator) */}
+      {/* Main area — content + resizer + operator */}
       <div className="console-main">
-        {/* Content panel — takes all remaining space above operator */}
         <div className="console-content">
-          <MainPanel
-            view={activeView}
-            activeTask={activeTask}
-            emails={emailList}
-            currentUser={currentUser}
-            onTaskComplete={handleTaskComplete}
-            onTaskStart={handleTaskStart}
-            onEmailTriaged={handleEmailTriaged}
-            onEmailToTask={handleEmailToTask}
-            onViewChange={handleViewChange}
-          />
+          {isDashboard ? (
+            // Dashboard: email triage / task detail / welcome
+            <MainPanel
+              view={activeView}
+              activeTask={activeTask}
+              emails={emailList}
+              currentUser={currentUser}
+              onTaskComplete={handleTaskComplete}
+              onTaskStart={handleTaskStart}
+              onEmailTriaged={handleEmailTriaged}
+              onEmailToTask={handleEmailToTask}
+              onViewChange={handleViewChange}
+            />
+          ) : (
+            // All other pages: nav sidebar + page content
+            <div className="app-layout-inner">
+              <Sidebar user={user} />
+              <main className="app-content-inner">{children}</main>
+            </div>
+          )}
         </div>
 
         {/* Drag handle */}
         <div className="console-resizer" onMouseDown={handleResizerMouseDown} />
 
-        {/* Operator — fixed height, set by drag */}
+        {/* Operator — persistent bottom strip */}
         <div className="console-operator" style={{ height: operatorHeight }}>
           <OperatorStrip currentUser={currentUser} />
         </div>
