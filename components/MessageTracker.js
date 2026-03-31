@@ -182,9 +182,19 @@ function HeroGroup({ group, senderEmail, senderName, onStatusChange, savingMap, 
     }
   }, [expanded, outreachStats, group.braceletId]);
 
-  // Send outreach drafts to bracelet customers
+  // Confirm and send outreach to bracelet customers
   const handleOutreach = useCallback(async () => {
     if (!group.braceletId) return;
+
+    // If we haven't confirmed yet, show confirmation
+    if (!outreachState || outreachState === "preview") {
+      const count = outreachStats?.customers || "?";
+      const method = outreachStats?.method === "sendgrid" ? "send emails" : "create a Gmail draft";
+      if (!window.confirm(`This will ${method} to ${count} bracelet customers for ${group.braceletName || "this hero"}. Continue?`)) {
+        return;
+      }
+    }
+
     setOutreachState("sending");
     try {
       const res = await fetch("/api/messages/outreach", {
@@ -197,17 +207,24 @@ function HeroGroup({ group, senderEmail, senderName, onStatusChange, savingMap, 
         }),
       });
       const data = await res.json();
-      if (data.success) {
-        setOutreachState({ draftsCreated: data.draftsCreated, eligible: data.eligibleCustomers });
+      if (data.success && (data.sent > 0 || data.draftId)) {
+        setOutreachState({
+          done: true,
+          method: data.method,
+          sent: data.sent || data.customersFound,
+          message: data.message,
+        });
+      } else if (data.success && data.customersFound === 0) {
+        setOutreachState({ error: "No customers found" });
       } else if (data.mock) {
-        setOutreachState({ draftsCreated: 0, mock: true });
+        setOutreachState({ mock: true });
       } else {
         setOutreachState({ error: data.error || "Failed" });
       }
     } catch (err) {
       setOutreachState({ error: err.message });
     }
-  }, [group.braceletId, senderEmail, senderName]);
+  }, [group.braceletId, group.braceletName, senderEmail, senderName, outreachState, outreachStats]);
 
   // Approve all "New" messages
   const handleApproveAll = useCallback(async () => {
@@ -460,39 +477,39 @@ function HeroGroup({ group, senderEmail, senderName, onStatusChange, savingMap, 
                     onClick={(e) => { e.stopPropagation(); handleOutreach(); }}
                     disabled={
                       outreachState === "sending" ||
-                      (outreachState && outreachState.draftsCreated != null) ||
-                      (outreachStats && outreachStats.eligible === 0)
+                      (outreachState && outreachState.done) ||
+                      (outreachStats && outreachStats.customers === 0)
                     }
                     style={{
                       ...BTN_STYLE,
                       padding: "5px 12px",
                       fontSize: 11,
-                      background: outreachState && outreachState.draftsCreated != null
+                      background: outreachState && outreachState.done
                         ? "var(--status-green)22"
                         : "var(--status-blue)18",
-                      color: outreachState && outreachState.draftsCreated != null
+                      color: outreachState && outreachState.done
                         ? "var(--status-green)"
-                        : outreachStats && outreachStats.eligible === 0
+                        : outreachStats && outreachStats.customers === 0
                         ? "var(--text-dim)"
                         : "var(--status-blue)",
-                      border: outreachState && outreachState.draftsCreated != null
+                      border: outreachState && outreachState.done
                         ? "1px solid var(--status-green)44"
                         : "1px solid var(--status-blue)44",
                       opacity: outreachState === "sending" ? 0.5
-                        : outreachStats && outreachStats.eligible === 0 ? 0.4
+                        : outreachStats && outreachStats.customers === 0 ? 0.4
                         : 1,
-                      cursor: outreachStats && outreachStats.eligible === 0 ? "not-allowed" : "pointer",
+                      cursor: outreachStats && outreachStats.customers === 0 ? "not-allowed" : "pointer",
                     }}
                     title={outreachStats
-                      ? `${outreachStats.eligible} customers haven't left a message yet`
+                      ? `${outreachStats.customers} bracelet customers — ${outreachStats.method === "sendgrid" ? "sends via SendGrid" : "creates Gmail draft"}`
                       : "Email bracelet customers asking them to leave a tribute message"}
                   >
                     {outreachState === "sending"
-                      ? "Creating Drafts..."
-                      : outreachState && outreachState.draftsCreated != null
-                      ? `✓ ${outreachState.draftsCreated} Outreach Drafts`
+                      ? "Sending..."
+                      : outreachState && outreachState.done
+                      ? `✓ Sent to ${outreachState.sent}`
                       : outreachStats
-                      ? `Request Messages (${outreachStats.eligible})`
+                      ? `Request Messages (${outreachStats.customers})`
                       : "Request Messages"}
                   </button>
                 )}

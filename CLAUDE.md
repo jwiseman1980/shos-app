@@ -138,6 +138,7 @@ scripts/                      — One-time migration scripts
 | `/api/sync` | 7:03 AM daily | Master data sync (Supabase → Salesforce) |
 | `/api/orders/sync-from-sf` | Every hour :15 | Sync orders from Salesforce |
 | `/api/daily-briefing` | 11:00 AM daily | Generate + post daily briefing to Slack |
+| `/api/cron/anniversary-outreach` | 11:30 AM daily | Email bracelet customers 14 days before hero anniversary |
 
 ## Key Architecture Decisions
 
@@ -173,6 +174,7 @@ Status changes trigger Slack messages:
 **Supabase:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 **Salesforce:** `SF_LIVE`, `SF_CLIENT_ID`, `SF_REFRESH_TOKEN`, `SF_INSTANCE_URL`
 **Google:** `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_SERVICE_ACCOUNT_KEY`, `GDRIVE_DESIGNS_FOLDER_ID`
+**Email (SendGrid):** `SENDGRID_API_KEY` — bulk outreach, newsletters, transactional email. Falls back to Gmail BCC draft if not set.
 **Slack:** `SLACK_SOP_WEBHOOK`, `SLACK_DM_JOSEPH`, `SLACK_DM_RYAN`, `SLACK_DM_KRISTIN`
 **Meta:** `META_APP_ID`, `META_APP_SECRET`, `META_PAGE_ACCESS_TOKEN`, `META_USER_TOKEN`, `META_PAGE_ID`, `IG_USER_ID`
 **Other:** `ANTHROPIC_API_KEY`, `SHIPSTATION_API_KEY`, `SHIPSTATION_API_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
