@@ -68,16 +68,15 @@ export async function GET(request) {
       });
     }
 
-    // Determine send method
-    const useSendGrid = Boolean(process.env.SENDGRID_API_KEY);
+    // Gmail service account required for draft creation
     const useGmail = Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
 
-    if (!useSendGrid && !useGmail) {
+    if (!useGmail) {
       return NextResponse.json({
         success: false,
         mock: true,
         matchedHeroes: matchedHeroes.map((h) => h.name),
-        message: "No email service configured",
+        message: "Gmail service account not configured — cannot create drafts",
       });
     }
 
@@ -135,32 +134,9 @@ export async function GET(request) {
         senderName,
       });
 
-      // Send
+      // Always create Gmail draft for human review — never auto-send from cron
       try {
-        if (useSendGrid) {
-          const { sendToMany } = await import("@/lib/sendgrid");
-
-          const recipients = customers.map((c) => c.email);
-
-          const { sent, failed } = await sendToMany({
-            recipients,
-            subject,
-            html,
-            text: plainText,
-            fromName: "Steel Hearts Foundation",
-            fromEmail: "hello@steel-hearts.org",
-            categories: ["anniversary-outreach", "tribute-request"],
-          });
-
-          results.push({
-            hero: hero.name,
-            status: "sent",
-            method: "sendgrid",
-            sent,
-            failed,
-            customers: customers.length,
-          });
-        } else {
+        {
           const { createGmailDraft } = await import("@/lib/gmail");
           const bccList = customers.map((c) => c.email).join(", ");
 
@@ -188,7 +164,7 @@ export async function GET(request) {
           type: "message_outreach",
           hero_id: hero.id,
           description: `Anniversary outreach: ${customers.length} customers for ${heroFullName}`,
-          metadata: { customers: customers.length, source: "cron", method: useSendGrid ? "sendgrid" : "gmail" },
+          metadata: { customers: customers.length, source: "cron", method: "gmail_draft" },
         }).catch(() => {});
       } catch (err) {
         results.push({ hero: hero.name, status: "error", error: err.message });
@@ -196,16 +172,14 @@ export async function GET(request) {
     }
 
     // Slack summary
-    const successful = results.filter((r) => r.status === "sent" || r.status === "draft_created");
+    const successful = results.filter((r) => r.status === "draft_created");
     if (successful.length > 0) {
       const summary = successful
-        .map((r) => `• ${r.hero}: ${r.customers} customers (${r.method})`)
+        .map((r) => `• ${r.hero}: ${r.customers} customers`)
         .join("\n");
 
-      const action = useSendGrid ? "Emails sent via SendGrid." : "Drafts in Joseph's Gmail — review and send.";
-
       await postToSlack(
-        `📬 *Anniversary Message Outreach*\n\n${summary}\n\n${action}`,
+        `📬 *Anniversary Message Outreach*\n\n${summary}\n\nDrafts in Joseph's Gmail — review and send.`,
         process.env.SLACK_DM_JOSEPH
       ).catch(() => {});
     }
@@ -213,7 +187,7 @@ export async function GET(request) {
     return NextResponse.json({
       success: true,
       matchedHeroes: matchedHeroes.length,
-      method: useSendGrid ? "sendgrid" : "gmail",
+      method: "gmail_draft",
       results,
     });
   } catch (error) {

@@ -126,12 +126,10 @@ export async function POST(request) {
       senderName: senderName || "Joseph Wiseman",
     });
 
-    // 4. Send via Resend (preferred) or fall back to Gmail draft
+    // 4. Always create Gmail draft — human reviews and sends. Never auto-send.
     let result;
 
-    if (process.env.SENDGRID_API_KEY) {
-      result = await sendViaSendGrid({ emails, subject, html, plainText, senderName });
-    } else if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+    if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
       result = await sendViaGmailDraft({ emails, subject, html, plainText, senderEmail, senderName });
     } else {
       return NextResponse.json({
@@ -139,7 +137,7 @@ export async function POST(request) {
         mock: true,
         customersFound: customers,
         heroName: heroFullName,
-        message: "No email service configured (need SENDGRID_API_KEY or Gmail service account)",
+        message: "Gmail service account not configured — cannot create drafts",
       });
     }
 
