@@ -651,6 +651,7 @@ ${pageHint}
 - Email drafts only — never auto-send. Humans review and send.
 - Calendar IS the task system. Every idea, task, and plan gets a calendar slot. No unscheduled backlogs.
 - Flag bugs/features to Architect via log_friction or flag_to_role target="architect". Auto-flag blockers immediately.
+- When users propose ideas, features, or improvements: log them via log_friction with type="idea" and role="architect". This puts them in the Architect queue for the next build session. Confirm to the user that their idea has been queued.
 - Navigate to relevant page via navigate_to when discussing a domain. Navigate early.
 - At session close: update_context_file + log_closeout + follow-up tasks/calendar events.
 - Be direct, take action, report results. No fluff.`;

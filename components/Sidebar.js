@@ -22,6 +22,7 @@ const NAV_ROLES = [
     items: [
       { href: "/", label: "My Tasks", exact: true },
       { href: "/tasks", label: "All Tasks" },
+      { href: "/ideas", label: "Ideas" },
       { href: "/gyst", label: "Personal" },
     ],
   },
