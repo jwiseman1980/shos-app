@@ -107,11 +107,18 @@ export default function RoleChat({ pathname, onClose, currentUser, bottomMode })
   async function endChatSession() {
     if (!sessionIdRef.current) return;
     try {
+      // Build a short summary from the last assistant message
+      const lastAssistant = [...displayMessages].reverse().find(m => m.type === "assistant");
+      const summaryText = lastAssistant?.text
+        ? lastAssistant.text.slice(0, 200).replace(/\n/g, " ").trim()
+        : "Session closed.";
+
       await fetch("/api/chat/history", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId: sessionIdRef.current,
+          summary: summaryText,
           toolsUsed: [...new Set(allToolsRef.current)],
         }),
       });

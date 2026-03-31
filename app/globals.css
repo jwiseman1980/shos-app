@@ -1143,6 +1143,13 @@ p {
   min-width: 0;
 }
 
+.email-triage-row-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  overflow: hidden;
+}
+
 .email-triage-from {
   font-size: 13px;
   font-weight: 600;
@@ -1150,19 +1157,19 @@ p {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.email-triage-time {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .email-triage-subject {
   font-size: 12px;
-  color: var(--text-bright);
-  margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.email-triage-snippet {
-  font-size: 11px;
   color: var(--text-dim);
   margin-top: 2px;
   overflow: hidden;
@@ -1182,18 +1189,20 @@ p {
 }
 
 .email-triage-mini-btn {
-  width: 28px;
-  height: 28px;
+  height: 26px;
+  padding: 0 8px;
   border: 1px solid var(--card-border);
   border-radius: 4px;
   background: transparent;
   color: var(--text-bright);
-  font-size: 14px;
+  font-size: 11px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: background 0.1s;
+  text-decoration: none;
+  white-space: nowrap;
 }
 .email-triage-mini-btn:hover {
   background: rgba(255, 255, 255, 0.08);

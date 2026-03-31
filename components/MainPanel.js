@@ -58,6 +58,24 @@ export default function MainPanel({
 
 /* ─── Email Triage Panel ─── */
 
+function relativeTime(dateStr) {
+  if (!dateStr) return "";
+  try {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  } catch { return ""; }
+}
+
+function parseFromName(from) {
+  if (!from) return "";
+  const match = from.match(/^"?([^"<]+)"?\s*</);
+  return match ? match[1].trim() : from.split("@")[0];
+}
+
 function EmailTriagePanel({ initialEmails, onEmailTriaged, onEmailToTask, currentUser }) {
   const [emails, setEmails] = useState(initialEmails || []);
   const [openEmail, setOpenEmail] = useState(null);
@@ -205,14 +223,15 @@ function EmailTriagePanel({ initialEmails, onEmailTriaged, onEmailToTask, curren
           <div
             key={email.id}
             className={`email-triage-row ${loadingId === email.id ? "loading" : ""}`}
-            onClick={() => handleOpen(email.id)}
           >
-            <div className="email-triage-row-content">
-              <div className="email-triage-from">
-                {email.fromName || email.from}
+            <div className="email-triage-row-content" onClick={() => handleOpen(email.id)} style={{ cursor: "pointer" }}>
+              <div className="email-triage-row-meta">
+                <span className="email-triage-from">
+                  {parseFromName(email.fromName || email.from)}
+                </span>
+                <span className="email-triage-time">{relativeTime(email.date)}</span>
               </div>
               <div className="email-triage-subject">{email.subject}</div>
-              <div className="email-triage-snippet">{email.snippet}</div>
             </div>
             <div className="email-triage-row-actions" onClick={(e) => e.stopPropagation()}>
               <button
@@ -220,15 +239,25 @@ function EmailTriagePanel({ initialEmails, onEmailTriaged, onEmailToTask, curren
                 className="email-triage-mini-btn"
                 title="Convert to task"
               >
-                +
+                →Task
               </button>
+              <a
+                href={`https://mail.google.com/mail/u/0/#inbox/${email.threadId || email.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="email-triage-mini-btn"
+                title="Open in Gmail"
+                onClick={(e) => e.stopPropagation()}
+              >
+                ↗
+              </a>
               <button
                 onClick={() => handleArchive(email.id)}
                 className="email-triage-mini-btn"
-                title="Mark handled"
+                title="Archive"
                 disabled={archiving.has(email.id)}
               >
-                {archiving.has(email.id) ? "\u22ef" : "\u2713"}
+                {archiving.has(email.id) ? "…" : "✓"}
               </button>
             </div>
           </div>

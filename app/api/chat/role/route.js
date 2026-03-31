@@ -1,8 +1,8 @@
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { isAuthenticated } from "@/lib/auth";
 import { readKnowledge, writeKnowledge, logFriction as storageLogFriction } from "@/lib/storage/index.js";
-import { supabaseQuery, createTask, updateTask, queryTasks, logCloseout, logEngagement } from "@/lib/storage/supabase-tools.js";
+import { supabaseQuery, supabaseUpsert, createTask, updateTask, queryTasks, logCloseout, logEngagement } from "@/lib/storage/supabase-tools.js";
 import { getTodayEvents, createEvent, updateEvent, getCalendarId } from "@/lib/calendar";
 import { listInbox, getMessage, archiveMessage, archiveMessages, createGmailDraft } from "@/lib/gmail";
 import { getHistoricalAverages, getLearningMetrics } from "@/lib/data/learning";
@@ -424,6 +424,26 @@ Always confirm with the user before making bulk mutations (e.g., assigning 20 he
       required: ["path"],
     },
   },
+  {
+    name: "supabase_upsert",
+    description: "Insert or update records in any existing Supabase table. Use for populating tables with new data — contacts, hero records, 990 financial fields, family messages, etc. Always confirm the schema first with supabase_query. Do NOT use this to create new tables — that is Architect territory.",
+    input_schema: {
+      type: "object",
+      properties: {
+        table: { type: "string", description: "The Supabase table name" },
+        records: {
+          type: "array",
+          description: "Array of record objects to insert/update. Keys must match column names.",
+          items: { type: "object" },
+        },
+        on_conflict: {
+          type: "string",
+          description: "Column(s) to use for conflict detection (e.g. 'id' or 'email'). If omitted, always inserts.",
+        },
+      },
+      required: ["table", "records"],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -435,7 +455,30 @@ async function executeReadContextFile(role) {
 }
 
 async function executeUpdateContextFile(role, content) {
-  return await writeKnowledge(role, content);
+  // Write to Supabase knowledge_files (primary)
+  const result = await writeKnowledge(role, content);
+
+  // Also sync to filesystem so the Architect always sees fresh context
+  try {
+    const fileMap = {
+      operator: "OPERATOR_CONTEXT.md",
+      architect: "ARCHITECT_CONTEXT.md",
+      ed: "ED_CONTEXT.md",
+      cos: "COS_CONTEXT.md",
+      cfo: "CFO_CONTEXT.md",
+      coo: "COO_CONTEXT.md",
+      comms: "CMO_CONTEXT.md",
+      dev: "DEV_CONTEXT.md",
+      family: "FAMREL_CONTEXT.md",
+    };
+    const filename = fileMap[role] || `${role.toUpperCase()}_CONTEXT.md`;
+    writeFileSync(join(process.cwd(), filename), content, "utf8");
+  } catch (e) {
+    // Non-fatal — Supabase write already succeeded
+    console.warn(`[update_context_file] Filesystem sync failed for ${role}:`, e.message);
+  }
+
+  return result;
 }
 
 function executeReadShosState() {
@@ -477,6 +520,33 @@ async function executeFlagToRole(sourceRole, targetRole, message, priority) {
       domain: "flag",
       tags: ["flag", `from:${sourceRole || "operator"}`],
     });
+
+    // If flagging to Architect, also append to OPERATOR_CONTEXT.md on disk
+    // so the next Architect session sees it immediately
+    if (targetRole === "architect") {
+      try {
+        const contextPath = join(process.cwd(), "OPERATOR_CONTEXT.md");
+        let existing = "";
+        try { existing = readFileSync(contextPath, "utf8"); } catch {}
+
+        const dateStr = new Date().toISOString().split("T")[0];
+        const flagLine = `- [${dateStr}] [${(priority || "medium").toUpperCase()}] ${message}`;
+
+        if (existing.includes("## Architect Queue")) {
+          // Append under the existing section
+          writeFileSync(contextPath, existing.replace(
+            "## Architect Queue",
+            `## Architect Queue\n${flagLine}`
+          ), "utf8");
+        } else {
+          // Add new section at end
+          writeFileSync(contextPath, `${existing.trimEnd()}\n\n## Architect Queue\n${flagLine}\n`, "utf8");
+        }
+      } catch (fsErr) {
+        console.warn("[flag_to_role] Filesystem append failed:", fsErr.message);
+      }
+    }
+
     return `Flag created as task for ${targetRole}: "${message}"`;
   } catch (e) {
     return `Failed to flag: ${e.message}`;
@@ -576,6 +646,8 @@ async function handleToolCall(role, toolName, toolInput) {
       return await executeAppMutation(toolInput.endpoint, toolInput.method, toolInput.body);
     case "supabase_query":
       return await supabaseQuery(toolInput);
+    case "supabase_upsert":
+      return await supabaseUpsert(toolInput);
     case "create_task":
       return await createTask(toolInput);
     case "update_task":
@@ -664,16 +736,26 @@ async function handleToolCall(role, toolName, toolInput) {
       })), null, 2);
     }
     case "read_email": {
-      const msg = await getMessage(toolInput.messageId);
-      return JSON.stringify({
-        id: msg.id,
-        from: msg.from,
-        to: msg.to,
-        subject: msg.subject,
-        date: msg.date,
-        body: msg.body?.slice(0, 6000) || "",
-        labels: msg.labelIds,
-      }, null, 2);
+      try {
+        const msg = await getMessage(toolInput.messageId);
+        if (!msg || !msg.id) {
+          return "Email not found — it may have been archived or the ID is stale. Use query_email to get fresh message IDs.";
+        }
+        return JSON.stringify({
+          id: msg.id,
+          from: msg.from,
+          to: msg.to,
+          subject: msg.subject,
+          date: msg.date,
+          body: msg.body?.slice(0, 6000) || "",
+          labels: msg.labelIds,
+        }, null, 2);
+      } catch (e) {
+        if (e.message?.includes("404") || e.message?.includes("not found") || e.message?.includes("invalid")) {
+          return "Email not found — it may have been archived or the ID is stale. Use query_email to get fresh message IDs.";
+        }
+        return `Failed to read email: ${e.message}`;
+      }
     }
     case "archive_email": {
       if (toolInput.messageIds && toolInput.messageIds.length > 0) {
@@ -715,6 +797,25 @@ async function handleToolCall(role, toolName, toolInput) {
     default:
       return `Unknown tool: ${toolName}`;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Model routing — Haiku for simple ops, Sonnet for complex reasoning
+// ---------------------------------------------------------------------------
+
+function classifyTask(messages) {
+  const lastUser = [...messages].reverse().find(m => m.role === "user");
+  const text = typeof lastUser?.content === "string"
+    ? lastUser.content
+    : JSON.stringify(lastUser?.content || "");
+  const complexKeywords = [
+    "draft", "write", "plan", "triage", "analyze", "research",
+    "summarize", "help me", "anniversary", "figure out", "review", "prepare",
+    "populate", "import", "extract", "process", "from the email", "from the attachment",
+    "explain", "how do i", "what should", "recommend",
+  ];
+  const isComplex = complexKeywords.some(kw => text.toLowerCase().includes(kw));
+  return isComplex ? "claude-sonnet-4-6" : "claude-haiku-4-5";
 }
 
 // ---------------------------------------------------------------------------
@@ -769,7 +870,7 @@ ${learningContext}
 ${pageHint}
 
 ## Core Rules
-- Supabase is primary DB. Use supabase_query for direct access, app_query/app_mutation for API routes.
+- Supabase is primary DB. Use supabase_query for direct access, supabase_upsert to write records, app_query/app_mutation for API routes.
 - Tables: heroes, contacts, organizations, orders, order_items, donations, disbursements, expenses, family_messages, tasks, volunteers, engagements, decisions, open_questions, anniversary_emails, knowledge_files, friction_logs, sop_executions, closeouts, initiatives, social_media_posts, social_media_profile_snapshots, users, sf_sync_log.
 - Supabase is PRIMARY. Salesforce is nightly backup mirror only — do NOT write new features to SF.
 - $10 charity obligation per bracelet ($35 standard). D-variant SKUs being phased out — donations are now separate checkout line items on the new website.
@@ -777,11 +878,34 @@ ${pageHint}
 - Never use browser automation for Instagram. API only (past incident: garbled "??" sent to memorial posts).
 - Email drafts only — never auto-send. Humans review and send.
 - Calendar IS the task system. Every idea, task, and plan gets a calendar slot. No unscheduled backlogs.
-- Flag bugs/features to Architect via log_friction or flag_to_role target="architect". Auto-flag blockers immediately.
-- When users propose ideas, features, or improvements: log them via log_friction with type="idea" and role="architect". This puts them in the Architect queue for the next build session. Confirm to the user that their idea has been queued.
 - Navigate to relevant page via navigate_to when discussing a domain. Navigate early.
 - At session close: update_context_file + log_closeout + follow-up tasks/calendar events.
-- Be direct, take action, report results. No fluff.`;
+- Be direct, take action, report results. No fluff.
+
+## Division of Labor
+OPERATOR handles (when the infrastructure exists in Supabase):
+- Email: query, read, archive, draft
+- Supabase: read any table (supabase_query), write/upsert any existing table (supabase_upsert)
+- Tasks: create, update, query
+- Calendar: create and update events
+- Engagement logging, session closeouts, Slack announcements
+- Data population: process incoming data (990s, contact lists, CSV pastes) and upsert into existing tables — even many rows at once
+
+ARCHITECT handles (building infrastructure that doesn't exist yet):
+- New database tables or schema changes
+- New API routes or code features
+- Any task where the target table/endpoint doesn't exist yet
+
+RULE: Before attempting any write, confirm the table exists with supabase_query.
+If the infrastructure isn't there → flag_to_role("architect", ...) and tell the user:
+"The infrastructure for this doesn't exist yet. I've flagged it to the Architect."
+
+## Email Triage Rules
+- Do NOT call query_email proactively at session start. The user sees their inbox in the dashboard.
+- Only call read_email when explicitly asked to read a specific message.
+- Only call query_email when searching for something specific not visible in the current view.
+- After archiving emails, those message IDs are stale — use query_email to get fresh IDs before reading.
+- Flag bugs/features via log_friction or flag_to_role(target="architect"). Ideas → log_friction(type="idea").`;
 
 }
 
@@ -938,6 +1062,9 @@ export async function POST(request) {
         const toolsUsed = [];
         const maxIterations = 10;
 
+        // Route to Haiku for simple ops, Sonnet for complex reasoning / drafting / data work
+        const selectedModel = classifyTask(currentMessages);
+
         for (let i = 0; i < maxIterations; i++) {
           const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
             method: "POST",
@@ -947,7 +1074,7 @@ export async function POST(request) {
               "anthropic-version": "2023-06-01",
             },
             body: JSON.stringify({
-              model: "claude-sonnet-4-6",
+              model: selectedModel,
               max_tokens: 4096,
               system: systemPrompt,
               tools: TOOLS,
@@ -1022,7 +1149,7 @@ export async function POST(request) {
           break;
         }
 
-        send({ type: "done", toolsUsed: [...new Set(toolsUsed)] });
+        send({ type: "done", toolsUsed: [...new Set(toolsUsed)], model: selectedModel.includes("haiku") ? "haiku" : "sonnet" });
       } catch (e) {
         try {
           controller.enqueue(
