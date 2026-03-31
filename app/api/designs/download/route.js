@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
+import { checkDesignInStorage } from "@/lib/design-storage";
+import { getServerClient } from "@/lib/supabase";
 import { sfQuery } from "@/lib/salesforce";
 
 /**
- * GET /api/designs/download?sku=USMA23-MORTON-7
- * Serves the SVG file attached to a Memorial_Bracelet__c record.
- * Size-aware: if SKU includes a size suffix (-6, -7, -6D, -7D), looks for
- * the size-specific SVG first, then falls back to base SKU.
+ * GET /api/designs/download?sku=USMA23-MORTON-6
+ *
+ * Size-aware SVG download. Checks in order:
+ * 1. Supabase Storage — exact SKU match (e.g., USMA23-MORTON-6.svg)
+ * 2. Supabase Storage — base SKU fallback (e.g., USMA23-MORTON.svg)
+ * 3. Salesforce — attached SVGs on the Memorial_Bracelet__c record
  */
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -16,12 +20,39 @@ export async function GET(request) {
   }
 
   try {
-    // Extract size and base SKU
     const sizeMatch = sku.match(/-([67])D?$/);
     const size = sizeMatch ? sizeMatch[1] : null;
     const baseSku = sku.replace(/-[67]D?$/, "").replace(/_-D$/, "").replace(/-D$/, "");
 
-    // Find hero
+    // --- 1. Check Supabase Storage (canonical, size-aware) ---
+    const sb = getServerClient();
+    const BUCKET = "designs";
+
+    // Try exact SKU first (e.g., USMA23-MORTON-6.svg)
+    const candidates = [sku];
+    if (size) candidates.push(`${baseSku}-${size}`);
+    if (!candidates.includes(baseSku)) candidates.push(baseSku);
+
+    for (const candidate of candidates) {
+      const fileName = `${candidate}.svg`;
+      const { data: files } = await sb.storage.from(BUCKET).list("", { search: fileName, limit: 1 });
+
+      if (files && files.length > 0 && files[0].name === fileName) {
+        const { data: blob } = await sb.storage.from(BUCKET).download(fileName);
+        if (blob) {
+          const buffer = await blob.arrayBuffer();
+          return new NextResponse(buffer, {
+            headers: {
+              "Content-Type": "image/svg+xml",
+              "Content-Disposition": `attachment; filename="${fileName}"`,
+              "Cache-Control": "public, max-age=3600",
+            },
+          });
+        }
+      }
+    }
+
+    // --- 2. Fallback: Salesforce attachments ---
     const heroes = await sfQuery(
       `SELECT Id FROM Memorial_Bracelet__c WHERE Lineitem_sku__c = '${baseSku}' LIMIT 1`
     );
@@ -30,7 +61,6 @@ export async function GET(request) {
       return NextResponse.json({ error: `No hero found for SKU: ${baseSku}` }, { status: 404 });
     }
 
-    // Get SVG files attached to this hero
     const files = await sfQuery(
       `SELECT ContentDocumentId, ContentDocument.Title, ContentDocument.FileType, ContentDocument.LatestPublishedVersionId
        FROM ContentDocumentLink
@@ -42,11 +72,10 @@ export async function GET(request) {
     );
 
     if (svgs.length === 0) {
-      return NextResponse.json({ error: `No SVG found for ${baseSku}` }, { status: 404 });
+      return NextResponse.json({ error: `No SVG found for ${sku}` }, { status: 404 });
     }
 
-    // If size specified, try to find size-specific SVG first
-    // Matches: -6/-7 suffix, _6/_7 suffix, or "female cut" / "female" (= 6")
+    // Size-specific match in SF attachment titles
     let targetSvg = null;
     if (size && svgs.length > 1) {
       targetSvg = svgs.find((f) => {
@@ -56,20 +85,11 @@ export async function GET(request) {
         return false;
       });
     }
-    // Fall back to first SVG if no size match or no size specified
-    if (!targetSvg) {
-      // If size specified and multiple SVGs exist, warn but still serve something
-      if (size && svgs.length > 1) {
-        console.warn(`No size-${size} SVG found for ${baseSku}, serving first available`);
-      }
-      targetSvg = svgs[0];
-    }
+    if (!targetSvg) targetSvg = svgs[0];
 
-    // Get the file content via ContentVersion
     const versionId = targetSvg.ContentDocument.LatestPublishedVersionId;
     const title = targetSvg.ContentDocument.Title;
 
-    // Get access token for direct download
     const tokenRes = await fetch("https://login.salesforce.com/services/oauth2/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -81,7 +101,6 @@ export async function GET(request) {
     });
     const { access_token, instance_url } = await tokenRes.json();
 
-    // Download the file body
     const fileRes = await fetch(
       `${instance_url}/services/data/v62.0/sobjects/ContentVersion/${versionId}/VersionData`,
       { headers: { Authorization: `Bearer ${access_token}` } }
