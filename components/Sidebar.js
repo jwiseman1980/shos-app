@@ -62,6 +62,7 @@ const NAV_ROLES = [
     href: "/coo",
     items: [
       { href: "/coo", label: "Overview", exact: true },
+      { href: "/production", label: "Production" },
       { href: "/bracelets", label: "Pipeline" },
       { href: "/orders", label: "Orders" },
       { href: "/designs", label: "Designs" },
