@@ -42,11 +42,27 @@ export default function DesignWorkQueue({ items: initialItems = [] }) {
       if (data.error) {
         setUploadResult((prev) => ({ ...prev, [item.itemId]: { error: data.error } }));
       } else {
-        setUploadResult((prev) => ({ ...prev, [item.itemId]: { success: true, url: data.webViewLink } }));
-        // Update local state — mark as having design
-        setItems((prev) =>
-          prev.map((i) => i.itemId === item.itemId ? { ...i, hasDesign: true } : i)
-        );
+        // Auto-advance to ready_to_laser now that design exists
+        try {
+          await fetch("/api/orders", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              itemId: item.itemId,
+              status: "ready_to_laser",
+              heroName: item.heroName || item.sku,
+            }),
+          });
+        } catch (advErr) {
+          console.warn("Auto-advance failed:", advErr.message);
+        }
+
+        setUploadResult((prev) => ({
+          ...prev,
+          [item.itemId]: { success: true, url: data.url, advanced: true },
+        }));
+        // Remove from queue — it's been advanced
+        setItems((prev) => prev.filter((i) => i.itemId !== item.itemId));
       }
     } catch (err) {
       setUploadResult((prev) => ({ ...prev, [item.itemId]: { error: err.message } }));
@@ -159,7 +175,7 @@ export default function DesignWorkQueue({ items: initialItems = [] }) {
                         {uploadResult[item.itemId].error}
                       </span>
                     ) : (
-                      <>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <input
                           ref={(el) => fileInputRefs.current[item.itemId] = el}
                           type="file"
@@ -182,9 +198,12 @@ export default function DesignWorkQueue({ items: initialItems = [] }) {
                             fontWeight: 600,
                           }}
                         >
-                          {"\u2191"} Upload
+                          {"\u2191"} Upload SVG
                         </button>
-                      </>
+                        <span style={{ fontSize: 10, color: "var(--text-dim)", fontFamily: "monospace" }}>
+                          {item.sku}.svg
+                        </span>
+                      </div>
                     )}
                   </td>
                 </tr>
