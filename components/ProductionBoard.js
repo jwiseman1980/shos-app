@@ -12,14 +12,14 @@ const COLUMNS = [
 
 const NEXT_STATUS = {
   design_needed: "ready_to_laser",
-  ready_to_laser: "in_production",
+  ready_to_laser: "ready_to_ship",
   in_production: "ready_to_ship",
   ready_to_ship: "shipped",
 };
 
 const ACTION_LABELS = {
   design_needed: null, // handled by upload
-  ready_to_laser: "Start Laser",
+  ready_to_laser: "Mark Done",
   in_production: "Mark Done",
   ready_to_ship: "Mark Shipped",
 };

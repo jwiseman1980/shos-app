@@ -82,7 +82,7 @@ export async function PATCH(request) {
     // Auto-set completed date when status is complete/sent
     if (
       status &&
-      ["Complete", "Completed", "Sent", "complete", "sent"].includes(status) &&
+      ["Complete", "Completed", "Sent", "Scheduled", "complete", "sent", "scheduled"].includes(status) &&
       !completedDate
     ) {
       const today = new Date().toISOString().split("T")[0];
@@ -249,7 +249,7 @@ export async function PATCH(request) {
     // --- Auto-complete anniversary task when status is Sent/Complete ---
     if (
       status &&
-      ["Complete", "Completed", "Sent", "complete", "sent"].includes(status) &&
+      ["Complete", "Completed", "Sent", "Scheduled", "complete", "sent", "scheduled"].includes(status) &&
       heroRecord?.id
     ) {
       try {
@@ -267,7 +267,7 @@ export async function PATCH(request) {
     // --- Slack notification on completion — rich message ---
     if (
       status &&
-      ["Complete", "Completed", "Sent", "complete", "sent"].includes(status)
+      ["Complete", "Completed", "Sent", "Scheduled", "complete", "sent", "scheduled"].includes(status)
     ) {
       try {
         const completedBy = assignedToName || "Volunteer";

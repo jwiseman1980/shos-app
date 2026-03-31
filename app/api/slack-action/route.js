@@ -83,16 +83,10 @@ async function handleAdvanceOrder(params) {
   const label = statusLabels[to] || to;
 
   // Notify appropriate person for next stage
-  if (to === "in_production") {
-    // Joseph started laser — no notification needed (he clicked the link)
-  } else if (to === "ready_to_ship") {
+  if (to === "ready_to_ship") {
     // Laser done → notify Kristin
     const kristinDm = process.env.SLACK_DM_KRISTIN;
-    if (kristinDm) {
-      const { buildReadyToShipMessage } = await import("@/lib/slack-actions");
-      // We'd need order info here — keep it simple for now
-      await notifyWithDm(`📦 *${name || "Order"}* ready to ship`, kristinDm);
-    }
+    await notifyWithDm(`📦 *${name || "Order"}* ready to ship`, kristinDm);
   } else if (to === "shipped") {
     await notifyWithDm(`✅ *${name || "Order"}* shipped`, null);
   }
