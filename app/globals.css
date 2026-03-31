@@ -873,15 +873,44 @@ p {
 }
 
 .console-content {
-  flex: 0 0 auto;
-  max-height: 35vh;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
-.console-operator {
-  flex: 1;
-  min-height: 0;
+.console-resizer {
+  flex: none;
+  height: 6px;
+  background: transparent;
+  cursor: row-resize;
+  position: relative;
   border-top: 1px solid var(--card-border);
+  transition: background 0.15s;
+}
+
+.console-resizer:hover {
+  background: var(--gold-glow);
+}
+
+.console-resizer::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 36px;
+  height: 2px;
+  background: var(--card-border);
+  border-radius: 2px;
+}
+
+.console-resizer:hover::after {
+  background: var(--gold);
+}
+
+.console-operator {
+  flex: none;
+  border-top: none;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -898,6 +927,53 @@ p {
   flex-direction: column;
   overflow-y: auto;
   height: 100vh;
+  transition: width 0.2s ease, min-width 0.2s ease;
+}
+
+/* Collapsed sidebar — narrow strip with just the toggle */
+.task-sidebar--collapsed {
+  width: 32px;
+  min-width: 32px;
+  overflow: hidden;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 12px;
+  gap: 12px;
+}
+
+/* Toggle button (collapse/expand chevron) */
+.task-sidebar-toggle {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+
+.task-sidebar-toggle:hover {
+  color: var(--text-bright);
+}
+
+.task-sidebar-toggle--expand {
+  writing-mode: vertical-rl;
+  margin: 0 auto;
+}
+
+.task-sidebar-collapsed-badge {
+  background: var(--gold);
+  color: #000;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 2px 5px;
+  min-width: 18px;
+  text-align: center;
+  margin: 0 auto;
 }
 
 .task-sidebar-header {
@@ -1269,7 +1345,7 @@ p {
   background: var(--bg-2);
   display: flex;
   flex-direction: column;
-  height: 280px;
+  height: 100%; /* inherits from .console-operator inline style */
   overflow: hidden;
 }
 
