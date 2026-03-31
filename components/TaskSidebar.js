@@ -1,5 +1,21 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+const NAV_LINKS = [
+  { href: "/",          label: "Dashboard",      icon: "⊞" },
+  { href: "/orders",    label: "Orders",          icon: "◈" },
+  { href: "/laser",     label: "Laser",           icon: "◉" },
+  { href: "/designs",   label: "Designs",         icon: "◇" },
+  { href: "/shipping",  label: "Shipping",        icon: "↗" },
+  { href: "/email",     label: "Inbox",           icon: "✉" },
+  { href: "/finance",   label: "Finance",         icon: "$" },
+  { href: "/anniversaries", label: "Anniversaries", icon: "♡" },
+  { href: "/families",  label: "Families",        icon: "⊛" },
+  { href: "/sops",      label: "SOPs",            icon: "≡" },
+];
+
 /**
  * Task Sidebar — unified daily task list (calendar events + queue items merged).
  *
@@ -18,6 +34,7 @@ export default function TaskSidebar({
   collapsed,
   onToggleCollapse,
 }) {
+  const pathname = usePathname();
   const today = new Date().toISOString().split("T")[0];
 
   const todayTasks = tasks.filter((t) => {
@@ -161,6 +178,25 @@ export default function TaskSidebar({
           </div>
         </>
       )}
+
+      {/* Nav */}
+      <div className="task-sidebar-nav">
+        {NAV_LINKS.map((link) => {
+          const isActive = link.href === "/"
+            ? pathname === "/" || pathname === ""
+            : pathname.startsWith(link.href);
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={`task-sidebar-nav-item${isActive ? " active" : ""}`}
+            >
+              <span className="task-sidebar-nav-icon">{link.icon}</span>
+              <span>{link.label}</span>
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }

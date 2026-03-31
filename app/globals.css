@@ -1124,6 +1124,47 @@ p {
   margin-top: 6px;
 }
 
+.task-sidebar-nav {
+  margin-top: auto;
+  border-top: 1px solid var(--border);
+  padding: 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.task-sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+  text-decoration: none;
+  border-radius: 4px;
+  margin: 0 4px;
+  transition: background 0.1s, color 0.1s;
+  white-space: nowrap;
+}
+
+.task-sidebar-nav-item:hover {
+  background: var(--card-bg);
+  color: var(--text-bright);
+}
+
+.task-sidebar-nav-item.active {
+  color: var(--gold);
+  background: rgba(196, 162, 55, 0.08);
+}
+
+.task-sidebar-nav-icon {
+  font-size: 11px;
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
 /* ── Email Triage Panel ── */
 
 .email-triage-panel {
