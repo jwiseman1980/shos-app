@@ -4,9 +4,8 @@ import { getSessionUser } from "@/lib/auth";
 import { loadQueueItems, loadRecentDomains } from "@/lib/data/dashboard";
 import { buildQueue } from "@/lib/priority-engine";
 import { getTodayEvents } from "@/lib/calendar";
-import { listInbox } from "@/lib/gmail";
-import { classifyEmail } from "@/lib/email-classifier";
-import CommandCenter from "@/components/CommandCenter";
+import WeekCalendar from "@/components/WeekCalendar";
+import TaskQueue from "@/components/TaskQueue";
 import DashboardChat from "@/components/DashboardChat";
 
 function getGreeting() {
@@ -16,26 +15,23 @@ function getGreeting() {
   return "Good evening";
 }
 
-function getDateString() {
-  return new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
-
-/** Compute 3-day date range in ET */
-function get3DayRange() {
-  const now = new Date();
+/** Get Monday-Sunday range for current week in ET */
+function getWeekRange() {
   const tz = "America/New_York";
-  const todayStr = now.toLocaleDateString("en-CA", { timeZone: tz });
+  const now = new Date();
+  const todayET = new Date(now.toLocaleString("en-US", { timeZone: tz }));
+  const dow = todayET.getDay(); // 0=Sun
+  const mondayOffset = dow === 0 ? -6 : 1 - dow;
 
-  const endDate = new Date(now);
-  endDate.setDate(endDate.getDate() + 2);
-  const endStr = endDate.toLocaleDateString("en-CA", { timeZone: tz });
+  const monday = new Date(todayET);
+  monday.setDate(todayET.getDate() + mondayOffset);
+  monday.setHours(0, 0, 0, 0);
 
-  // Get current ET offset
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+
+  // Get ET offset for RFC3339
   const etOffset = new Intl.DateTimeFormat("en-US", {
     timeZone: tz,
     timeZoneName: "shortOffset",
@@ -43,23 +39,27 @@ function get3DayRange() {
   const m = etOffset.match(/GMT([+-])(\d+)/);
   const tzSuffix = m ? `${m[1]}${m[2].padStart(2, "0")}:00` : "-05:00";
 
+  const monStr = monday.toLocaleDateString("en-CA");
+  const sunStr = sunday.toLocaleDateString("en-CA");
+
   return {
-    timeMin: `${todayStr}T00:00:00${tzSuffix}`,
-    timeMax: `${endStr}T23:59:59${tzSuffix}`,
+    timeMin: `${monStr}T00:00:00${tzSuffix}`,
+    timeMax: `${sunStr}T23:59:59${tzSuffix}`,
+    weekStart: monStr,
+    weekLabel: `${monday.toLocaleDateString("en-US", { month: "short", day: "numeric" })} \u2013 ${sunday.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`,
   };
 }
 
 export default async function DashboardPage() {
   const user = await getSessionUser();
   const firstName = user?.name?.split(" ")[0] || "Operator";
-  const { timeMin, timeMax } = get3DayRange();
+  const { timeMin, timeMax, weekStart, weekLabel } = getWeekRange();
 
   // Load all data in parallel
   const [
     { items, historicalAverages },
     recentDomains,
     calendarEvents,
-    inboxResult,
   ] = await Promise.all([
     loadQueueItems(user),
     loadRecentDomains(),
@@ -69,48 +69,31 @@ export default async function DashboardPage() {
       }
       return [];
     }),
-    listInbox({ maxResults: 15 }).catch((err) => {
-      console.error("[dashboard] Inbox fetch failed:", err.message);
-      return { messages: [] };
-    }),
   ]);
 
-  // Build the priority queue
   const queue = buildQueue(items, recentDomains, historicalAverages);
-
-  // Classify inbox emails
-  const inboxEmails = (inboxResult.messages || []).map((m) => ({
-    id: m.id,
-    from: m.from,
-    subject: m.subject,
-    snippet: m.snippet,
-    date: m.date,
-    isUnread: m.isUnread,
-    category: classifyEmail(m.from, m.subject),
-  }));
 
   return (
     <main className="dashboard-cockpit">
       {/* Header */}
-      <div style={{ padding: "16px 24px 0", flexShrink: 0 }}>
-        <div style={{ fontSize: 13, color: "var(--text-dim)", marginBottom: 4 }}>
-          {getDateString()}
-        </div>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text-bright)", margin: "0 0 16px" }}>
+      <div style={{ padding: "12px 24px 0", flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <h1 style={{ fontSize: 20, fontWeight: 700, color: "var(--text-bright)", margin: 0 }}>
           {getGreeting()}, {firstName}
         </h1>
+        <span style={{ fontSize: 12, color: "var(--text-dim)" }}>{weekLabel}</span>
       </div>
 
-      {/* Command Center fills available space */}
-      <div style={{ flex: 1, padding: "0 24px", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        <CommandCenter
-          events={calendarEvents}
-          queue={queue}
-          emails={inboxEmails}
-        />
+      {/* Week Calendar */}
+      <div style={{ flex: 1, padding: "12px 24px 0", overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 0 }}>
+        <WeekCalendar events={calendarEvents} weekStart={weekStart} />
       </div>
 
-      {/* Operator chat docked to bottom */}
+      {/* Task Queue */}
+      <div style={{ padding: "12px 24px 0", flexShrink: 0 }}>
+        <TaskQueue items={queue} />
+      </div>
+
+      {/* Operator */}
       <DashboardChat currentUser={user} />
     </main>
   );
