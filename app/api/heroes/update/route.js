@@ -213,11 +213,15 @@ export async function PATCH(request) {
             body: [
               `Hi ${assignedUser.name.split(" ")[0]},`,
               "",
-              `You've been assigned to handle the anniversary remembrance for ${displayName}.`,
+              `You've been assigned the anniversary remembrance email for ${displayName}.`,
               "",
-              `Please log into the SHOS app and navigate to the Anniversary Tracker to review the details and create the email draft when you're ready.`,
+              `Check your Slack DMs — there's a message with everything you need:`,
+              `• Click "Create Draft" to generate the email in your Gmail`,
+              `• Open Gmail, review the email carefully (these go to Gold Star families)`,
+              `• Send it now, or use Gmail's "Schedule send" to deliver it on the anniversary date`,
+              `• Come back to Slack and click "Sent" or "Scheduled" when done`,
               "",
-              `https://shos-app.vercel.app/anniversaries`,
+              `Pro tip: You can schedule all your emails in one sitting using Gmail's "Schedule send" feature (click the arrow next to the Send button).`,
               "",
               "Thank you for helping us honor their memory.",
               "",
@@ -231,12 +235,23 @@ export async function PATCH(request) {
 
       // Slack notification — rich message with action links
       try {
-        const familyName = null; // TODO: look up family contact name if needed
+        // Look up family contact name
+        let familyName = null;
+        if (heroRecord?.id) {
+          const { data: famData } = await supabase
+            .from("family_contacts")
+            .select("name")
+            .eq("hero_id", heroRecord.id)
+            .limit(1)
+            .single();
+          familyName = famData?.name || null;
+        }
         const msg = buildAnniversaryAssignedMessage(
           displayName,
           heroRecord?.memorial_date,
           familyName,
           heroRecord?.id || sfId,
+          assignedToName,
         );
         const anniversaryChannel = process.env.SLACK_ANNIVERSARY_CHANNEL;
         const volunteerDm = assignedUser?.email ? getVolunteerDm(assignedUser.email) : null;

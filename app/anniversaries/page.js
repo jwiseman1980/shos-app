@@ -129,14 +129,14 @@ export default async function AnniversariesPage({ searchParams }) {
     }
   }
 
-  // Simplified binary stats: Sent vs Not Sent
+  // Simple stats: Sent / Scheduled / Not Sent
   const totalThisMonth = sorted.length;
   const sentCount = sorted.filter((h) => normalizeStatus(h.anniversaryStatus) === "sent").length;
-  const notSentCount = totalThisMonth - sentCount;
+  const scheduledCount = sorted.filter((h) => normalizeStatus(h.anniversaryStatus) === "scheduled").length;
+  const notSentCount = totalThisMonth - sentCount - scheduledCount;
   const assignedCount = sorted.filter((h) => h.anniversaryAssignedTo).length;
-  const researchCount = sorted.filter((h) => h.needsResearch && normalizeStatus(h.anniversaryStatus) !== "sent").length;
-  // Legacy aliases for backward compat
-  const completedCount = sentCount;
+  const researchCount = sorted.filter((h) => h.needsResearch && normalizeStatus(h.anniversaryStatus) === "not_sent").length;
+  const completedCount = sentCount + scheduledCount;
 
   const today = new Date().getDate();
 
@@ -175,7 +175,7 @@ export default async function AnniversariesPage({ searchParams }) {
         ))}
       </div>
 
-      {/* Summary Stats — Binary: Sent vs Not Sent */}
+      {/* Summary Stats */}
       <div className="stat-grid">
         <StatBlock
           label="Total"
@@ -186,9 +186,17 @@ export default async function AnniversariesPage({ searchParams }) {
         <StatBlock
           label="Sent"
           value={sentCount}
-          note={totalThisMonth > 0 ? `${Math.round((sentCount / totalThisMonth) * 100)}% complete` : "--"}
+          note={totalThisMonth > 0 ? `${Math.round((completedCount / totalThisMonth) * 100)}% done` : "--"}
           accent="var(--status-green)"
         />
+        {scheduledCount > 0 && (
+          <StatBlock
+            label="Scheduled"
+            value={scheduledCount}
+            note="In Gmail, awaiting send"
+            accent="var(--status-blue)"
+          />
+        )}
         <StatBlock
           label="Not Sent"
           value={notSentCount}
@@ -198,7 +206,7 @@ export default async function AnniversariesPage({ searchParams }) {
           label="Assigned"
           value={assignedCount}
           note={`${totalThisMonth - assignedCount} unassigned`}
-          accent="var(--status-blue)"
+          accent="var(--status-purple)"
         />
         {researchCount > 0 && (
           <StatBlock
@@ -245,6 +253,7 @@ export default async function AnniversariesPage({ searchParams }) {
           </Link>
           {[
             { key: "not_sent", label: "Not Sent" },
+            { key: "scheduled", label: "Scheduled" },
             { key: "sent", label: "Sent" },
             { key: "unassigned", label: "Unassigned" },
             { key: "no_contact", label: "No Contact" },

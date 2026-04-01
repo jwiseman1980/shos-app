@@ -55,7 +55,7 @@ export async function GET(request) {
   // Anniversary summary
   const annPending = anniversaries.filter((h) => {
     const s = (h.anniversaryStatus || "").toLowerCase().replace(/\s+/g, "_");
-    return !["email_sent", "sent", "complete", "skipped"].includes(s);
+    return !["email_sent", "sent", "complete", "completed", "skipped", "scheduled"].includes(s);
   }).length;
 
   const date = new Date().toLocaleDateString("en-US", {

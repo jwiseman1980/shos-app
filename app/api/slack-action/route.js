@@ -37,6 +37,10 @@ export async function GET(request) {
       return await handleMarkSent(params);
     }
 
+    if (action === "mark_scheduled") {
+      return await handleMarkScheduled(params);
+    }
+
     return new Response(buildHtml("Unknown Action", `Action "${action}" is not recognized.`), {
       status: 400,
       headers: { "Content-Type": "text/html" },
@@ -102,7 +106,7 @@ async function handleAdvanceOrder(params) {
 }
 
 async function handleCreateDraft(params) {
-  const { hero: heroId, name } = params;
+  const { hero: heroId, name, volunteer } = params;
   if (!heroId) {
     return new Response(buildHtml("Missing Parameters", "Hero ID is required."), {
       status: 400,
@@ -110,8 +114,32 @@ async function handleCreateDraft(params) {
     });
   }
 
-  // Redirect to the app's anniversary page with the hero pre-selected
-  // The actual draft creation happens through the existing UI
+  // Try to create the draft via the existing draft-email API
+  try {
+    const draftRes = await fetch(`${APP_URL}/api/anniversaries/draft-email`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": process.env.SHOS_API_KEY || "",
+      },
+      body: JSON.stringify({ heroId, sfId: heroId }),
+    });
+
+    if (draftRes.ok) {
+      return new Response(buildHtml(
+        "Draft Created",
+        `A Gmail draft has been created for ${name || "this hero"}'s remembrance email. Open Gmail to review, edit, and send (or schedule send for the anniversary date).`,
+        "https://mail.google.com",
+      ), {
+        status: 200,
+        headers: { "Content-Type": "text/html" },
+      });
+    }
+  } catch {
+    // Fall through to app redirect
+  }
+
+  // Fallback: redirect to the app's anniversary page
   return Response.redirect(`${APP_URL}/anniversaries?create_draft=${heroId}`, 302);
 }
 
@@ -152,6 +180,49 @@ async function handleMarkSent(params) {
   return new Response(buildHtml(
     "Done",
     `Remembrance email for ${name || "hero"} marked as sent.`,
+    APP_URL + "/anniversaries",
+  ), {
+    status: 200,
+    headers: { "Content-Type": "text/html" },
+  });
+}
+
+async function handleMarkScheduled(params) {
+  const { hero: heroId, name, volunteer } = params;
+  if (!heroId) {
+    return new Response(buildHtml("Missing Parameters", "Hero ID is required."), {
+      status: 400,
+      headers: { "Content-Type": "text/html" },
+    });
+  }
+
+  const sb = getServerClient();
+  const { error } = await sb
+    .from("heroes")
+    .update({
+      anniversary_status: "scheduled",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", heroId);
+
+  if (error) {
+    return new Response(buildHtml("Error", `Failed to update: ${error.message}`), {
+      status: 500,
+      headers: { "Content-Type": "text/html" },
+    });
+  }
+
+  // Notify ops + anniversary channel
+  const anniversaryChannel = process.env.SLACK_ANNIVERSARY_CHANNEL;
+  const msg = `📅 *${volunteer || "Volunteer"}* scheduled remembrance email for *${name || "Hero"}* — will send on the anniversary date`;
+  await Promise.all([
+    notifyWithDm(msg, null),
+    anniversaryChannel ? (await import("@/lib/slack-actions")).postWebhook(anniversaryChannel, msg) : Promise.resolve(),
+  ]);
+
+  return new Response(buildHtml(
+    "Scheduled",
+    `Remembrance email for ${name || "hero"} marked as scheduled. It will send automatically on the anniversary date via Gmail.`,
     APP_URL + "/anniversaries",
   ), {
     status: 200,

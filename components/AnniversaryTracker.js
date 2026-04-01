@@ -3,24 +3,28 @@
 import { useState, useCallback, useEffect } from "react";
 import StatusBadge from "@/components/StatusBadge";
 
-// Binary status: Sent or Not Sent. That's it.
+// Simple status: Not Sent / Scheduled / Sent.
 // Assignment is tracked by the assignedTo field, not status.
-// "Research needed" is derived from: assigned + no family contact on file.
+// "Research needed" is derived from: no family contact on file.
 const STATUS_OPTIONS = [
   { value: "Not Sent", label: "Not Sent", key: "not_sent" },
+  { value: "Scheduled", label: "Scheduled", key: "scheduled" },
   { value: "Sent", label: "Sent", key: "sent" },
 ];
 
 function normalizeStatus(status) {
   if (!status) return "not_sent";
   const s = status.toLowerCase().replace(/\s+/g, "_");
-  // Anything that means "done" → sent. Everything else → not_sent.
   if (["sent", "email_sent", "complete", "completed", "social_posted"].includes(s)) return "sent";
+  if (["scheduled"].includes(s)) return "scheduled";
   return "not_sent";
 }
 
 function statusLabel(status) {
-  return normalizeStatus(status) === "sent" ? "Sent" : "Not Sent";
+  const n = normalizeStatus(status);
+  if (n === "sent") return "Sent";
+  if (n === "scheduled") return "Scheduled";
+  return "Not Sent";
 }
 
 function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onUpdate, senderIdentity }) {
