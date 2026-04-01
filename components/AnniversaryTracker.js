@@ -3,39 +3,24 @@
 import { useState, useCallback, useEffect } from "react";
 import StatusBadge from "@/components/StatusBadge";
 
+// Binary status: Sent or Not Sent. That's it.
+// Assignment is tracked by the assignedTo field, not status.
+// "Research needed" is derived from: assigned + no family contact on file.
 const STATUS_OPTIONS = [
-  { value: "Not Assigned", label: "Not Assigned", key: "not_assigned" },
-  { value: "Assigned", label: "Assigned", key: "assigned" },
-  { value: "In Progress", label: "In Progress", key: "in_progress" },
+  { value: "Not Sent", label: "Not Sent", key: "not_sent" },
   { value: "Sent", label: "Sent", key: "sent" },
-  { value: "Complete", label: "Complete", key: "complete" },
-  { value: "Research", label: "Research", key: "research" },
-  { value: "Escalated", label: "Escalated", key: "escalated" },
-  { value: "Skipped", label: "Skipped", key: "skipped" },
 ];
 
 function normalizeStatus(status) {
-  if (!status) return "not_assigned";
-  return status.toLowerCase().replace(/\s+/g, "_");
+  if (!status) return "not_sent";
+  const s = status.toLowerCase().replace(/\s+/g, "_");
+  // Anything that means "done" → sent. Everything else → not_sent.
+  if (["sent", "email_sent", "complete", "completed", "social_posted"].includes(s)) return "sent";
+  return "not_sent";
 }
 
 function statusLabel(status) {
-  const key = normalizeStatus(status);
-  const labels = {
-    not_assigned: "Not Assigned",
-    not_started: "Not Assigned",
-    assigned: "Assigned",
-    in_progress: "In Progress",
-    sent: "Sent",
-    email_sent: "Sent",
-    complete: "Complete",
-    completed: "Complete",
-    research: "Research",
-    escalated: "Escalated",
-    skipped: "Skipped",
-    blocked: "Escalated",
-  };
-  return labels[key] || status || "Not Assigned";
+  return normalizeStatus(status) === "sent" ? "Sent" : "Not Sent";
 }
 
 function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onUpdate, senderIdentity }) {

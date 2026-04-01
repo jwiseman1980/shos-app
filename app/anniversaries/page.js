@@ -60,33 +60,30 @@ export default async function AnniversariesPage({ searchParams }) {
   // Apply filters
   let heroes = allHeroes;
   if (statusFilter) {
-    heroes = heroes.filter((h) => normalizeStatus(h.anniversaryStatus) === statusFilter);
+    if (statusFilter === "unassigned") {
+      heroes = heroes.filter((h) => !h.anniversaryAssignedTo);
+    } else if (statusFilter === "no_contact") {
+      heroes = heroes.filter((h) => !h.familyContactId);
+    } else {
+      heroes = heroes.filter((h) => normalizeStatus(h.anniversaryStatus) === statusFilter);
+    }
   }
   if (volunteerFilter) {
     heroes = heroes.filter((h) => h.anniversaryAssignedTo === volunteerFilter);
   }
 
   // Sort by day of month and add computed fields for client
-  // Heroes with no family contact are flagged as "Research" tasks for Joseph
   const sorted = [...heroes]
     .sort((a, b) => {
       return (getDayOfMonth(a.memorialDate) || a.anniversaryDay || 0) -
         (getDayOfMonth(b.memorialDate) || b.anniversaryDay || 0);
     })
     .map((hero) => {
-      const needsResearch = !hero.familyContactId;
-      const currentStatus = normalizeStatus(hero.anniversaryStatus);
-      const isActionable = currentStatus === "not_assigned" || currentStatus === "not_started" || currentStatus === "escalated";
       return {
         ...hero,
         dayOfMonth: getDayOfMonth(hero.memorialDate) || hero.anniversaryDay || 0,
         years: yearsSince(hero.memorialDate),
-        // Auto-flag as research if no family contact and not in a completed/sent/skipped status
-        ...(needsResearch && isActionable ? {
-          anniversaryStatus: "Research",
-          anniversaryAssignedTo: hero.anniversaryAssignedTo || "Joseph Wiseman",
-          anniversaryNotes: hero.anniversaryNotes || "No family contact data — research needed",
-        } : {}),
+        needsResearch: !hero.familyContactId,
       };
     });
 
@@ -132,26 +129,14 @@ export default async function AnniversariesPage({ searchParams }) {
     }
   }
 
-  // Compute stats from sorted heroes (which includes research flagging)
+  // Simplified binary stats: Sent vs Not Sent
   const totalThisMonth = sorted.length;
-  const completedCount = sorted.filter((h) => {
-    const s = normalizeStatus(h.anniversaryStatus);
-    return s === "complete" || s === "completed" || s === "sent";
-  }).length;
-  const inProgressCount = sorted.filter((h) => {
-    const s = normalizeStatus(h.anniversaryStatus);
-    return s === "in_progress" || s === "assigned";
-  }).length;
-  const researchCount = sorted.filter((h) => {
-    const s = normalizeStatus(h.anniversaryStatus);
-    return s === "research";
-  }).length;
-  const escalatedCount = sorted.filter((h) => {
-    const s = normalizeStatus(h.anniversaryStatus);
-    return s === "escalated" || s === "skipped";
-  }).length;
-  const notStartedCount = totalThisMonth - completedCount - inProgressCount - researchCount - escalatedCount;
+  const sentCount = sorted.filter((h) => normalizeStatus(h.anniversaryStatus) === "sent").length;
+  const notSentCount = totalThisMonth - sentCount;
   const assignedCount = sorted.filter((h) => h.anniversaryAssignedTo).length;
+  const researchCount = sorted.filter((h) => h.needsResearch && normalizeStatus(h.anniversaryStatus) !== "sent").length;
+  // Legacy aliases for backward compat
+  const completedCount = sentCount;
 
   const today = new Date().getDate();
 
@@ -190,48 +175,36 @@ export default async function AnniversariesPage({ searchParams }) {
         ))}
       </div>
 
-      {/* Summary Stats */}
+      {/* Summary Stats — Binary: Sent vs Not Sent */}
       <div className="stat-grid">
         <StatBlock
-          label="Total This Month"
+          label="Total"
           value={totalThisMonth}
           note={isCurrentMonth ? "Current month" : monthName}
           accent="var(--gold)"
         />
         <StatBlock
-          label="Completed"
-          value={completedCount}
-          note={totalThisMonth > 0 ? `${Math.round((completedCount / totalThisMonth) * 100)}% done` : "--"}
+          label="Sent"
+          value={sentCount}
+          note={totalThisMonth > 0 ? `${Math.round((sentCount / totalThisMonth) * 100)}% complete` : "--"}
           accent="var(--status-green)"
         />
         <StatBlock
-          label="In Progress"
-          value={inProgressCount}
-          accent="var(--status-blue)"
+          label="Not Sent"
+          value={notSentCount}
+          accent="var(--status-orange)"
         />
         <StatBlock
           label="Assigned"
           value={assignedCount}
           note={`${totalThisMonth - assignedCount} unassigned`}
-          accent="var(--status-purple)"
-        />
-        <StatBlock
-          label="Not Started"
-          value={notStartedCount}
-          accent="var(--status-gray)"
+          accent="var(--status-blue)"
         />
         {researchCount > 0 && (
           <StatBlock
-            label="Research"
+            label="No Contact"
             value={researchCount}
-            note="No family contact"
-            accent="var(--status-orange)"
-          />
-        )}
-        {escalatedCount > 0 && (
-          <StatBlock
-            label="Escalated"
-            value={escalatedCount}
+            note="Need family research"
             accent="var(--status-red)"
           />
         )}
@@ -271,13 +244,10 @@ export default async function AnniversariesPage({ searchParams }) {
             All
           </Link>
           {[
-            { key: "not_assigned", label: "Not Assigned" },
-            { key: "assigned", label: "Assigned" },
-            { key: "in_progress", label: "In Progress" },
+            { key: "not_sent", label: "Not Sent" },
             { key: "sent", label: "Sent" },
-            { key: "complete", label: "Complete" },
-            { key: "research", label: "Research" },
-            { key: "escalated", label: "Escalated" },
+            { key: "unassigned", label: "Unassigned" },
+            { key: "no_contact", label: "No Contact" },
           ].map((s) => (
             <Link
               key={s.key}

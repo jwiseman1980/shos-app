@@ -82,6 +82,52 @@ export default function DayPanel({ events = [], tasks = [], collapsed, onToggle 
     return tasks.filter((t) => t.source !== "calendar" && t.status !== "done");
   }, [tasks]);
 
+  // Deconfliction: detect overlapping events and assign columns
+  const eventLayout = useMemo(() => {
+    if (!timedEvents.length) return [];
+
+    // Sort by start time, then by duration (longer first)
+    const sorted = [...timedEvents].sort((a, b) => {
+      const diff = new Date(a.start) - new Date(b.start);
+      if (diff !== 0) return diff;
+      return getDurationMinutes(b.start, b.end) - getDurationMinutes(a.start, a.end);
+    });
+
+    // Assign columns using a greedy algorithm
+    const columns = []; // Array of arrays, each sub-array is a column
+    const layout = new Map(); // eventId → { col, totalCols }
+
+    for (const ev of sorted) {
+      const evStart = new Date(ev.start).getTime();
+      const evEnd = new Date(ev.end).getTime();
+
+      // Find the first column where this event doesn't overlap
+      let placed = false;
+      for (let c = 0; c < columns.length; c++) {
+        const lastInCol = columns[c][columns[c].length - 1];
+        const lastEnd = new Date(lastInCol.end).getTime();
+        if (evStart >= lastEnd) {
+          columns[c].push(ev);
+          layout.set(ev.id || ev.summary, { col: c });
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        columns.push([ev]);
+        layout.set(ev.id || ev.summary, { col: columns.length - 1 });
+      }
+    }
+
+    // Now set totalCols for each event based on its overlap group
+    const totalCols = columns.length;
+    for (const [key, val] of layout) {
+      val.totalCols = totalCols;
+    }
+
+    return { layout, totalCols };
+  }, [timedEvents]);
+
   // Current time position
   const nowHour = parseInt(
     now.toLocaleString("en-US", { hour: "numeric", hour12: false, timeZone: "America/New_York" })
@@ -220,7 +266,7 @@ export default function DayPanel({ events = [], tasks = [], collapsed, onToggle 
           );
         })}
 
-        {/* Timed events overlay */}
+        {/* Timed events overlay — with deconfliction columns */}
         {timedEvents.map((ev, i) => {
           const topOffset = getMinuteOffset(ev.start);
           const duration = getDurationMinutes(ev.start, ev.end);
@@ -231,6 +277,14 @@ export default function DayPanel({ events = [], tasks = [], collapsed, onToggle 
           const current = isNow(ev.start, ev.end);
           const expanded = expandedId === ev.id;
 
+          // Deconfliction: position side-by-side when overlapping
+          const evLayout = eventLayout?.layout?.get(ev.id || ev.summary);
+          const col = evLayout?.col || 0;
+          const totalCols = eventLayout?.totalCols || 1;
+          const availWidth = 100; // percentage of container
+          const colWidth = availWidth / totalCols;
+          const leftPct = col * colWidth;
+
           return (
             <div
               key={ev.id || i}
@@ -238,16 +292,16 @@ export default function DayPanel({ events = [], tasks = [], collapsed, onToggle 
               style={{
                 position: "absolute",
                 top,
-                left: 48,
-                right: 8,
+                left: `calc(48px + (100% - 56px) * ${col / totalCols})`,
+                width: `calc((100% - 56px) * ${1 / totalCols} - 4px)`,
                 height: expanded ? "auto" : height,
                 minHeight: 20,
                 background: current
                   ? "rgba(52, 152, 219, 0.15)"
-                  : "rgba(255,255,255,0.04)",
+                  : "rgba(255,255,255,0.06)",
                 borderLeft: `3px solid ${roleColor}`,
                 borderRadius: "0 4px 4px 0",
-                padding: "3px 8px",
+                padding: "3px 6px",
                 cursor: "pointer",
                 opacity: past && !current ? 0.5 : 1,
                 zIndex: current ? 2 : 1,
@@ -257,7 +311,7 @@ export default function DayPanel({ events = [], tasks = [], collapsed, onToggle 
             >
               <div
                 style={{
-                  fontSize: 11,
+                  fontSize: totalCols > 2 ? 9 : 11,
                   color: "var(--text-bright)",
                   fontWeight: current ? 600 : 400,
                   whiteSpace: expanded ? "normal" : "nowrap",
@@ -267,9 +321,11 @@ export default function DayPanel({ events = [], tasks = [], collapsed, onToggle 
               >
                 {ev.summary}
               </div>
-              <div style={{ fontSize: 10, color: "var(--text-dim)" }}>
-                {formatTime(ev.start)} – {formatTime(ev.end)}
-              </div>
+              {totalCols <= 2 && (
+                <div style={{ fontSize: 10, color: "var(--text-dim)" }}>
+                  {formatTime(ev.start)} – {formatTime(ev.end)}
+                </div>
+              )}
               {expanded && ev.description && (
                 <div
                   style={{
