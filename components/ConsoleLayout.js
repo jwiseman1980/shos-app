@@ -73,17 +73,28 @@ export default function ConsoleLayout({ tasks, emails, currentUser, greeting }) 
     } catch {}
   }, []);
 
+  // --- Live task refresh ---
+  const refreshTasks = useCallback(async () => {
+    try {
+      const res = await fetch("/api/dashboard/queue");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.tasks) setTaskList(data.tasks);
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     const emailTools = ["archive_email", "query_email", "read_email", "mark_email_read"];
+    const taskTools = ["update_task", "create_task"];
     const handler = (e) => {
       const tools = e.detail?.toolsUsed || [];
-      if (tools.some((t) => emailTools.includes(t))) {
-        refreshEmails();
-      }
+      if (tools.some((t) => emailTools.includes(t))) refreshEmails();
+      if (tools.some((t) => taskTools.includes(t))) refreshTasks();
     };
     window.addEventListener("operator:done", handler);
     return () => window.removeEventListener("operator:done", handler);
-  }, [refreshEmails]);
+  }, [refreshEmails, refreshTasks]);
 
   // --- Task handlers ---
   const handleTaskClick = useCallback((task) => {

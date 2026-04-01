@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 /**
  * Task Detail — expanded view for a task in the main panel.
@@ -11,6 +11,18 @@ import { useState, useCallback } from "react";
 export default function TaskDetail({ task, onComplete, onStart }) {
   const [completing, setCompleting] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [checkedSteps, setCheckedSteps] = useState([]);
+
+  // Reset checklist when task changes
+  useEffect(() => {
+    setCheckedSteps([]);
+  }, [task.id]);
+
+  const toggleStep = (i) => {
+    setCheckedSteps((prev) =>
+      prev.includes(i) ? prev.filter((s) => s !== i) : [...prev, i]
+    );
+  };
 
   const handleStart = useCallback(async () => {
     setStarting(true);
@@ -149,6 +161,35 @@ export default function TaskDetail({ task, onComplete, onStart }) {
           <span className="task-detail-tag">{task.time}</span>
         )}
       </div>
+
+      {/* SOP step checklist */}
+      {task.steps?.length > 0 && (
+        <div className="task-detail-steps">
+          <div className="task-detail-steps-header">
+            Steps
+            <span className="task-detail-steps-progress">
+              {checkedSteps.length}/{task.steps.length}
+            </span>
+          </div>
+          {task.steps.map((step, i) => (
+            <button
+              key={i}
+              className={`task-detail-step ${checkedSteps.includes(i) ? "checked" : ""}`}
+              onClick={() => toggleStep(i)}
+            >
+              <span className="task-detail-step-check">
+                {checkedSteps.includes(i) ? "✓" : ""}
+              </span>
+              <div className="task-detail-step-content">
+                <div className="task-detail-step-title">{step.title}</div>
+                {step.detail && (
+                  <div className="task-detail-step-detail">{step.detail}</div>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Deep link */}
       {task.deepLink && task.deepLink !== "/" && (

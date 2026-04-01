@@ -1410,6 +1410,78 @@ p {
   background: rgba(39, 174, 96, 0.1);
 }
 
+/* ─── Task detail step checklist ─── */
+.task-detail-steps {
+  margin-top: 20px;
+  border-top: 1px solid var(--card-border);
+  padding-top: 16px;
+}
+.task-detail-steps-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.task-detail-steps-progress {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.task-detail-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 8px 0;
+  cursor: pointer;
+  border-bottom: 1px solid var(--card-border);
+  transition: opacity 0.15s;
+}
+.task-detail-step:last-child { border-bottom: none; }
+.task-detail-step:hover { opacity: 0.8; }
+.task-detail-step-check {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  border: 1px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #27ae60;
+  margin-top: 1px;
+}
+.task-detail-step.checked .task-detail-step-check {
+  background: rgba(39, 174, 96, 0.15);
+  border-color: rgba(39, 174, 96, 0.4);
+}
+.task-detail-step-title {
+  font-size: 13px;
+  color: var(--text-bright);
+  line-height: 1.4;
+}
+.task-detail-step.checked .task-detail-step-title {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+.task-detail-step-detail {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin-top: 3px;
+}
+
 .task-detail-meta {
   display: flex;
   gap: 6px;
