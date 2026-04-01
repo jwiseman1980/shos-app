@@ -45,6 +45,7 @@ export default async function RootLayout({ children }) {
 
   let user = null;
   let tasks = [];
+  let calendarEvents = [];
   let emails = [];
   let greeting = "Good morning";
 
@@ -58,7 +59,7 @@ export default async function RootLayout({ children }) {
     const [
       { items, historicalAverages },
       recentDomains,
-      calendarEvents,
+      calEvents,
       emailResult,
     ] = await Promise.all([
       loadQueueItems(user).catch(() => ({ items: [], historicalAverages: {} })),
@@ -75,6 +76,7 @@ export default async function RootLayout({ children }) {
       }),
     ]);
 
+    calendarEvents = calEvents;
     const queue = buildQueue(items, recentDomains, historicalAverages);
     tasks = mergeCalendarAndQueue(calendarEvents, queue);
 
@@ -98,6 +100,7 @@ export default async function RootLayout({ children }) {
           <ConsoleShell
             user={user}
             tasks={tasks}
+            calendarEvents={calendarEvents}
             emails={emails}
             greeting={greeting}
           >

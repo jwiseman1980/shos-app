@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import TaskSidebar from "@/components/TaskSidebar";
 import MainPanel from "@/components/MainPanel";
 import OperatorStrip from "@/components/OperatorStrip";
+import DayPanel from "@/components/DayPanel";
 
 /**
  * ConsoleShell — the persistent app-wide operating surface.
@@ -15,20 +16,19 @@ import OperatorStrip from "@/components/OperatorStrip";
  * Dashboard (/): shows MainPanel (email triage / task detail)
  * All other pages: shows nav Sidebar + {children}
  */
-export default function ConsoleShell({ user, tasks, emails, greeting, children }) {
+export default function ConsoleShell({ user, tasks, calendarEvents, emails, greeting, children }) {
   const pathname = usePathname();
   const isDashboard = pathname === "/" || pathname === "";
 
   // Trimmed user for Operator and MainPanel
   const currentUser = user ? { name: user.name, email: user.email } : null;
 
-  const [activeView, setActiveView] = useState(
-    emails?.length > 0 ? "email-triage" : "welcome"
-  );
+  const [activeView, setActiveView] = useState("welcome");
   const [activeTaskId, setActiveTaskId] = useState(null);
   const [taskList, setTaskList] = useState(tasks || []);
   const [emailList, setEmailList] = useState(emails || []);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [operatorHeight, setOperatorHeight] = useState(280);
 
   // Drag state for resizable operator
@@ -148,6 +148,8 @@ export default function ConsoleShell({ user, tasks, emails, greeting, children }
               view={activeView}
               activeTask={activeTask}
               emails={emailList}
+              calendarEvents={calendarEvents}
+              tasks={taskList}
               currentUser={currentUser}
               onTaskComplete={handleTaskComplete}
               onTaskStart={handleTaskStart}
@@ -169,6 +171,14 @@ export default function ConsoleShell({ user, tasks, emails, greeting, children }
           <OperatorStrip currentUser={currentUser} />
         </div>
       </div>
+
+      {/* Day Panel — persistent right-side calendar */}
+      <DayPanel
+        events={calendarEvents || []}
+        tasks={taskList}
+        collapsed={!rightPanelOpen}
+        onToggle={() => setRightPanelOpen((v) => !v)}
+      />
     </div>
   );
 }

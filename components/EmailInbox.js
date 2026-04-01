@@ -412,6 +412,44 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
     }
   }, [openMessage, draft]);
 
+  const [sending, setSending] = useState(false);
+  const [sendConfirm, setSendConfirm] = useState(false);
+
+  const handleSendEmail = useCallback(async () => {
+    if (!openMessage || !draft) return;
+    setSending(true);
+    try {
+      const subject = openMessage.subject?.startsWith("Re:")
+        ? openMessage.subject
+        : `Re: ${openMessage.subject}`;
+      const res = await fetch("/api/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "send",
+          to: openMessage.from,
+          subject,
+          body: draft,
+          threadId: openMessage.threadId,
+          inReplyTo: openMessage.messageId || openMessage.id,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDraft("");
+        setSendConfirm(false);
+        setOpenMessage(null);
+        setMessages((prev) => prev.filter((m) => m.id !== openMessage.id));
+      } else {
+        alert("Failed to send: " + (data.error || "Unknown error"));
+      }
+    } catch {
+      alert("Failed to send email");
+    } finally {
+      setSending(false);
+    }
+  }, [openMessage, draft]);
+
   // Open email and immediately start drafting a reply
   const handleQuickReply = useCallback(async (messageId) => {
     setLoading(true);
@@ -506,7 +544,7 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
                     padding: 12, resize: "vertical", fontFamily: "inherit", boxSizing: "border-box",
                   }}
                 />
-                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                   <button
                     onClick={handleSaveDraft}
                     disabled={draftSaved}
@@ -520,8 +558,38 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
                   >
                     {draftSaved ? "✓ Saved to Gmail Drafts" : "Save to Gmail Drafts"}
                   </button>
+                  {!sendConfirm ? (
+                    <button
+                      onClick={() => setSendConfirm(true)}
+                      disabled={!draft.trim()}
+                      style={{
+                        background: "var(--status-blue)",
+                        border: "1px solid var(--status-blue)",
+                        color: "#fff",
+                        cursor: draft.trim() ? "pointer" : "not-allowed",
+                        padding: "6px 14px", borderRadius: 6, fontSize: 12, fontWeight: 600,
+                        opacity: draft.trim() ? 1 : 0.5,
+                      }}
+                    >
+                      Send
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleSendEmail}
+                      disabled={sending}
+                      style={{
+                        background: sending ? "var(--card-border)" : "#e74c3c",
+                        border: "1px solid #e74c3c",
+                        color: "#fff",
+                        cursor: sending ? "wait" : "pointer",
+                        padding: "6px 14px", borderRadius: 6, fontSize: 12, fontWeight: 600,
+                      }}
+                    >
+                      {sending ? "Sending..." : "Confirm Send"}
+                    </button>
+                  )}
                   <button
-                    onClick={() => { setDraft(""); setDraftSaved(false); }}
+                    onClick={() => { setDraft(""); setDraftSaved(false); setSendConfirm(false); }}
                     style={{
                       background: "none", border: "1px solid var(--card-border)",
                       color: "var(--text-dim)", cursor: "pointer",

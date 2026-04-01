@@ -6,6 +6,7 @@ import {
   archiveMessages,
   markAsRead,
   starMessage,
+  sendGmailMessage,
 } from "@/lib/gmail";
 import { getServerClient } from "@/lib/supabase";
 
@@ -84,6 +85,25 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const { action, messageId, subject, from, snippet } = body;
+
+    if (action === "send") {
+      const { to, subject: sendSubject, body: sendBody, threadId, inReplyTo } = body;
+      if (!to || !sendSubject || !sendBody) {
+        return NextResponse.json({ error: "to, subject, and body required" }, { status: 400 });
+      }
+
+      const result = await sendGmailMessage({
+        senderEmail: "joseph.wiseman@steel-hearts.org",
+        senderName: "Joseph Wiseman",
+        to,
+        subject: sendSubject,
+        body: sendBody,
+        threadId,
+        inReplyTo,
+      });
+
+      return NextResponse.json({ success: true, action: "sent", ...result });
+    }
 
     if (action !== "convert_to_task") {
       return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });

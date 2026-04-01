@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import TaskDetail from "@/components/TaskDetail";
 import EmailInbox from "@/components/EmailInbox";
+import MorningBriefing from "@/components/MorningBriefing";
 
 /**
  * Main Panel — the large content area in the console.
@@ -17,6 +18,7 @@ export default function MainPanel({
   activeTask,
   tasks = [],
   emails: initialEmails,
+  calendarEvents = [],
   emailCount = 0,
   currentUser,
   onTaskComplete,
@@ -48,14 +50,15 @@ export default function MainPanel({
     );
   }
 
-  // Dashboard (default)
+  // Dashboard (default) — Morning Briefing
   return (
-    <DashboardView
+    <MorningBriefing
       tasks={tasks}
-      emailCount={emailCount}
-      onTaskClick={onTaskClick}
-      onViewChange={onViewChange}
+      emails={initialEmails}
+      calendarEvents={calendarEvents}
       greeting={greeting}
+      onViewChange={onViewChange}
+      onTaskClick={onTaskClick}
     />
   );
 }
