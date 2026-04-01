@@ -91,7 +91,10 @@ export default async function OrdersPage() {
     [orders, stats, designItems, laserItems, shipItems] = await Promise.all([
       getGroupedOrders(),
       getOrderStats(),
-      getItemsByStatus("design_needed").catch(() => []),
+      Promise.all([
+        getItemsByStatus("design_needed"),
+        getItemsByStatus("not_started"),
+      ]).then(([a, b]) => [...a, ...b]).catch(() => []),
       Promise.all([
         getItemsByStatus("ready_to_laser"),
         getItemsByStatus("in_production"),

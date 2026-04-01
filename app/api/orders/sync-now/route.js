@@ -5,6 +5,7 @@
 import { isAuthenticated } from "@/lib/auth";
 import { getServerClient } from "@/lib/supabase";
 import { sfQuery } from "@/lib/salesforce";
+import { triageNeedsDecision } from "@/lib/data/orders";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -154,6 +155,16 @@ export async function POST() {
     synced++;
   }
 
+  // Auto-triage any not_started items so they advance immediately
+  let triageResult = null;
+  if (synced > 0) {
+    try {
+      triageResult = await triageNeedsDecision();
+    } catch (e) {
+      console.error("Post-sync triage failed:", e.message);
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     synced,
@@ -161,5 +172,8 @@ export async function POST() {
     errors,
     syncedOrders,
     sfOrdersFound: sfOrders.length,
+    triage: triageResult
+      ? { advanced: triageResult.advanced, fromStock: triageResult.fromStock, needsDesign: triageResult.needsDesign }
+      : null,
   });
 }
