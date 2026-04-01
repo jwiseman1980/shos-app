@@ -7,8 +7,7 @@ import {
   markAsRead,
   starMessage,
 } from "@/lib/gmail";
-import { createTask } from "@/lib/storage/supabase-tools.js";
-import { createEvent } from "@/lib/calendar";
+import { getServerClient } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +90,7 @@ export async function POST(request) {
     }
 
     // Create task in Supabase
+    const sb = getServerClient();
     const taskData = {
       title: subject || "Email task",
       description: `From: ${from || "unknown"}\n${snippet || ""}`.trim(),
@@ -100,10 +100,11 @@ export async function POST(request) {
       item_type: "task",
       source: "email",
       source_id: messageId,
-      due_date: new Date().toISOString().split("T")[0], // Due today
+      due_date: new Date().toISOString().split("T")[0],
     };
 
-    const result = await createTask(taskData);
+    const { data: result, error: taskErr } = await sb.from("tasks").insert(taskData).select().single();
+    if (taskErr) throw new Error(taskErr.message);
 
     // Archive the email after converting
     if (messageId) {
@@ -111,20 +112,19 @@ export async function POST(request) {
       await markAsRead(messageId).catch(() => {});
     }
 
-    // Return task data for the sidebar
     const task = {
-      id: `email-task-${messageId}`,
+      id: result?.id || `email-task-${messageId}`,
       title: taskData.title,
       description: taskData.description,
       date: taskData.due_date,
       source: "email",
       sourceType: "task",
       domain: "general",
-      status: "pending",
+      status: "todo",
       estimatedMinutes: 10,
     };
 
-    return NextResponse.json({ success: true, task, result });
+    return NextResponse.json({ success: true, task });
   } catch (err) {
     console.error("Email convert-to-task error:", err.message);
     return NextResponse.json(

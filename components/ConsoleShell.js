@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import TaskSidebar from "@/components/TaskSidebar";
 import MainPanel from "@/components/MainPanel";
 import OperatorStrip from "@/components/OperatorStrip";
-import Sidebar from "@/components/Sidebar";
 
 /**
  * ConsoleShell — the persistent app-wide operating surface.
@@ -157,11 +156,8 @@ export default function ConsoleShell({ user, tasks, emails, greeting, children }
               onViewChange={handleViewChange}
             />
           ) : (
-            // All other pages: nav sidebar + page content
-            <div className="app-layout-inner">
-              <Sidebar user={user} />
-              <main className="app-content-inner">{children}</main>
-            </div>
+            // All other pages: just page content (nav is in TaskSidebar)
+            <main className="app-content-inner">{children}</main>
           )}
         </div>
 
