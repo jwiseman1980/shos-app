@@ -192,7 +192,7 @@ export async function PATCH(request) {
     }
 
     // --- Notify volunteer on assignment (email + Slack) ---
-    if (assignedToName && assignedToName !== "Joseph Wiseman") {
+    if (assignedToName) {
       // Look up volunteer email
       const { data: assignedUser } = await supabase
         .from("users")
