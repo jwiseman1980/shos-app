@@ -29,6 +29,8 @@ const supabase = createClient(
 
 const DRY_RUN = process.env.DRY_RUN === "true";
 
+const looksLikeSfId = (s) => s && /^a0u/i.test(s);
+
 /**
  * Parse a fullName like:
  *   "CPT James F. Adamouski (USMA '95)"
@@ -94,8 +96,12 @@ async function main() {
       continue;
     }
 
-    // Skip if already populated
-    if (row.first_name && row.last_name) {
+    // Skip if already populated with real names (not SF IDs)
+    if (
+      row.first_name && row.last_name &&
+      !looksLikeSfId(row.first_name) && !looksLikeSfId(row.last_name) &&
+      !looksLikeSfId(row.name)
+    ) {
       skipped++;
       continue;
     }
@@ -123,23 +129,7 @@ async function main() {
           last_name: last,
           name: displayName,
         })
-        .eq("sf_id", hero.sfId)
-        .is("first_name", null)
-        // Also update if it's an empty string
-        ;
-
-      // Supabase .is() only catches null — do a second pass for empty string
-      if (!upsertErr) {
-        await supabase
-          .from("heroes")
-          .update({
-            first_name: first,
-            last_name: last,
-            name: displayName,
-          })
-          .eq("sf_id", hero.sfId)
-          .eq("first_name", "");
-      }
+        .eq("sf_id", hero.sfId);
 
       if (upsertErr) {
         console.error(`  ERROR updating ${hero.sfId}:`, upsertErr.message);
@@ -150,7 +140,61 @@ async function main() {
     updated++;
   }
 
-  console.log(`\nDone. updated=${updated}  skipped=${skipped}  notFound=${notFound}`);
+  console.log(`\nDone (JSON pass). updated=${updated}  skipped=${skipped}  notFound=${notFound}`);
+
+  // --- Phase 2: Fix Supabase heroes where last_name/first_name is a SF ID ---
+  // These are heroes added after heroes.json was generated.
+  // Their Supabase `name` column has the real full name (e.g. "CPT James Smith").
+  console.log("\n--- Phase 2: fixing heroes with SF ID stored as name field ---");
+
+  const { data: badRows, error: badErr } = await supabase
+    .from("heroes")
+    .select("id, sf_id, name, first_name, last_name, rank")
+    .or("last_name.ilike.a0u%,first_name.ilike.a0u%,name.ilike.a0u%");
+
+  if (badErr) {
+    console.error("Phase 2 query failed:", badErr.message);
+    return;
+  }
+
+  console.log(`Found ${badRows.length} heroes with SF-ID-style name fields.\n`);
+
+  let p2updated = 0;
+  for (const row of badRows) {
+    // Use rank from row (already stored correctly in most cases)
+    const rank = looksLikeSfId(row.rank) ? null : row.rank;
+
+    // Prefer the `name` column if it's not itself a SF ID
+    const sourceName = (!looksLikeSfId(row.name) && row.name) ? row.name : null;
+    if (!sourceName) {
+      console.warn(`  No parseable name for ${row.sf_id} — skipping (manual fix needed)`);
+      continue;
+    }
+
+    const { first, last } = parseName(sourceName, rank);
+    if (!first || !last) {
+      console.warn(`  Could not parse "${sourceName}" — skipping`);
+      continue;
+    }
+
+    const displayName = [rank, first, last].filter(Boolean).join(" ");
+    console.log(`  ${row.sf_id}  "${row.name}" → first="${first}" last="${last}" name="${displayName}"`);
+
+    if (!DRY_RUN) {
+      const { error: updErr } = await supabase
+        .from("heroes")
+        .update({ first_name: first, last_name: last, name: displayName })
+        .eq("id", row.id);
+
+      if (updErr) {
+        console.error(`  ERROR: ${updErr.message}`);
+        continue;
+      }
+    }
+    p2updated++;
+  }
+
+  console.log(`\nPhase 2 done. updated=${p2updated}`);
 }
 
 main().catch((err) => {

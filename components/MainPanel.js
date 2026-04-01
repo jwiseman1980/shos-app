@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import TaskDetail from "@/components/TaskDetail";
+import EmailInbox from "@/components/EmailInbox";
 
 /**
  * Main Panel — the large content area in the console.
@@ -24,12 +25,12 @@ export default function MainPanel({
 }) {
   if (view === "email-triage") {
     return (
-      <EmailTriagePanel
-        initialEmails={initialEmails}
-        onEmailTriaged={onEmailTriaged}
-        onEmailToTask={onEmailToTask}
-        currentUser={currentUser}
-      />
+      <div style={{ padding: 16, height: "100%", overflowY: "auto" }}>
+        <EmailInbox
+          initialMessages={initialEmails}
+          onEmailToTask={onEmailToTask}
+        />
+      </div>
     );
   }
 

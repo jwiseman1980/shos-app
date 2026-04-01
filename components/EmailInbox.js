@@ -140,7 +140,7 @@ function EmailRow({ msg, isSelected, onSelect, onOpen, onArchive }) {
   );
 }
 
-function EmailDetail({ message, onBack, onArchive, onReply }) {
+function EmailDetail({ message, onBack, onArchive, onReply, onTask, draftLoading }) {
   const { name, email } = parseFrom(message.from);
 
   return (
@@ -163,6 +163,16 @@ function EmailDetail({ message, onBack, onArchive, onReply }) {
         </button>
         <div style={{ flex: 1 }} />
         <button
+          onClick={() => onTask?.(message)}
+          style={{
+            background: "none", border: "1px solid var(--card-border)",
+            color: "var(--text-dim)", cursor: "pointer",
+            padding: "4px 12px", borderRadius: 6, fontSize: 12,
+          }}
+        >
+          + Task
+        </button>
+        <button
           onClick={() => onArchive(message.id)}
           style={{
             background: "var(--status-green)22", border: "1px solid var(--status-green)",
@@ -170,17 +180,19 @@ function EmailDetail({ message, onBack, onArchive, onReply }) {
             padding: "4px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600,
           }}
         >
-          {"\u2713"} Dismiss
+          ✓ Dismiss
         </button>
         <button
           onClick={() => onReply(message)}
+          disabled={draftLoading}
           style={{
-            background: "var(--status-blue)22", border: "1px solid var(--status-blue)",
-            color: "var(--status-blue)", cursor: "pointer",
+            background: "var(--card-border)", border: "1px solid var(--card-border)",
+            color: "var(--text-bright)", cursor: draftLoading ? "default" : "pointer",
             padding: "4px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600,
+            opacity: draftLoading ? 0.6 : 1,
           }}
         >
-          {"\u21A9"} Draft Reply
+          {draftLoading ? "Drafting…" : "↩ Draft Reply"}
         </button>
       </div>
 
@@ -237,7 +249,7 @@ function EmailDetail({ message, onBack, onArchive, onReply }) {
   );
 }
 
-export default function EmailInbox({ initialMessages = [], initialNextPage = null }) {
+export default function EmailInbox({ initialMessages = [], initialNextPage = null, onEmailToTask }) {
   const [messages, setMessages] = useState(initialMessages);
   const [nextPage, setNextPage] = useState(initialNextPage);
   const [selected, setSelected] = useState(new Set());
@@ -245,6 +257,9 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
   const [loading, setLoading] = useState(false);
   const [archiving, setArchiving] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState("");
+  const [draft, setDraft] = useState("");
+  const [draftLoading, setDraftLoading] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
 
   const fetchInbox = useCallback(async (query, pageToken) => {
     setLoading(true);
@@ -339,15 +354,73 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
     fetchInbox(searchQuery);
   }, [fetchInbox, searchQuery]);
 
-  const handleReply = useCallback((message) => {
-    // Open Gmail compose in new tab with reply context
-    const replyTo = message.replyTo || parseFrom(message.from).email;
-    const subject = message.subject?.startsWith("Re:") ? message.subject : `Re: ${message.subject}`;
-    window.open(
-      `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(replyTo)}&su=${encodeURIComponent(subject)}`,
-      "_blank"
-    );
+  const handleReply = useCallback(async (message) => {
+    setDraft("");
+    setDraftLoading(true);
+    setDraftSaved(false);
+    try {
+      const res = await fetch("/api/email/draft-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messageId: message.id,
+          subject: message.subject,
+          from: message.from,
+          body: message.body,
+          snippet: message.snippet,
+        }),
+      });
+      const data = await res.json();
+      setDraft(data.draft || "");
+    } catch {
+      setDraft("Failed to generate draft. Try again.");
+    } finally {
+      setDraftLoading(false);
+    }
   }, []);
+
+  const handleSaveDraft = useCallback(async () => {
+    if (!openMessage) return;
+    try {
+      await fetch("/api/email/draft-reply", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: openMessage.from,
+          subject: openMessage.subject,
+          body: draft,
+          threadId: openMessage.threadId,
+          messageId: openMessage.id,
+        }),
+      });
+      setDraftSaved(true);
+    } catch {
+      alert("Failed to save draft");
+    }
+  }, [openMessage, draft]);
+
+  const handleConvertToTask = useCallback(async (message) => {
+    try {
+      const res = await fetch("/api/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "convert_to_task",
+          messageId: message.id,
+          subject: message.subject,
+          from: message.from,
+          snippet: message.snippet,
+        }),
+      });
+      if (res.ok) {
+        const { task } = await res.json();
+        onEmailToTask?.(task);
+        handleArchive(message.id);
+      }
+    } catch (err) {
+      console.error("Convert to task failed:", err);
+    }
+  }, [handleArchive, onEmailToTask]);
 
   const unreadCount = messages.filter((m) => m.isUnread).length;
 
@@ -356,14 +429,64 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
     return (
       <div style={{
         background: "var(--card-bg)", border: "1px solid var(--card-border)",
-        borderRadius: 8, overflow: "hidden", minHeight: 500,
+        borderRadius: 8, overflow: "hidden", minHeight: 500, display: "flex", flexDirection: "column",
       }}>
         <EmailDetail
           message={openMessage}
-          onBack={() => setOpenMessage(null)}
+          onBack={() => { setOpenMessage(null); setDraft(""); setDraftSaved(false); }}
           onArchive={handleArchive}
           onReply={handleReply}
+          onTask={handleConvertToTask}
+          draftLoading={draftLoading}
         />
+        {(draft || draftLoading) && (
+          <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--card-border)" }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-dim)", padding: "12px 0 8px" }}>
+              Draft Reply
+            </div>
+            {draftLoading ? (
+              <div style={{ color: "var(--text-dim)", fontSize: 13, padding: "8px 0" }}>Generating…</div>
+            ) : (
+              <>
+                <textarea
+                  value={draft}
+                  onChange={(e) => { setDraft(e.target.value); setDraftSaved(false); }}
+                  rows={10}
+                  style={{
+                    width: "100%", background: "var(--bg)", border: "1px solid var(--card-border)",
+                    borderRadius: 6, color: "var(--text-bright)", fontSize: 13, lineHeight: 1.6,
+                    padding: 12, resize: "vertical", fontFamily: "inherit", boxSizing: "border-box",
+                  }}
+                />
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <button
+                    onClick={handleSaveDraft}
+                    disabled={draftSaved}
+                    style={{
+                      background: draftSaved ? "var(--status-green)22" : "var(--card-border)",
+                      border: `1px solid ${draftSaved ? "var(--status-green)" : "var(--card-border)"}`,
+                      color: draftSaved ? "var(--status-green)" : "var(--text-bright)",
+                      cursor: draftSaved ? "default" : "pointer",
+                      padding: "6px 14px", borderRadius: 6, fontSize: 12, fontWeight: 600,
+                    }}
+                  >
+                    {draftSaved ? "✓ Saved to Gmail Drafts" : "Save to Gmail Drafts"}
+                  </button>
+                  <button
+                    onClick={() => { setDraft(""); setDraftSaved(false); }}
+                    style={{
+                      background: "none", border: "1px solid var(--card-border)",
+                      color: "var(--text-dim)", cursor: "pointer",
+                      padding: "6px 14px", borderRadius: 6, fontSize: 12,
+                    }}
+                  >
+                    Discard
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     );
   }

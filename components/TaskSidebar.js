@@ -4,16 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV_LINKS = [
-  { href: "/",          label: "Dashboard",      icon: "⊞" },
-  { href: "/orders",    label: "Orders",          icon: "◈" },
-  { href: "/laser",     label: "Laser",           icon: "◉" },
-  { href: "/designs",   label: "Designs",         icon: "◇" },
-  { href: "/shipping",  label: "Shipping",        icon: "↗" },
-  { href: "/email",     label: "Inbox",           icon: "✉" },
-  { href: "/finance",   label: "Finance",         icon: "$" },
+  { href: "/",              label: "Dashboard",     icon: "⊞" },
+  { href: "/orders",        label: "Orders",        icon: "◈" },
+  { href: "/laser",         label: "Laser",         icon: "◉" },
+  { href: "/designs",       label: "Designs",       icon: "◇" },
+  { href: "/shipping",      label: "Shipping",      icon: "↗" },
+  { href: "/finance",       label: "Finance",       icon: "$" },
   { href: "/anniversaries", label: "Anniversaries", icon: "♡" },
-  { href: "/families",  label: "Families",        icon: "⊛" },
-  { href: "/sops",      label: "SOPs",            icon: "≡" },
+  { href: "/families",      label: "Families",      icon: "⊛" },
+  { href: "/sops",          label: "SOPs",          icon: "≡" },
 ];
 
 /**

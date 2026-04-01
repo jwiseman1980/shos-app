@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { getMessage, getGmailClient } from "@/lib/gmail";
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const JOSEPH_EMAIL = "joseph.wiseman@steel-hearts.org";
 const JOSEPH_NAME = "Joseph Wiseman";
@@ -40,13 +37,21 @@ ${emailBody}
 
 Write the reply now:`;
 
-    const response = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1024,
+        messages: [{ role: "user", content: prompt }],
+      }),
     });
-
-    const draft = response.content[0]?.text || "";
+    const json = await response.json();
+    const draft = json.content?.[0]?.text || "";
     return NextResponse.json({ draft });
   } catch (err) {
     console.error("[draft-reply] Error:", err.message);
