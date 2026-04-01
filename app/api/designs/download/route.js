@@ -28,10 +28,19 @@ export async function GET(request) {
     const sb = getServerClient();
     const BUCKET = "designs";
 
-    // Try exact SKU first (e.g., USMA23-MORTON-6.svg)
+    // Try exact SKU first (e.g., USN-CAPODANNO-6.svg)
+    // When a size is specified, do NOT fall back to base SKU — wrong size is worse than no file
     const candidates = [sku];
-    if (size) candidates.push(`${baseSku}-${size}`);
-    if (!candidates.includes(baseSku)) candidates.push(baseSku);
+    if (size) {
+      const sizedName = `${baseSku}-${size}`;
+      if (!candidates.includes(sizedName)) candidates.push(sizedName);
+    } else {
+      // Only fall back to base SKU when no size was requested
+      if (!candidates.includes(baseSku)) candidates.push(baseSku);
+    }
+
+    // Always label the download with the requested SKU (including size)
+    const downloadName = `${sku}.svg`;
 
     for (const candidate of candidates) {
       const fileName = `${candidate}.svg`;
@@ -44,7 +53,7 @@ export async function GET(request) {
           return new NextResponse(buffer, {
             headers: {
               "Content-Type": "image/svg+xml",
-              "Content-Disposition": `attachment; filename="${fileName}"`,
+              "Content-Disposition": `attachment; filename="${downloadName}"`,
               "Cache-Control": "public, max-age=3600",
             },
           });
@@ -115,7 +124,7 @@ export async function GET(request) {
     return new NextResponse(fileBuffer, {
       headers: {
         "Content-Type": "image/svg+xml",
-        "Content-Disposition": `attachment; filename="${title}.svg"`,
+        "Content-Disposition": `attachment; filename="${sku}.svg"`,
         "Cache-Control": "public, max-age=3600",
       },
     });

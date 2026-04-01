@@ -5,6 +5,7 @@ import DataCard from "@/components/DataCard";
 import StatBlock from "@/components/StatBlock";
 import OrderBoard from "@/components/OrderBoard";
 import SyncOrdersButton from "@/components/SyncOrdersButton";
+import LaserDoneButton from "@/components/LaserDoneButton";
 import Link from "next/link";
 import { getGroupedOrders, getOrderStats, getItemsByStatus } from "@/lib/data/orders";
 
@@ -16,26 +17,40 @@ const STATUS_LABEL = {
   ready_to_ship: "Ready",
 };
 
-function PipelineItem({ item }) {
+function PipelineItem({ item, showDownload, showDone }) {
   const hero = item.heroName || item.sku || "—";
   const size = item.size ? `${item.size}"` : "";
   return (
     <div style={{
       padding: "7px 0",
       borderBottom: "1px solid var(--card-border)",
-      display: "flex", flexDirection: "column", gap: 2,
+      display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8,
     }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-bright)", lineHeight: 1.3 }}>
-        {hero}{size ? ` · ${size}` : ""}
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-bright)", lineHeight: 1.3 }}>
+          {hero}{size ? ` · ${size}` : ""}
+        </div>
+        <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
+          #{item.orderNumber}{item.customerName ? ` · ${item.customerName}` : ""}
+        </div>
       </div>
-      <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
-        #{item.orderNumber}{item.customerName ? ` · ${item.customerName}` : ""}
+      <div style={{ display: "flex", gap: 4, flexShrink: 0, alignItems: "center" }}>
+        {showDownload && item.hasDesign && item.designUrl && (
+          <a href={item.designUrl} target="_blank" rel="noopener" style={{
+            fontSize: 10, fontWeight: 600, color: "var(--status-green)",
+            textDecoration: "none", padding: "2px 6px", borderRadius: 4,
+            border: "1px solid var(--status-green)", whiteSpace: "nowrap",
+          }}>
+            {"\u2B07"} SVG
+          </a>
+        )}
+        {showDone && <LaserDoneButton itemId={item.id} />}
       </div>
     </div>
   );
 }
 
-function PipelineColumn({ title, items, href, accent, emptyText }) {
+function PipelineColumn({ title, items, href, accent, emptyText, showDownload, showDone }) {
   const shown = items.slice(0, 8);
   const overflow = items.length - shown.length;
   return (
@@ -70,7 +85,7 @@ function PipelineColumn({ title, items, href, accent, emptyText }) {
           </div>
         ) : (
           <>
-            {shown.map((item) => <PipelineItem key={item.id} item={item} />)}
+            {shown.map((item) => <PipelineItem key={item.id} item={item} showDownload={showDownload} showDone={showDone} />)}
             {overflow > 0 && (
               <div style={{ padding: "8px 0", fontSize: 11, color: "var(--text-dim)" }}>
                 +{overflow} more — <Link href={href} style={{ color: "var(--text-dim)" }}>view all</Link>
@@ -153,6 +168,8 @@ export default async function OrdersPage() {
             href="/laser"
             accent="var(--status-blue)"
             emptyText="Laser queue clear"
+            showDownload
+            showDone
           />
           <PipelineColumn
             title="Ship"
