@@ -4,6 +4,7 @@ import PageShell from "@/components/PageShell";
 import DataCard from "@/components/DataCard";
 import StatBlock from "@/components/StatBlock";
 import OrderBoard from "@/components/OrderBoard";
+import SyncOrdersButton from "@/components/SyncOrdersButton";
 import Link from "next/link";
 import { getGroupedOrders, getOrderStats, getItemsByStatus } from "@/lib/data/orders";
 
@@ -102,7 +103,7 @@ export default async function OrdersPage() {
   }
 
   return (
-    <PageShell title="Order Queue" subtitle="Fulfillment pipeline — Salesforce + ShipStation">
+    <PageShell title="Order Queue" subtitle="Fulfillment pipeline — Salesforce + ShipStation" action={<SyncOrdersButton />}>
       <div className="stat-grid">
         <StatBlock
           label="Design Queue"

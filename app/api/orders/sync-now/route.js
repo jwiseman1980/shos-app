@@ -1,13 +1,8 @@
 /**
- * Salesforce → Supabase Order Sync
- *
- * Polls SF for Squarespace orders newer than the latest in Supabase
- * and inserts them. Runs hourly via Vercel cron.
- *
- * This bridges the gap: Squarespace → SF → (this cron) → Supabase
- * until the new website (steel-hearts-site) replaces Squarespace entirely.
+ * Manual order sync trigger — session-authenticated.
+ * Calls the same SF→Supabase logic as the hourly cron.
  */
-
+import { isAuthenticated } from "@/lib/auth";
 import { getServerClient } from "@/lib/supabase";
 import { sfQuery } from "@/lib/salesforce";
 import { NextResponse } from "next/server";
@@ -29,25 +24,14 @@ function sizeFromSku(sku) {
   return "Regular-7in";
 }
 
-export async function GET(request) {
-  // Auth: Vercel CRON_SECRET or SHOS_API_KEY
-  const authHeader = request.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-  const apiKey = process.env.SHOS_API_KEY;
-  const key =
-    new URL(request.url).searchParams.get("key") ||
-    request.headers.get("x-api-key");
-
-  const isVercelCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
-  const isApiKey = apiKey && key === apiKey;
-
-  if (!isVercelCron && !isApiKey) {
+export async function POST() {
+  if (!(await isAuthenticated())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const sb = getServerClient();
 
-  // Find the highest numeric order number in Supabase by paginating
+  // Find the highest numeric order number in Supabase
   let latestNum = 0;
   let offset = 0;
   const pageSize = 1000;
@@ -67,27 +51,9 @@ export async function GET(request) {
   }
 
   if (!latestNum || latestNum < 1000) {
-    const slackWebhook = process.env.SLACK_SOP_WEBHOOK;
-    if (slackWebhook) {
-      try {
-        await fetch(slackWebhook, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: `:warning: Order sync FAILED — could not determine latest order number (got ${latestNum}). Check Supabase orders table.`,
-          }),
-        });
-      } catch {}
-    }
-    return NextResponse.json({
-      ok: false,
-      error: "Could not determine latest order number",
-    });
+    return NextResponse.json({ ok: false, error: "Could not determine latest order number" });
   }
 
-  // Query SF for orders created after the latest order's date
-  // We use CreatedDate instead of Name comparison to avoid string sort issues
-  // Fetch orders from the last 48 hours as a safety window — dedup handles overlap
   const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
   const soql = `SELECT Name, Order_Date__c, Order_Type__c, Billing_Name__c, Billing_Email__c, Shipping_Name__c, Shipping_Address1__c, Shipping_City__c, Shipping_State__c, Shipping_Postal__c, Shipping_Country__c, Order_Total__c, (SELECT Lineitem_sku__c, Quantity__c, Unit_Price__c, Production_Status__c FROM Squarespace_Order_Items__r) FROM Squarespace_Order__c WHERE CreatedDate >= ${since} ORDER BY CreatedDate ASC LIMIT 200`;
 
@@ -95,32 +61,14 @@ export async function GET(request) {
   try {
     sfOrders = await sfQuery(soql);
   } catch (e) {
-    // Alert Slack on SF failure
-    const slackWebhook = process.env.SLACK_SOP_WEBHOOK;
-    if (slackWebhook) {
-      try {
-        await fetch(slackWebhook, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            text: `:warning: Order sync FAILED — Salesforce query error: ${e.message}`,
-          }),
-        });
-      } catch {}
-    }
     return NextResponse.json(
-      { ok: false, error: "SF query failed", message: e.message },
+      { ok: false, error: "Salesforce query failed", message: e.message },
       { status: 500 }
     );
   }
 
   if (!sfOrders || sfOrders.length === 0) {
-    return NextResponse.json({
-      ok: true,
-      synced: 0,
-      latestOrderNumber: latestNum,
-      message: "No new orders",
-    });
+    return NextResponse.json({ ok: true, synced: 0, message: "No new orders in Salesforce" });
   }
 
   // Build hero lookup cache
@@ -146,9 +94,9 @@ export async function GET(request) {
   let synced = 0;
   let skipped = 0;
   let errors = 0;
+  const syncedOrders = [];
 
   for (const o of sfOrders) {
-    // Dedup
     const { data: existing } = await sb
       .from("orders")
       .select("id")
@@ -181,7 +129,6 @@ export async function GET(request) {
       .single();
 
     if (oErr) {
-      console.error("Order sync error:", o.Name, oErr.message);
       errors++;
       continue;
     }
@@ -203,21 +150,8 @@ export async function GET(request) {
       });
     }
 
+    syncedOrders.push(`#${o.Name} — ${o.Billing_Name__c}`);
     synced++;
-  }
-
-  // Post to Slack
-  const slackWebhook = process.env.SLACK_SOP_WEBHOOK;
-  if (slackWebhook && synced > 0) {
-    try {
-      await fetch(slackWebhook, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: `Order sync: ${synced} new order(s) from Squarespace via SF`,
-        }),
-      });
-    } catch {}
   }
 
   return NextResponse.json({
@@ -225,7 +159,7 @@ export async function GET(request) {
     synced,
     skipped,
     errors,
-    latestOrderNumber: latestNum,
+    syncedOrders,
     sfOrdersFound: sfOrders.length,
   });
 }
