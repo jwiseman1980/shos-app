@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { checkDesignInStorage } from "@/lib/design-storage";
+import { checkDesignInStorage, uploadDesignToStorage } from "@/lib/design-storage";
 import { getServerClient } from "@/lib/supabase";
 import { sfQuery } from "@/lib/salesforce";
 
@@ -120,6 +120,14 @@ export async function GET(request) {
     }
 
     const fileBuffer = await fileRes.arrayBuffer();
+
+    // Auto-migrate: copy SF design to Supabase Storage so detection works next time
+    try {
+      await uploadDesignToStorage(sku, Buffer.from(fileBuffer));
+      console.log(`Auto-migrated ${sku}.svg from Salesforce to Supabase Storage`);
+    } catch (migErr) {
+      console.warn(`Auto-migrate to storage failed for ${sku}:`, migErr.message);
+    }
 
     return new NextResponse(fileBuffer, {
       headers: {
