@@ -3,7 +3,7 @@ import { getServerClient } from "@/lib/supabase";
 import {
   buildAnniversaryAssignedMessage,
   buildAnniversaryCompletedMessage,
-  getVolunteerDm,
+  sendSlackDm,
   notifyWithChannelAndDm,
   postWebhook,
   notifyWithDm,
@@ -255,12 +255,13 @@ export async function PATCH(request) {
         );
         // Assignment instructions go to volunteer DM ONLY — not ops-hub
         // Ops-hub gets notified when the email is actually sent/scheduled
-        const volunteerDm = assignedUser?.email ? getVolunteerDm(assignedUser.email) : null;
-        if (volunteerDm) {
-          await postWebhook(volunteerDm, msg);
-        } else {
-          // No DM webhook for this volunteer — fall back to ops-hub so it's not lost
-          await postWebhook(process.env.SLACK_SOP_WEBHOOK, msg);
+        // Uses Slack API (bot token + user ID from DB) or falls back to webhooks
+        if (assignedUser?.email) {
+          const sent = await sendSlackDm(assignedUser.email, msg);
+          if (!sent) {
+            // No DM method available — fall back to ops-hub so it's not lost
+            await postWebhook(process.env.SLACK_SOP_WEBHOOK, `⚠️ Could not DM ${assignedToName} — no Slack DM configured\n\n${msg}`);
+          }
         }
       } catch {
         // Best effort
