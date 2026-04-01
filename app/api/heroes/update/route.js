@@ -146,7 +146,10 @@ export async function PATCH(request) {
     // --- Look up hero record for task creation and notifications ---
     const { data: heroRecord } = await supabase
       .from("heroes")
-      .select("id, name, rank, first_name, last_name, memorial_date, memorial_month, memorial_day, family_contact_id, family_contacts(name, email)")
+      .select(`
+        id, name, rank, first_name, last_name, memorial_date, memorial_month, memorial_day, family_contact_id,
+        family_contact:contacts!family_contact_id(id, first_name, last_name, email)
+      `)
       .eq("sf_id", sfId)
       .single();
 
@@ -240,7 +243,8 @@ export async function PATCH(request) {
 
       // Slack notification — rich message with action links
       try {
-        const familyName = heroRecord?.family_contacts?.name || null;
+        const fc = heroRecord?.family_contact;
+        const familyName = fc ? `${fc.first_name || ""} ${fc.last_name || ""}`.trim() || null : null;
         const msg = buildAnniversaryAssignedMessage(
           displayName,
           heroRecord?.memorial_date,
