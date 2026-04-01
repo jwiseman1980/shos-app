@@ -157,6 +157,7 @@ Available mutation endpoints:
 - POST /api/tasks — create a task. Body: { title, description, status, priority, role, domain, hero_id, due_date, tags }
 - POST /api/engagements — log an engagement. Body: { type, subject, description, outcome, follow_up_needed, follow_up_date }
 - POST /api/messages/draft-batch — create Gmail drafts for all eligible families with messages. Body: { heroIds?: string[] } (optional: specific heroes, omit for all eligible)
+- PATCH /api/orders — advance a bracelet order item's production status. Body: { itemId, status, heroName? }. Valid statuses: not_started → design_needed → ready_to_laser → in_production → ready_to_ship → shipped. Use supabase_query on order_items (join orders via order_id) to find itemId first. Triggers Slack notifications and shipping email automatically.
 
 Always confirm with the user before making bulk mutations (e.g., assigning 20 heroes at once). Single updates are fine without confirmation.`,
     input_schema: {
