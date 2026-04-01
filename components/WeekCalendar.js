@@ -1,10 +1,8 @@
 "use client";
 
-const ROLE_COLORS = {
-  primary: "#3498db", ops: "#e74c3c", cto: "#8e44ad", ed: "#c4a237",
-  cos: "#27ae60", cfo: "#2ecc71", coo: "#e67e22", comms: "#1abc9c",
-  dev: "#9b59b6", family: "#e91e63",
-};
+import { getEventColor } from "@/lib/calendar-colors";
+
+const ROLE_COLORS = { primary: "#3498db", ops: "#e74c3c" };
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -85,8 +83,8 @@ export default function WeekCalendar({ events = [], weekStart }) {
                   {day.allDay.map((e, i) => (
                     <div key={i} style={{
                       fontSize: 9, padding: "2px 5px", borderRadius: 3, fontWeight: 600,
-                      background: `${ROLE_COLORS[e.role] || "#666"}22`,
-                      color: ROLE_COLORS[e.role] || "#666",
+                      background: `${getEventColor(e)}22`,
+                      color: getEventColor(e),
                       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                     }} title={e.summary}>
                       {e.summary}
@@ -106,7 +104,7 @@ export default function WeekCalendar({ events = [], weekStart }) {
                 }} title={`${e.summary}\n${e.description?.slice(0, 100) || ""}`}>
                   <span style={{
                     width: 5, height: 5, borderRadius: "50%", flexShrink: 0, marginTop: 4,
-                    background: ROLE_COLORS[e.role] || "#666",
+                    background: getEventColor(e),
                   }} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{

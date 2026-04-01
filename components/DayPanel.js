@@ -2,31 +2,11 @@
 
 import { useState, useEffect, useMemo } from "react";
 
-const ROLE_COLORS = {
-  primary: "#3498db",
-  ops: "#e74c3c",
-  cto: "#8e44ad",
-  ed: "#c4a237",
-  cos: "#27ae60",
-  cfo: "#2ecc71",
-  coo: "#e67e22",
-  comms: "#1abc9c",
-  dev: "#9b59b6",
-  family: "#e91e63",
-};
+import { getEventColor, getEventLabel } from "@/lib/calendar-colors";
 
-const ROLE_LABELS = {
-  primary: "Personal",
-  ops: "Ops",
-  cto: "CTO",
-  ed: "ED",
-  cos: "COS",
-  cfo: "CFO",
-  coo: "COO",
-  comms: "Comms",
-  dev: "Dev",
-  family: "Family",
-};
+// Legacy compat — components now use getEventColor/getEventLabel
+const ROLE_COLORS = { primary: "#3498db", ops: "#e74c3c" };
+const ROLE_LABELS = { primary: "Tasks", ops: "Ops" };
 
 const HOUR_HEIGHT = 48;
 const START_HOUR = 6;
@@ -246,7 +226,7 @@ export default function DayPanel({ events = [], tasks = [], collapsed, onToggle 
           const duration = getDurationMinutes(ev.start, ev.end);
           const top = (topOffset / 60) * HOUR_HEIGHT;
           const height = Math.max((duration / 60) * HOUR_HEIGHT, 20);
-          const roleColor = ROLE_COLORS[ev.role] || "var(--gold)";
+          const roleColor = getEventColor(ev);
           const past = isPast(ev.end);
           const current = isNow(ev.start, ev.end);
           const expanded = expandedId === ev.id;

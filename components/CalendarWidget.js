@@ -2,31 +2,11 @@
 
 import { useState, useEffect } from "react";
 
-const ROLE_COLORS = {
-  primary:  "#3498db",
-  ops:      "#e74c3c",
-  cto:      "#8e44ad",
-  ed:       "#c4a237",
-  cos:      "#27ae60",
-  cfo:      "#2ecc71",
-  coo:      "#e67e22",
-  comms:    "#1abc9c",
-  dev:      "#9b59b6",
-  family:   "#e91e63",
-};
+import { getEventColor, getEventLabel } from "@/lib/calendar-colors";
 
-const ROLE_LABELS = {
-  primary:  "Personal",
-  ops:      "Ops",
-  cto:      "CTO",
-  ed:       "ED",
-  cos:      "COS",
-  cfo:      "CFO",
-  coo:      "COO",
-  comms:    "Comms",
-  dev:      "Dev",
-  family:   "Family",
-};
+// Legacy compat — components now use getEventColor/getEventLabel
+const ROLE_COLORS = { primary: "#3498db", ops: "#e74c3c" };
+const ROLE_LABELS = { primary: "Tasks", ops: "Ops" };
 
 function formatTime(isoStr) {
   if (!isoStr || isoStr.length === 10) return "All day";
@@ -104,7 +84,7 @@ export default function CalendarWidget({ initialEvents }) {
                 width: 6,
                 height: 6,
                 borderRadius: "50%",
-                background: ROLE_COLORS[event.role] || "#666",
+                background: getEventColor(event),
                 flexShrink: 0,
               }} />
               {event.summary}
@@ -170,12 +150,12 @@ export default function CalendarWidget({ initialEvents }) {
                 fontSize: 10,
                 padding: "1px 6px",
                 borderRadius: 3,
-                background: `${ROLE_COLORS[event.role] || "#666"}22`,
-                color: ROLE_COLORS[event.role] || "#666",
+                background: `${getEventColor(event)}22`,
+                color: getEventColor(event),
                 fontWeight: 600,
                 flexShrink: 0,
               }}>
-                {ROLE_LABELS[event.role] || event.role}
+                {getEventLabel(event)}
               </span>
             </div>
           );

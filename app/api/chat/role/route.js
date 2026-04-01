@@ -282,8 +282,8 @@ Always confirm with the user before making bulk mutations (e.g., assigning 20 he
       properties: {
         roles: {
           type: "array",
-          items: { type: "string", enum: ["primary", "ops", "cto", "ed", "cos", "cfo", "coo", "comms", "dev", "family"] },
-          description: "Which role calendars to check (default: all)",
+          items: { type: "string", enum: ["primary", "ops"] },
+          description: "Which calendars to check (default: both). Primary = human tasks, Ops = system/anniversary markers.",
         },
         date: {
           type: "string",
@@ -294,14 +294,14 @@ Always confirm with the user before making bulk mutations (e.g., assigning 20 he
   },
   {
     name: "create_calendar_event",
-    description: "Create a calendar event on a functional calendar. Use this to schedule tasks, sessions, follow-ups, or ideas. EVERY task, idea, and plan gets a calendar slot — no exceptions. Pick the calendar that matches the domain of work.",
+    description: "Create a calendar event. All human tasks go on Primary calendar. Use colorId to categorize by function (6=Ops, 5=Finance, 10=Family, 9=Partnerships, 3=Governance, 7=ProfDev, 4=Personal, 11=Urgent, 8=Anchor).",
     input_schema: {
       type: "object",
       properties: {
         role: {
           type: "string",
-          enum: ["primary", "ops", "cto", "ed", "cos", "cfo", "coo", "comms", "dev", "family"],
-          description: "Which role calendar to create the event on",
+          enum: ["primary", "ops"],
+          description: "Calendar: primary (all human tasks) or ops (system events only). Almost always use primary.",
         },
         summary: { type: "string", description: "Event title" },
         description: { type: "string", description: "Event description — include full context, dependencies, files, and follow-ups" },
