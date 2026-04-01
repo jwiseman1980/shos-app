@@ -17,7 +17,7 @@ const STATUS_LABEL = {
   ready_to_ship: "Ready",
 };
 
-function PipelineItem({ item, showDownload, showDone }) {
+function PipelineItem({ item, showDownload, showDone, doneStatus, doneLabel, doneColor }) {
   const hero = item.heroName || item.sku || "—";
   const size = item.size ? `${item.size}"` : "";
   return (
@@ -44,13 +44,21 @@ function PipelineItem({ item, showDownload, showDone }) {
             {"\u2B07"} SVG
           </a>
         )}
-        {showDone && <LaserDoneButton itemId={item.id} />}
+        {showDone && (
+          <LaserDoneButton
+            itemId={item.id}
+            heroName={item.heroName}
+            toStatus={doneStatus}
+            label={doneLabel}
+            color={doneColor}
+          />
+        )}
       </div>
     </div>
   );
 }
 
-function PipelineColumn({ title, items, href, accent, emptyText, showDownload, showDone }) {
+function PipelineColumn({ title, items, href, accent, emptyText, showDownload, showDone, doneStatus, doneLabel, doneColor }) {
   const shown = items.slice(0, 8);
   const overflow = items.length - shown.length;
   return (
@@ -85,7 +93,17 @@ function PipelineColumn({ title, items, href, accent, emptyText, showDownload, s
           </div>
         ) : (
           <>
-            {shown.map((item) => <PipelineItem key={item.id} item={item} showDownload={showDownload} showDone={showDone} />)}
+            {shown.map((item) => (
+              <PipelineItem
+                key={item.id}
+                item={item}
+                showDownload={showDownload}
+                showDone={showDone}
+                doneStatus={doneStatus}
+                doneLabel={doneLabel}
+                doneColor={doneColor}
+              />
+            ))}
             {overflow > 0 && (
               <div style={{ padding: "8px 0", fontSize: 11, color: "var(--text-dim)" }}>
                 +{overflow} more — <Link href={href} style={{ color: "var(--text-dim)" }}>view all</Link>
@@ -170,6 +188,9 @@ export default async function OrdersPage() {
             emptyText="Laser queue clear"
             showDownload
             showDone
+            doneStatus="ready_to_ship"
+            doneLabel="\u2713 Done"
+            doneColor="var(--status-blue)"
           />
           <PipelineColumn
             title="Ship"
@@ -177,6 +198,10 @@ export default async function OrdersPage() {
             href="/shipping"
             accent="var(--status-green)"
             emptyText="Nothing to ship"
+            showDone
+            doneStatus="shipped"
+            doneLabel="\u{1F4E6} Shipped"
+            doneColor="var(--status-green)"
           />
         </div>
       </div>

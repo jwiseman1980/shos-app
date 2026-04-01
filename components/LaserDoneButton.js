@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-export default function LaserDoneButton({ itemId }) {
+export default function LaserDoneButton({ itemId, heroName, toStatus = "ready_to_ship", label = "\u2713 Done", color = "var(--status-blue)" }) {
   const [state, setState] = useState("idle"); // idle | saving | done
 
   async function handleDone(e) {
@@ -13,7 +13,7 @@ export default function LaserDoneButton({ itemId }) {
       const res = await fetch("/api/orders", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId, status: "ready_to_ship" }),
+        body: JSON.stringify({ itemId, heroName, status: toStatus }),
       });
       const data = await res.json();
       if (data.success) {
@@ -40,13 +40,13 @@ export default function LaserDoneButton({ itemId }) {
       onClick={handleDone}
       disabled={state === "saving"}
       style={{
-        fontSize: 10, fontWeight: 600, color: "var(--status-blue)",
-        background: "none", border: "1px solid var(--status-blue)",
+        fontSize: 10, fontWeight: 600, color,
+        background: "none", border: `1px solid ${color}`,
         borderRadius: 4, padding: "2px 6px", cursor: "pointer",
         opacity: state === "saving" ? 0.5 : 1, whiteSpace: "nowrap",
       }}
     >
-      {state === "saving" ? "..." : "\u2713 Done"}
+      {state === "saving" ? "..." : label}
     </button>
   );
 }
