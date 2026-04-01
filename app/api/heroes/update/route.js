@@ -6,6 +6,7 @@ import {
   getVolunteerDm,
   notifyWithChannelAndDm,
   postWebhook,
+  notifyWithDm,
 } from "@/lib/slack-actions";
 
 /**
@@ -252,9 +253,15 @@ export async function PATCH(request) {
           heroRecord?.id || sfId,
           assignedToName,
         );
-        const anniversaryChannel = process.env.SLACK_ANNIVERSARY_CHANNEL;
+        // Assignment instructions go to volunteer DM ONLY — not ops-hub
+        // Ops-hub gets notified when the email is actually sent/scheduled
         const volunteerDm = assignedUser?.email ? getVolunteerDm(assignedUser.email) : null;
-        await notifyWithChannelAndDm(msg, anniversaryChannel, volunteerDm);
+        if (volunteerDm) {
+          await postWebhook(volunteerDm, msg);
+        } else {
+          // No DM webhook for this volunteer — fall back to ops-hub so it's not lost
+          await postWebhook(process.env.SLACK_SOP_WEBHOOK, msg);
+        }
       } catch {
         // Best effort
       }
