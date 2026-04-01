@@ -79,6 +79,9 @@ function parseFromName(from) {
 function EmailTriagePanel({ initialEmails, onEmailTriaged, onEmailToTask, currentUser }) {
   const [emails, setEmails] = useState(initialEmails || []);
   const [openEmail, setOpenEmail] = useState(null);
+  const [draft, setDraft] = useState("");
+  const [draftLoading, setDraftLoading] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
 
   // Sync when parent refreshes email list (e.g. after Operator archives via tool)
   useEffect(() => {
@@ -164,28 +167,66 @@ function EmailTriagePanel({ initialEmails, onEmailTriaged, onEmailToTask, curren
     }
   }, [handleArchive, onEmailToTask]);
 
+  const handleDraftReply = useCallback(async () => {
+    setDraftLoading(true);
+    setDraft("");
+    setDraftSaved(false);
+    try {
+      const res = await fetch("/api/email/draft-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messageId: openEmail.id,
+          subject: openEmail.subject,
+          from: openEmail.from,
+          body: openEmail.body,
+          snippet: openEmail.snippet,
+        }),
+      });
+      const data = await res.json();
+      setDraft(data.draft || "");
+    } catch {
+      setDraft("Failed to generate draft. Try again.");
+    } finally {
+      setDraftLoading(false);
+    }
+  }, [openEmail]);
+
+  const handleSaveDraft = useCallback(async () => {
+    try {
+      await fetch("/api/email/draft-reply", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: openEmail.from,
+          subject: openEmail.subject,
+          body: draft,
+          threadId: openEmail.threadId,
+          messageId: openEmail.id,
+        }),
+      });
+      setDraftSaved(true);
+    } catch {
+      alert("Failed to save draft");
+    }
+  }, [openEmail, draft]);
+
   // Detail view
   if (openEmail) {
     return (
       <div className="email-triage-detail">
         <div className="email-triage-detail-header">
-          <button
-            onClick={() => setOpenEmail(null)}
-            className="email-triage-back"
-          >
+          <button onClick={() => { setOpenEmail(null); setDraft(""); setDraftSaved(false); }} className="email-triage-back">
             &larr; Back to inbox
           </button>
           <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={() => handleConvertToTask(openEmail)}
-              className="email-triage-action-btn convert"
-            >
+            <button onClick={handleDraftReply} className="email-triage-action-btn" disabled={draftLoading}>
+              {draftLoading ? "Drafting…" : "Draft Reply"}
+            </button>
+            <button onClick={() => handleConvertToTask(openEmail)} className="email-triage-action-btn convert">
               + Task
             </button>
-            <button
-              onClick={() => handleArchive(openEmail.id)}
-              className="email-triage-action-btn handled"
-            >
+            <button onClick={() => handleArchive(openEmail.id)} className="email-triage-action-btn handled">
               Handled
             </button>
           </div>
@@ -197,11 +238,35 @@ function EmailTriagePanel({ initialEmails, onEmailTriaged, onEmailToTask, curren
           <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 16 }}>
             From: {openEmail.from} &middot; {openEmail.date}
           </div>
-          <div
-            style={{ fontSize: 13, color: "var(--text-bright)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}
-          >
+          <div style={{ fontSize: 13, color: "var(--text-bright)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
             {openEmail.body || openEmail.snippet}
           </div>
+
+          {(draft || draftLoading) && (
+            <div className="email-draft-panel">
+              <div className="email-draft-label">Draft Reply</div>
+              {draftLoading ? (
+                <div style={{ color: "var(--text-dim)", fontSize: 13, padding: "12px 0" }}>Generating…</div>
+              ) : (
+                <>
+                  <textarea
+                    className="email-draft-textarea"
+                    value={draft}
+                    onChange={(e) => { setDraft(e.target.value); setDraftSaved(false); }}
+                    rows={10}
+                  />
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <button onClick={handleSaveDraft} className="email-triage-action-btn" disabled={draftSaved}>
+                      {draftSaved ? "Saved to Gmail Drafts ✓" : "Save to Gmail Drafts"}
+                    </button>
+                    <button onClick={() => { setDraft(""); setDraftSaved(false); }} className="email-triage-action-btn">
+                      Discard
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );

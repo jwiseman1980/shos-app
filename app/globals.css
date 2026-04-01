@@ -1167,6 +1167,42 @@ p {
   opacity: 0.7;
 }
 
+/* ── Email Draft Panel ── */
+
+.email-draft-panel {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.email-draft-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.email-draft-textarea {
+  width: 100%;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  color: var(--text-bright);
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 12px;
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.email-draft-textarea:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
 /* ── Email Triage Panel ── */
 
 .email-triage-panel {
