@@ -60,7 +60,7 @@ function InitialsAvatar({ name, email }) {
   );
 }
 
-function EmailRow({ msg, isSelected, onSelect, onOpen, onArchive }) {
+function EmailRow({ msg, isSelected, onSelect, onOpen, onArchive, onQuickReply }) {
   const { name, email } = parseFrom(msg.from);
   const displayName = name || email;
 
@@ -123,6 +123,19 @@ function EmailRow({ msg, isSelected, onSelect, onOpen, onArchive }) {
       </div>
 
       {/* Quick actions */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onQuickReply(msg.id); }}
+        title="Draft reply"
+        style={{
+          background: "none", border: "none", cursor: "pointer",
+          color: "var(--text-dim)", fontSize: 14, padding: "4px 8px",
+          borderRadius: 4, flexShrink: 0,
+        }}
+        onMouseEnter={(e) => e.currentTarget.style.color = "var(--text-bright)"}
+        onMouseLeave={(e) => e.currentTarget.style.color = "var(--text-dim)"}
+      >
+        ↩
+      </button>
       <button
         onClick={(e) => { e.stopPropagation(); onArchive(msg.id); }}
         title="Dismiss (archive)"
@@ -399,6 +412,41 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
     }
   }, [openMessage, draft]);
 
+  // Open email and immediately start drafting a reply
+  const handleQuickReply = useCallback(async (messageId) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/email/${messageId}`);
+      const data = await res.json();
+      setOpenMessage(data);
+      setMessages((prev) =>
+        prev.map((m) => m.id === messageId ? { ...m, isUnread: false } : m)
+      );
+      // Kick off draft generation right away
+      setDraft("");
+      setDraftLoading(true);
+      setDraftSaved(false);
+      const draftRes = await fetch("/api/email/draft-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messageId: data.id,
+          subject: data.subject,
+          from: data.from,
+          body: data.body,
+          snippet: data.snippet,
+        }),
+      });
+      const draftData = await draftRes.json();
+      setDraft(draftData.draft || "");
+    } catch {
+      setDraft("Failed to generate draft. Try again.");
+    } finally {
+      setLoading(false);
+      setDraftLoading(false);
+    }
+  }, []);
+
   const handleConvertToTask = useCallback(async (message) => {
     try {
       const res = await fetch("/api/email", {
@@ -574,6 +622,7 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
             onSelect={handleSelect}
             onOpen={handleOpen}
             onArchive={handleArchive}
+            onQuickReply={handleQuickReply}
           />
         ))}
 
