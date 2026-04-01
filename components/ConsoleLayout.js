@@ -13,9 +13,7 @@ import OperatorStrip from "@/components/OperatorStrip";
  * Right bottom: Operator chat strip (resizable)
  */
 export default function ConsoleLayout({ tasks, emails, currentUser, greeting }) {
-  const [activeView, setActiveView] = useState(
-    emails?.length > 0 ? "email-triage" : "welcome"
-  );
+  const [activeView, setActiveView] = useState("dashboard");
   const [activeTaskId, setActiveTaskId] = useState(null);
   const [taskList, setTaskList] = useState(tasks || []);
   const [emailList, setEmailList] = useState(emails || []);
@@ -153,13 +151,17 @@ export default function ConsoleLayout({ tasks, emails, currentUser, greeting }) 
           <MainPanel
             view={activeView}
             activeTask={activeTask}
+            tasks={taskList}
             emails={emailList}
+            emailCount={emailList.length}
             currentUser={currentUser}
             onTaskComplete={handleTaskComplete}
             onTaskStart={handleTaskStart}
+            onTaskClick={handleTaskClick}
             onEmailTriaged={handleEmailTriaged}
             onEmailToTask={handleEmailToTask}
             onViewChange={handleViewChange}
+            greeting={greeting}
           />
         </div>
 
