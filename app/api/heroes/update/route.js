@@ -142,14 +142,19 @@ export async function PATCH(request) {
     }
 
     const slackWebhook = process.env.SLACK_SOP_WEBHOOK;
-    const displayName = heroName || sfId;
 
     // --- Look up hero record for task creation and notifications ---
     const { data: heroRecord } = await supabase
       .from("heroes")
-      .select("id, memorial_date, memorial_month, memorial_day")
+      .select("id, name, rank, first_name, last_name, memorial_date, memorial_month, memorial_day, family_contact_id, family_contacts(name, email)")
       .eq("sf_id", sfId)
       .single();
+
+    // Build display name from hero record or fallback to what client sent
+    const builtName = heroRecord
+      ? [heroRecord.rank, heroRecord.first_name, heroRecord.last_name].filter(Boolean).join(" ").trim() || heroRecord.name
+      : null;
+    const displayName = builtName || heroName || sfId;
 
     // --- Auto-create task when volunteer is assigned ---
     if (assignedToName) {
@@ -235,17 +240,7 @@ export async function PATCH(request) {
 
       // Slack notification — rich message with action links
       try {
-        // Look up family contact name
-        let familyName = null;
-        if (heroRecord?.id) {
-          const { data: famData } = await supabase
-            .from("family_contacts")
-            .select("name")
-            .eq("hero_id", heroRecord.id)
-            .limit(1)
-            .single();
-          familyName = famData?.name || null;
-        }
+        const familyName = heroRecord?.family_contacts?.name || null;
         const msg = buildAnniversaryAssignedMessage(
           displayName,
           heroRecord?.memorial_date,
