@@ -139,7 +139,7 @@ function OrderCard({ order, onItemStatusChange, section = "default" }) {
                 <th style={{ ...thStyle, textAlign: "center" }}>Qty</th>
                 <th style={thStyle}>Size</th>
                 {section !== "ship" && (
-                  <th style={thStyle}>{section === "laser" ? "SVG" : "Design"}</th>
+                  <th style={thStyle}>Design</th>
                 )}
                 <th style={thStyle}>Status</th>
               </tr>
@@ -163,21 +163,15 @@ function OrderCard({ order, onItemStatusChange, section = "default" }) {
                   </td>
                   {section !== "ship" && (
                     <td style={tdStyle}>
-                      {section === "laser" ? (
-                        item.designUrl ? (
-                          <a href={item.designUrl} target="_blank" rel="noopener"
-                            style={{ color: "var(--status-green)", textDecoration: "none", fontSize: 12, fontWeight: 600 }}>
-                            {"\u2B07"} Download
-                          </a>
-                        ) : (
-                          <span style={{ color: "var(--status-green)", fontSize: 11 }}>In SF</span>
-                        )
+                      {item.hasDesign && item.designUrl ? (
+                        <a href={item.designUrl} target="_blank" rel="noopener"
+                          style={{ color: "var(--status-green)", textDecoration: "none", fontSize: 11, fontWeight: 600 }}>
+                          {"\u2B07"} SVG
+                        </a>
+                      ) : item.hasDesign ? (
+                        <span style={{ color: "var(--status-green)", fontSize: 12 }}>{"\u2713"}</span>
                       ) : (
-                        item.hasDesign ? (
-                          <span style={{ color: "var(--status-green)", fontSize: 12 }}>{"\u2713"}</span>
-                        ) : (
-                          <span style={{ color: "var(--status-orange)", fontSize: 11 }}>Needed</span>
-                        )
+                        <span style={{ color: "var(--status-orange)", fontSize: 11 }}>Needed</span>
                       )}
                     </td>
                   )}
