@@ -328,8 +328,8 @@ export default async function AnniversariesPage({ searchParams }) {
         )}
       </DataCard>
 
-      {/* Bulk Actions Card */}
-      <DataCard title="Quick Actions">
+      {/* Workflow Card */}
+      <DataCard title="How It Works">
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <div
             style={{
@@ -341,10 +341,10 @@ export default async function AnniversariesPage({ searchParams }) {
             }}
           >
             <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-bright)", marginBottom: 4 }}>
-              Status Updates
+              1. Assign (App)
             </div>
             <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
-              Use the dropdown in each row to change status. Changes save to Salesforce immediately.
+              Use the dropdown to assign a volunteer. They get a Slack DM with instructions.
             </div>
           </div>
           <div
@@ -357,10 +357,10 @@ export default async function AnniversariesPage({ searchParams }) {
             }}
           >
             <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-bright)", marginBottom: 4 }}>
-              Volunteer Assignment
+              2. Draft & Send (Slack)
             </div>
             <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
-              Assign team members from the dropdown. Each volunteer can filter to see only their heroes.
+              Volunteers click "Create Draft" in their Slack DM, review in Gmail, then send or schedule.
             </div>
           </div>
           <div
@@ -373,10 +373,10 @@ export default async function AnniversariesPage({ searchParams }) {
             }}
           >
             <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-bright)", marginBottom: 4 }}>
-              Notes
+              3. Mark Done (Slack)
             </div>
             <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
-              Click "add note" in any row to leave notes. Press Enter or click Save. Saves to Salesforce.
+              After sending, volunteers click "Sent" or "Scheduled" in Slack. Status updates here automatically.
             </div>
           </div>
         </div>

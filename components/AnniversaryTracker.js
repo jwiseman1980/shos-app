@@ -3,14 +3,8 @@
 import { useState, useCallback, useEffect } from "react";
 import StatusBadge from "@/components/StatusBadge";
 
-// Simple status: Not Sent / Scheduled / Sent.
-// Assignment is tracked by the assignedTo field, not status.
-// "Research needed" is derived from: no family contact on file.
-const STATUS_OPTIONS = [
-  { value: "Not Sent", label: "Not Sent", key: "not_sent" },
-  { value: "Scheduled", label: "Scheduled", key: "scheduled" },
-  { value: "Sent", label: "Sent", key: "sent" },
-];
+// Status is read-only in the app — changes happen via Slack buttons.
+// Assignment is the only editable field here.
 
 function normalizeStatus(status) {
   if (!status) return "not_sent";
@@ -27,15 +21,13 @@ function statusLabel(status) {
   return "Not Sent";
 }
 
-function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onUpdate, senderIdentity }) {
+function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onUpdate }) {
   const [status, setStatus] = useState(hero.anniversaryStatus || "Not Started");
   const [assignedTo, setAssignedTo] = useState(hero.anniversaryAssignedTo || "");
   const [notes, setNotes] = useState(hero.anniversaryNotes || "");
   const [editingNotes, setEditingNotes] = useState(false);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
-  const [draftState, setDraftState] = useState(null); // null | "creating" | "created" | "error" | "no_family"
-
   const save = useCallback(async (fields) => {
     setSaving(true);
     setLastSaved(null);
@@ -60,12 +52,6 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
     }
   }, [hero.sfId, onUpdate]);
 
-  const handleStatusChange = (e) => {
-    const newStatus = e.target.value;
-    setStatus(newStatus);
-    save({ status: newStatus, heroName: hero.fullName.replace(/\s*\(.*?\)\s*/, "") });
-  };
-
   const handleAssignChange = (e) => {
     const newAssign = e.target.value;
     setAssignedTo(newAssign);
@@ -75,45 +61,6 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
   const handleNotesSave = () => {
     setEditingNotes(false);
     save({ notes });
-  };
-
-  const handleCreateDraft = async () => {
-    if (!senderIdentity) return;
-    if (!hero.familyContactId) {
-      setDraftState("no_family");
-      setTimeout(() => setDraftState(null), 3000);
-      return;
-    }
-    setDraftState("creating");
-    try {
-      const res = await fetch("/api/anniversaries/draft-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          heroName: hero.fullName.replace(/\s*\(.*?\)\s*/, ""),
-          branch: hero.serviceCode,
-          years: hero.years,
-          memorialDate: hero.memorialDate,
-          familyEmail: hero.familyContactEmail,
-          familyName: hero.familyContactName,
-          senderEmail: senderIdentity.email,
-          senderName: senderIdentity.name,
-          sfId: hero.sfId,
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setDraftState("created");
-        // Auto-update status to "In Progress"
-        setStatus("In Progress");
-        save({ status: "In Progress", heroName: hero.fullName.replace(/\s*\(.*?\)\s*/, "") });
-      } else {
-        setDraftState("error");
-      }
-    } catch {
-      setDraftState("error");
-    }
-    setTimeout(() => setDraftState(null), 4000);
   };
 
   const normStatus = normalizeStatus(status);
@@ -190,39 +137,33 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
         </select>
       </td>
 
-      {/* Status — Dropdown */}
+      {/* Status — Read-only badge (status changes happen in Slack) */}
       <td>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <select
-            value={statusLabel(status)}
-            onChange={handleStatusChange}
+          <span
             style={{
-              background: "var(--bg)",
-              color: "var(--text-bright)",
-              border: "1px solid var(--card-border)",
-              borderRadius: "var(--radius-sm)",
-              padding: "3px 6px",
               fontSize: 11,
-              cursor: "pointer",
+              fontWeight: 600,
+              padding: "3px 8px",
+              borderRadius: "var(--radius-sm)",
+              whiteSpace: "nowrap",
+              background:
+                normStatus === "sent" ? "rgba(34, 197, 94, 0.15)" :
+                normStatus === "scheduled" ? "rgba(59, 130, 246, 0.15)" :
+                "rgba(245, 158, 11, 0.1)",
+              color:
+                normStatus === "sent" ? "var(--status-green)" :
+                normStatus === "scheduled" ? "var(--status-blue)" :
+                "var(--status-orange)",
             }}
           >
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+            {statusLabel(status)}
+          </span>
           {saving && (
             <span style={{ fontSize: 10, color: "var(--gold)" }}>saving...</span>
           )}
           {lastSaved === "saved" && (
             <span style={{ fontSize: 10, color: "var(--status-green)" }}>saved</span>
-          )}
-          {lastSaved === "offline" && (
-            <span style={{ fontSize: 10, color: "var(--status-orange)" }}>offline</span>
-          )}
-          {lastSaved === "error" && (
-            <span style={{ fontSize: 10, color: "var(--status-red)" }}>failed</span>
           )}
         </div>
       </td>
@@ -284,7 +225,7 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
         )}
       </td>
 
-      {/* Draft Email */}
+      {/* Contact Info */}
       <td>
         {!hero.familyContactId ? (
           <span
@@ -297,35 +238,14 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
               borderRadius: "var(--radius-sm)",
               whiteSpace: "nowrap",
             }}
-            title="No family contact — research task for Joseph"
+            title="No family contact on file"
           >
             Research Needed
           </span>
-        ) : draftState === "creating" ? (
-          <span style={{ fontSize: 10, color: "var(--gold)" }}>creating...</span>
-        ) : draftState === "created" ? (
-          <span style={{ fontSize: 10, color: "var(--status-green)" }}>draft created</span>
-        ) : draftState === "error" ? (
-          <span style={{ fontSize: 10, color: "var(--status-red)" }}>failed</span>
         ) : (
-          <button
-            onClick={handleCreateDraft}
-            disabled={!senderIdentity}
-            style={{
-              background: senderIdentity ? "var(--gold)" : "var(--card-border)",
-              color: senderIdentity ? "#000" : "var(--text-dim)",
-              border: "none",
-              borderRadius: "var(--radius-sm)",
-              padding: "3px 8px",
-              fontSize: 10,
-              fontWeight: 600,
-              cursor: senderIdentity ? "pointer" : "not-allowed",
-              whiteSpace: "nowrap",
-            }}
-            title={senderIdentity ? `Create draft in ${senderIdentity.email}` : "Not logged in"}
-          >
-            Create Draft
-          </button>
+          <span style={{ fontSize: 11, color: "var(--text-dim)" }} title={hero.familyContactEmail || ""}>
+            {hero.familyContactName || "On file"}
+          </span>
         )}
       </td>
     </tr>
@@ -341,11 +261,6 @@ export default function AnniversaryTracker({
   currentUser,
 }) {
   const [heroData, setHeroData] = useState(heroes);
-
-  // Derive sender identity from the logged-in user
-  const senderIdentity = currentUser?.email
-    ? { email: currentUser.email, name: currentUser.name || currentUser.email.split("@")[0] }
-    : null;
 
   // Sync heroData when heroes prop changes (e.g. month switch)
   useEffect(() => {
@@ -376,20 +291,11 @@ export default function AnniversaryTracker({
 
   return (
     <div style={{ overflowX: "auto" }}>
-      {/* Logged-in user indicator */}
+      {/* Workflow note */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, padding: "8px 0" }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          Sending as:
+        <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
+          Assign volunteers here. Drafts, sending, and status updates happen in Slack.
         </span>
-        {senderIdentity ? (
-          <span style={{ fontSize: 12, color: "var(--status-green)" }}>
-            {senderIdentity.name} ({senderIdentity.email})
-          </span>
-        ) : (
-          <span style={{ fontSize: 12, color: "var(--status-red)" }}>
-            Not logged in
-          </span>
-        )}
       </div>
 
       <table className="data-table">
@@ -402,7 +308,7 @@ export default function AnniversaryTracker({
             <th>Assigned To</th>
             <th>Status</th>
             <th>Notes</th>
-            <th>Email</th>
+            <th>Family Contact</th>
           </tr>
         </thead>
         <tbody>
@@ -422,7 +328,6 @@ export default function AnniversaryTracker({
                 monthName={monthName}
                 volunteers={volunteers}
                 onUpdate={handleUpdate}
-                senderIdentity={senderIdentity}
               />
             );
           })}
