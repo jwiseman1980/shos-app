@@ -1,4 +1,4 @@
-import { getHeroes, getHeroStats, getAnniversariesByMonth } from '@/lib/data/heroes';
+import { getHeroes, getHeroStats, getAnniversariesByMonth, getEventMemorials, getEventMemorialsByMonth } from '@/lib/data/heroes';
 
 function checkApiKey(request) {
   const apiKey = request.headers.get('x-api-key');
@@ -23,8 +23,16 @@ export async function GET(request) {
 
     if (action === 'anniversaries') {
       const month = parseInt(searchParams.get('month') || new Date().getMonth() + 1);
+      const includeEvents = searchParams.get('includeEvents') === 'true';
       const heroes = await getAnniversariesByMonth(month);
-      return Response.json({ success: true, count: heroes.length, data: heroes });
+      const events = includeEvents ? await getEventMemorialsByMonth(month) : [];
+      return Response.json({ success: true, count: heroes.length, data: heroes, ...(events.length && { events }) });
+    }
+
+    if (action === 'event-memorials') {
+      const month = searchParams.get('month');
+      const events = month ? await getEventMemorialsByMonth(parseInt(month)) : await getEventMemorials();
+      return Response.json({ success: true, count: events.length, data: events });
     }
 
     // Search heroes by name or SKU

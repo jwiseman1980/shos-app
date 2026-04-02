@@ -108,7 +108,7 @@ CREATE TABLE users (
   initials TEXT,
   is_admin BOOLEAN DEFAULT FALSE,
   is_active BOOLEAN DEFAULT TRUE,
-  slack_user_id TEXT,                         -- Slack member ID for bot DMs
+  slack_user_id TEXT,                          -- Slack member ID for bot DMs
   last_login_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -184,6 +184,7 @@ CREATE TABLE heroes (
   memorial_month INTEGER,                     -- 1-12
   memorial_day INTEGER,                       -- 1-31
   incident TEXT,
+  memorial_type TEXT DEFAULT 'individual',     -- individual, class, incident (filters anniversary cycle)
   -- Status
   active_listing BOOLEAN DEFAULT FALSE,       -- CRITICAL: only true = visible on website
   bracelet_sent BOOLEAN DEFAULT FALSE,
