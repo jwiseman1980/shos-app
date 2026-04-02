@@ -41,6 +41,7 @@ export default function TaskSidebar({
   greeting,
   collapsed,
   onToggleCollapse,
+  isFounder,
 }) {
   const pathname = usePathname();
   const today = new Date().toISOString().split("T")[0];
@@ -168,6 +169,15 @@ export default function TaskSidebar({
             </Link>
           );
         })}
+        {isFounder && (
+          <Link
+            href="/gyst/properties"
+            className={`task-sidebar-nav-item${pathname.startsWith("/gyst") ? " active" : ""}`}
+          >
+            <span className="task-sidebar-nav-icon">{"⊕"}</span>
+            <span>GYST</span>
+          </Link>
+        )}
       </div>
 
       {/* Grouped task sections */}

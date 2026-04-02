@@ -137,6 +137,7 @@ export default function ConsoleShell({ user, tasks, calendarEvents, emails, gree
         greeting={greeting}
         collapsed={!sidebarOpen}
         onToggleCollapse={() => setSidebarOpen((v) => !v)}
+        isFounder={user?.isFounder || false}
       />
 
       {/* Main area — content + resizer + operator */}
