@@ -15,6 +15,23 @@ export default async function SocialMediaPage() {
       <div className="page-header">
         <h1 className="page-title">Social Media</h1>
         <p className="page-subtitle">Daily engagement hub — SOP-001</p>
+        <Link
+          href="/comms/social/dashboard"
+          style={{
+            display: "inline-block",
+            marginTop: 8,
+            fontSize: 12,
+            padding: "6px 14px",
+            background: "rgba(142, 68, 173, 0.15)",
+            color: "#8e44ad",
+            border: "1px solid rgba(142, 68, 173, 0.3)",
+            borderRadius: "var(--radius-md)",
+            textDecoration: "none",
+            fontWeight: 600,
+          }}
+        >
+          Open Analytics Dashboard &rarr;
+        </Link>
       </div>
 
       {/* Quick Stats */}
@@ -104,6 +121,11 @@ export default async function SocialMediaPage() {
             href="/memorials"
             label="Memorial Pages"
             sub="Hero memorial content"
+          />
+          <QuickLink
+            href="/comms/social/dashboard"
+            label="Analytics Dashboard"
+            sub="Followers, growth, top posts"
           />
         </div>
       </div>

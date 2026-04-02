@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const FINANCE_TABS = [
   { href: "/finance", label: "Overview", exact: true },
+  { href: "/finance/dashboard", label: "KPI Dashboard" },
   { href: "/finance/report", label: "Monthly Report" },
   { href: "/finance/disbursements", label: "Disbursements" },
   { href: "/finance/recon", label: "Recon Matrix" },

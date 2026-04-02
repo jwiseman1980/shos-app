@@ -236,6 +236,40 @@ function EmailDetail({ message, onBack, onArchive, onReply, onTask, draftLoading
         </div>
       </div>
 
+      {/* Attachments */}
+      {message.attachments?.length > 0 && (
+        <div style={{
+          padding: "8px 16px",
+          borderBottom: "1px solid var(--card-border)",
+          display: "flex", flexWrap: "wrap", gap: 8,
+        }}>
+          {message.attachments.map((att, i) => (
+            <div key={i} style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "6px 10px", borderRadius: 6,
+              background: "var(--card-bg)", border: "1px solid var(--card-border)",
+              fontSize: 12, color: "var(--text-bright)",
+            }}>
+              <span style={{ fontSize: 14 }}>
+                {att.mimeType?.startsWith("image/") ? "🖼️" :
+                 att.mimeType === "application/pdf" ? "📄" :
+                 att.mimeType?.includes("spreadsheet") || att.mimeType?.includes("excel") ? "📊" :
+                 att.mimeType?.includes("word") || att.mimeType?.includes("document") ? "📝" :
+                 "📎"}
+              </span>
+              <span style={{ fontWeight: 500 }}>{att.filename}</span>
+              {att.size > 0 && (
+                <span style={{ color: "var(--text-dim)", fontSize: 11 }}>
+                  ({att.size > 1048576
+                    ? `${(att.size / 1048576).toFixed(1)} MB`
+                    : `${Math.round(att.size / 1024)} KB`})
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Body */}
       <div style={{
         flex: 1, overflow: "auto", padding: 16,

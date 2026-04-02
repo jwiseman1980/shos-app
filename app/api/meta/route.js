@@ -52,7 +52,7 @@ export async function GET(request) {
 
       case "ig_profile": {
         const profile = await getInstagramProfile();
-        persistProfileSnapshot(profile).catch(() => {});
+        persistProfileSnapshot("instagram", profile).catch(() => {});
         return NextResponse.json({ success: true, profile });
       }
 
@@ -76,7 +76,7 @@ export async function GET(request) {
           getInstagramPosts(5).catch(() => []),
         ]);
         // Persist in background — never blocks response
-        if (igProfile) persistProfileSnapshot(igProfile).catch(() => {});
+        if (igProfile) persistProfileSnapshot("instagram", igProfile).catch(() => {});
         if (fbPosts.length) persistPosts("facebook", fbPosts).catch(() => {});
         if (igPosts.length) persistPosts("instagram", igPosts).catch(() => {});
         return NextResponse.json({
