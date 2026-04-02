@@ -157,6 +157,7 @@ Available mutation endpoints:
 - POST /api/tasks — create a task. Body: { title, description, status, priority, role, domain, hero_id, due_date, tags }
 - POST /api/engagements — log an engagement. Body: { type, subject, description, outcome, follow_up_needed, follow_up_date }
 - POST /api/messages/draft-batch — create Gmail drafts for all eligible families with messages. Body: { heroIds?: string[] } (optional: specific heroes, omit for all eligible)
+- POST /api/orders — create a donated bracelet order. Body: { heroName, recipientName, recipientEmail?, quantity6?, quantity7?, source?, notes?, sku?, shippingName?, shippingAddress1?, shippingCity?, shippingState?, shippingPostal?, shippingCountry? }. Auto-triages: checks design availability (→ ready_to_laser) and burnout stock (→ ready_to_ship), otherwise → design_needed. Creates one order per recipient. Use app_query on /api/heroes?search=NAME to look up hero name and SKU first. Use supabase_query on contacts to look up recipient addresses.
 - PATCH /api/orders — advance a bracelet order item's production status. Body: { itemId, status, heroName? }. Valid statuses: not_started → design_needed → ready_to_laser → in_production → ready_to_ship → shipped. Use supabase_query on order_items (join orders via order_id) to find itemId first. Triggers Slack notifications and shipping email automatically.
 
 Always confirm with the user before making bulk mutations (e.g., assigning 20 heroes at once). Single updates are fine without confirmation.`,
@@ -805,18 +806,9 @@ async function handleToolCall(role, toolName, toolInput) {
 // ---------------------------------------------------------------------------
 
 function classifyTask(messages) {
-  const lastUser = [...messages].reverse().find(m => m.role === "user");
-  const text = typeof lastUser?.content === "string"
-    ? lastUser.content
-    : JSON.stringify(lastUser?.content || "");
-  const complexKeywords = [
-    "draft", "write", "plan", "triage", "analyze", "research",
-    "summarize", "help me", "anniversary", "figure out", "review", "prepare",
-    "populate", "import", "extract", "process", "from the email", "from the attachment",
-    "explain", "how do i", "what should", "recommend",
-  ];
-  const isComplex = complexKeywords.some(kw => text.toLowerCase().includes(kw));
-  return isComplex ? "claude-sonnet-4-6" : "claude-haiku-4-5";
+  // All tasks now route to Sonnet for better tool use and reasoning.
+  // Haiku routing was causing rate limits and poor multi-step execution.
+  return "claude-sonnet-4-6";
 }
 
 // ---------------------------------------------------------------------------
