@@ -66,7 +66,7 @@ CREATE TYPE volunteer_status AS ENUM (
 
 CREATE TYPE anniversary_status AS ENUM (
   'not_started', 'prep', 'assigned', 'email_drafted', 'email_sent',
-  'social_posted', 'complete', 'skipped'
+  'sent', 'scheduled', 'social_posted', 'complete', 'skipped'
 );
 
 CREATE TYPE engagement_type AS ENUM (
