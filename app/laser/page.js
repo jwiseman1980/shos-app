@@ -23,16 +23,19 @@ const PRODUCTION_PRESETS = [
 ];
 
 const STANDARD_ENGRAVE = {
-  preset: "Success 6",
+  preset: "Success 9",
   material: '5/64" (2mm) 304 Stainless Steel',
   mode: "Engrave",
   power: 31,
   speed: 2500,
-  passes: 2,
+  passes: 1,
   linesCm: 300,
   engraving: "Bi-directional",
   pulseWidth: 500,
   frequency: 60,
+  crossHatch: true,
+  outlineTracing: false,
+  engravingAngle: "0 (Incremental)",
 };
 
 const BED_POSITIONS = [
@@ -146,7 +149,7 @@ export default async function LaserPage() {
 
       {/* Standard Engrave Settings */}
       <div className="section" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <DataCard title="Standard Engrave — Success 6">
+        <DataCard title={`Standard Engrave — ${STANDARD_ENGRAVE.preset}`}>
           <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 12 }}>
             Production preset for regular (non-color) bracelet engraving.
           </div>
@@ -162,6 +165,9 @@ export default async function LaserPage() {
                 ["Engraving", STANDARD_ENGRAVE.engraving],
                 ["Pulse Width", `${STANDARD_ENGRAVE.pulseWidth} ns`],
                 ["Frequency", `${STANDARD_ENGRAVE.frequency} kHz`],
+                ["Cross Hatch", STANDARD_ENGRAVE.crossHatch ? "On" : "Off"],
+                ["Outline Tracing", STANDARD_ENGRAVE.outlineTracing ? "On" : "Off"],
+                ["Engraving Angle", STANDARD_ENGRAVE.engravingAngle],
               ].map(([label, value]) => (
                 <tr key={label} style={{ borderBottom: "1px solid var(--card-border)" }}>
                   <td style={{ ...tdStyle, color: "var(--text-dim)", width: "40%" }}>{label}</td>
