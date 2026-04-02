@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { verifyActionUrl, notifyWithDm } from "@/lib/slack-actions";
+import { verifyActionUrl, notifyWithDm, sendSlackDm, buildDesignQueueMessage, buildDesignUploadedMessage } from "@/lib/slack-actions";
 import { updateItemStatus } from "@/lib/data/orders";
 import { getServerClient } from "@/lib/supabase";
+import { getOrderDesignQueue } from "@/lib/data/designs";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://shos-app.vercel.app";
 
@@ -39,6 +40,14 @@ export async function GET(request) {
 
     if (action === "mark_scheduled") {
       return await handleMarkScheduled(params);
+    }
+
+    if (action === "upload_design_page") {
+      return await handleUploadDesignPage(params);
+    }
+
+    if (action === "view_design_queue") {
+      return await handleViewDesignQueue();
     }
 
     return new Response(buildHtml("Unknown Action", `Action "${action}" is not recognized.`), {
@@ -253,6 +262,46 @@ async function handleMarkScheduled(params) {
     status: 200,
     headers: { "Content-Type": "text/html" },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Design Queue Actions (Ryan's Slack-first workflow)
+// ---------------------------------------------------------------------------
+
+async function handleUploadDesignPage(params) {
+  const { sku, name } = params;
+  // Redirect Ryan to the upload page in the app with SKU pre-filled
+  const uploadUrl = `${APP_URL}/designs?upload=${encodeURIComponent(sku || "")}`;
+  return new Response(buildHtml(
+    "Upload Design",
+    `Upload the completed SVG design for ${name || sku || "this hero"}.`,
+    uploadUrl,
+  ), {
+    status: 200,
+    headers: { "Content-Type": "text/html" },
+  });
+}
+
+async function handleViewDesignQueue() {
+  // Build a fresh queue summary and redirect to the app
+  try {
+    const queue = await getOrderDesignQueue();
+    const items = queue.filter(q => !q.hasDesign).map(q => ({
+      sku: q.sku,
+      heroName: q.heroName,
+      size: q.size,
+      heroId: q.heroId,
+      orderCount: 1,
+    }));
+
+    // Also DM Ryan the queue summary
+    const msg = buildDesignQueueMessage(items);
+    await sendSlackDm("ryan.santana@steel-hearts.org", msg);
+  } catch {
+    // Best effort
+  }
+
+  return Response.redirect(`${APP_URL}/designs`, 302);
 }
 
 // ---------------------------------------------------------------------------

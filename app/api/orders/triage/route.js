@@ -4,12 +4,9 @@ import {
   buildDesignNeededMessage,
   buildReadyToLaserMessage,
   buildReadyToShipMessage,
+  sendSlackDm,
   notifyWithDm,
 } from "@/lib/slack-actions";
-
-const SLACK_DM_JOSEPH = process.env.SLACK_DM_JOSEPH;
-const SLACK_DM_RYAN = process.env.SLACK_DM_RYAN;
-const SLACK_DM_KRISTIN = process.env.SLACK_DM_KRISTIN;
 
 export const dynamic = "force-dynamic";
 
@@ -36,17 +33,17 @@ async function handler(request) {
     if (result.results) {
       for (const item of result.results) {
         if (item.action === "advanced") {
-          // Design exists → ready to laser → DM Joseph with download + action links
+          // Design exists → ready to laser → DM Joseph
           const msg = buildReadyToLaserMessage(item.name, item.name, null, [item.id]);
-          await notifyWithDm(msg, SLACK_DM_JOSEPH);
+          await sendSlackDm("joseph.wiseman@steel-hearts.org", msg);
         } else if (item.action === "fromStock") {
-          // Burnout stock → ready to ship → DM Kristin with ship link
+          // Burnout stock → ready to ship → DM Kristin
           const msg = buildReadyToShipMessage("", `${item.name} (from stock, ${item.stockAfter} remaining)`, [item.id]);
-          await notifyWithDm(msg, SLACK_DM_KRISTIN);
+          await sendSlackDm("kristin.hughes@steel-hearts.org", msg);
         } else if (item.action === "needsDesign") {
-          // No design → DM Ryan with upload link
-          const msg = buildDesignNeededMessage(item.name, item.name, null, 1);
-          await notifyWithDm(msg, SLACK_DM_RYAN);
+          // No design → DM Ryan with rich design-needed message
+          const msg = buildDesignNeededMessage(item.name, item.sku || item.name, item.size, 1, item.heroId);
+          await sendSlackDm("ryan.santana@steel-hearts.org", msg);
         }
       }
     }
