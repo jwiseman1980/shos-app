@@ -194,6 +194,27 @@ export async function PATCH(request) {
         const msg = buildDesignNeededMessage(name, heroName || "", null, 1);
         await notifyPerson(msg, SLACK_DM_RYAN);
       } else if (status === "ready_to_ship") {
+        // Decrement blank bracelet inventory (a blank was consumed during laser)
+        try {
+          const sb = getServerClient();
+          const { data: item } = await sb
+            .from("order_items")
+            .select("lineitem_sku, quantity")
+            .eq("id", itemId)
+            .single();
+          if (item) {
+            const is6 = /-6D?$/i.test(item.lineitem_sku || "");
+            const qty = item.quantity || 1;
+            const field = is6 ? "decrement_6in" : "decrement_7in";
+            await fetch(new URL("/api/inventory/blanks", request.url).href, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ [field]: qty }),
+            });
+          }
+        } catch (blankErr) {
+          console.warn("Blank stock decrement failed:", blankErr.message);
+        }
         // Notify Kristin with ship action link
         const msg = buildReadyToShipMessage("", name, [itemId]);
         await notifyPerson(msg, SLACK_DM_KRISTIN);

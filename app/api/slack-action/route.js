@@ -75,9 +75,34 @@ async function handleAdvanceOrder(params) {
     if (result.success) updated++;
   }
 
-  // Trigger downstream Slack notifications via the orders API
-  // (the PATCH handler in /api/orders already does this, but we called updateItemStatus directly)
-  // Post a confirmation instead
+  // Decrement blank stock when laser is done (ready_to_ship)
+  if (to === "ready_to_ship") {
+    try {
+      const sb = getServerClient();
+      for (const id of itemIds) {
+        const { data: item } = await sb
+          .from("order_items")
+          .select("lineitem_sku, quantity")
+          .eq("id", id)
+          .single();
+        if (item) {
+          const is6 = /-6D?$/i.test(item.lineitem_sku || "");
+          const qty = item.quantity || 1;
+          const current = await (await fetch(`${APP_URL}/api/inventory/blanks`)).json();
+          const field = is6 ? "blanks_6in" : "blanks_7in";
+          const newVal = Math.max(0, (current[field] || 0) - qty);
+          await fetch(`${APP_URL}/api/inventory/blanks`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ [field]: newVal }),
+          });
+        }
+      }
+    } catch (blankErr) {
+      console.warn("Blank stock decrement failed:", blankErr.message);
+    }
+  }
+
   const statusLabels = {
     in_production: "laser started",
     ready_to_ship: "ready to ship",
