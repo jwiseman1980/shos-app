@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import TaskDetail from "@/components/TaskDetail";
 import EmailInbox from "@/components/EmailInbox";
 import MorningBriefing from "@/components/MorningBriefing";
+import AnniversaryDetail from "@/components/AnniversaryDetail";
 
 /**
  * Main Panel — the large content area in the console.
@@ -35,6 +36,18 @@ export default function MainPanel({
         <EmailInbox
           initialMessages={initialEmails}
           onEmailToTask={onEmailToTask}
+        />
+      </div>
+    );
+  }
+
+  if (view === "anniversary-detail" && activeTask) {
+    return (
+      <div style={{ padding: 16, height: "100%", overflowY: "auto" }}>
+        <AnniversaryDetail
+          task={activeTask}
+          onComplete={onTaskComplete}
+          onBack={() => onViewChange?.("welcome")}
         />
       </div>
     );

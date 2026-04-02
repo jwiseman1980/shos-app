@@ -92,7 +92,7 @@ export default function ConsoleShell({ user, tasks, calendarEvents, emails, gree
   // Task handlers
   const handleTaskClick = useCallback((task) => {
     setActiveTaskId(task.id);
-    setActiveView("task-detail");
+    setActiveView(task.sourceType === "anniversary" ? "anniversary-detail" : "task-detail");
   }, []);
 
   const handleTaskComplete = useCallback((taskId) => {
