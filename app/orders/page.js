@@ -189,7 +189,7 @@ export default async function OrdersPage() {
             showDownload
             showDone
             doneStatus="ready_to_ship"
-            doneLabel="\u2713 Done"
+            doneLabel="✓ Done"
             doneColor="var(--status-blue)"
           />
           <PipelineColumn
@@ -200,7 +200,7 @@ export default async function OrdersPage() {
             emptyText="Nothing to ship"
             showDone
             doneStatus="shipped"
-            doneLabel="\u{1F4E6} Shipped"
+            doneLabel="📦 Shipped"
             doneColor="var(--status-green)"
           />
         </div>

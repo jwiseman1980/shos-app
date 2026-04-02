@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-export default function LaserDoneButton({ itemId, heroName, toStatus = "ready_to_ship", label = "\u2713 Done", color = "var(--status-blue)" }) {
+export default function LaserDoneButton({ itemId, heroName, toStatus = "ready_to_ship", label = "✓ Done", color = "var(--status-blue)" }) {
   const [state, setState] = useState("idle"); // idle | saving | done
 
   async function handleDone(e) {
