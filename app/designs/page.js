@@ -90,8 +90,8 @@ export default async function DesignsPage() {
         />
         <StatBlock
           label="In Catalog"
-          value={catalogDesigns.length}
-          note="Completed designs in storage"
+          value={new Set(catalogDesigns.map(d => d.baseSku)).size}
+          note={`${catalogDesigns.length} files`}
           accent="var(--gold)"
         />
       </div>

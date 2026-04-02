@@ -2,21 +2,44 @@
 
 import { useState, useMemo } from "react";
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://shos-app.vercel.app";
+/**
+ * Group designs by base SKU so 6" and 7" appear on one row.
+ */
+function groupByHero(designs) {
+  const map = new Map();
+  for (const d of designs) {
+    const key = d.baseSku || d.sku;
+    if (!map.has(key)) {
+      map.set(key, { baseSku: key, heroName: d.heroName, sizes: {} });
+    }
+    const group = map.get(key);
+    if (!group.heroName && d.heroName) group.heroName = d.heroName;
+    if (d.size) {
+      group.sizes[d.size] = d.sku;
+    } else {
+      // Base file with no size suffix
+      group.sizes["base"] = d.sku;
+    }
+  }
+  return Array.from(map.values()).sort((a, b) =>
+    (a.heroName || a.baseSku).localeCompare(b.heroName || b.baseSku)
+  );
+}
 
 export default function DesignCatalog({ designs = [] }) {
   const [search, setSearch] = useState("");
 
+  const grouped = useMemo(() => groupByHero(designs), [designs]);
+
   const filtered = useMemo(() => {
-    if (!search.trim()) return designs;
+    if (!search.trim()) return grouped;
     const q = search.toLowerCase();
-    return designs.filter(
-      (d) =>
-        d.name.toLowerCase().includes(q) ||
-        (d.heroName && d.heroName.toLowerCase().includes(q)) ||
-        d.sku.toLowerCase().includes(q)
+    return grouped.filter(
+      (g) =>
+        g.baseSku.toLowerCase().includes(q) ||
+        (g.heroName && g.heroName.toLowerCase().includes(q))
     );
-  }, [designs, search]);
+  }, [grouped, search]);
 
   if (designs.length === 0) {
     return (
@@ -32,7 +55,7 @@ export default function DesignCatalog({ designs = [] }) {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name, SKU, or hero..."
+          placeholder="Search by name or SKU..."
           style={{
             width: "100%",
             maxWidth: 400,
@@ -46,7 +69,7 @@ export default function DesignCatalog({ designs = [] }) {
           }}
         />
         <span style={{ fontSize: 11, color: "var(--text-dim)", marginLeft: 12 }}>
-          {filtered.length} of {designs.length} designs
+          {filtered.length} of {grouped.length} heroes
         </span>
       </div>
 
@@ -63,48 +86,51 @@ export default function DesignCatalog({ designs = [] }) {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ position: "sticky", top: 0, background: "var(--card-bg)", zIndex: 1 }}>
-              <th style={thStyle}>SKU</th>
               <th style={thStyle}>Hero</th>
-              <th style={thStyle}>Size</th>
-              <th style={thStyle}>File</th>
-              <th style={thStyle}>Download</th>
+              <th style={thStyle}>SKU</th>
+              <th style={thStyle}>Downloads</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((d) => (
-              <tr key={d.name} style={{ borderBottom: "1px solid var(--card-border)" }}>
-                <td style={tdStyle}>
-                  <span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--text-dim)" }}>
-                    {d.sku}
-                  </span>
-                </td>
+            {filtered.map((g) => (
+              <tr key={g.baseSku} style={{ borderBottom: "1px solid var(--card-border)" }}>
                 <td style={tdStyle}>
                   <span style={{ fontWeight: 500, color: "var(--text-bright)", fontSize: 13 }}>
-                    {d.heroName || d.sku}
+                    {g.heroName || g.baseSku}
                   </span>
                 </td>
-                <td style={{ ...tdStyle, fontSize: 12, color: "var(--text-dim)" }}>
-                  {d.size === "6" ? '6"' : d.size === "7" ? '7"' : "—"}
-                </td>
-                <td style={{ ...tdStyle, fontSize: 11, color: "var(--text-dim)" }}>
-                  {d.name}
+                <td style={tdStyle}>
+                  <span style={{ fontSize: 11, fontFamily: "monospace", color: "var(--text-dim)" }}>
+                    {g.baseSku}
+                  </span>
                 </td>
                 <td style={tdStyle}>
-                  <a
-                    href={`/api/designs/download?sku=${encodeURIComponent(d.sku)}`}
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: "var(--status-blue)",
-                      textDecoration: "none",
-                      padding: "3px 10px",
-                      border: "1px solid var(--status-blue)",
-                      borderRadius: 4,
-                      display: "inline-block",
-                    }}
-                  >
-                    ↓ SVG
-                  </a>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {g.sizes["7"] && (
+                      <a
+                        href={`/api/designs/download?sku=${encodeURIComponent(g.sizes["7"])}`}
+                        style={linkStyle}
+                      >
+                        ↓ 7"
+                      </a>
+                    )}
+                    {g.sizes["6"] && (
+                      <a
+                        href={`/api/designs/download?sku=${encodeURIComponent(g.sizes["6"])}`}
+                        style={linkStyle}
+                      >
+                        ↓ 6"
+                      </a>
+                    )}
+                    {g.sizes["base"] && !g.sizes["7"] && !g.sizes["6"] && (
+                      <a
+                        href={`/api/designs/download?sku=${encodeURIComponent(g.sizes["base"])}`}
+                        style={linkStyle}
+                      >
+                        ↓ SVG
+                      </a>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -124,4 +150,15 @@ const thStyle = {
   letterSpacing: "0.05em",
   color: "var(--text-dim)",
   textAlign: "left",
+};
+const linkStyle = {
+  fontSize: 11,
+  fontWeight: 600,
+  color: "var(--status-blue)",
+  textDecoration: "none",
+  padding: "3px 10px",
+  border: "1px solid var(--status-blue)",
+  borderRadius: 4,
+  display: "inline-block",
+  whiteSpace: "nowrap",
 };
