@@ -10,6 +10,7 @@
 
 import { getServerClient } from "@/lib/supabase";
 import { sfQuery } from "@/lib/salesforce";
+import { triageNeedsDecision } from "@/lib/data/orders";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -206,15 +207,28 @@ export async function GET(request) {
     synced++;
   }
 
+  // Auto-triage any not_started items so they advance immediately
+  let triageResult = null;
+  if (synced > 0) {
+    try {
+      triageResult = await triageNeedsDecision();
+    } catch (e) {
+      console.error("Post-sync triage failed:", e.message);
+    }
+  }
+
   // Post to Slack
   const slackWebhook = process.env.SLACK_SOP_WEBHOOK;
   if (slackWebhook && synced > 0) {
     try {
+      const triageNote = triageResult
+        ? ` → ${triageResult.advanced} to laser, ${triageResult.fromStock} from stock, ${triageResult.needsDesign} need design`
+        : "";
       await fetch(slackWebhook, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text: `Order sync: ${synced} new order(s) from Squarespace via SF`,
+          text: `Order sync: ${synced} new order(s) from Squarespace via SF${triageNote}`,
         }),
       });
     } catch {}
@@ -227,5 +241,8 @@ export async function GET(request) {
     errors,
     latestOrderNumber: latestNum,
     sfOrdersFound: sfOrders.length,
+    triage: triageResult
+      ? { advanced: triageResult.advanced, fromStock: triageResult.fromStock, needsDesign: triageResult.needsDesign }
+      : null,
   });
 }

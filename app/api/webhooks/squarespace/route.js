@@ -12,6 +12,7 @@
  */
 
 import { getServerClient } from "@/lib/supabase";
+import { triageNeedsDecision } from "@/lib/data/orders";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -192,15 +193,26 @@ export async function POST(request) {
       }
     }
 
+    // Auto-triage so the order advances immediately
+    let triageResult = null;
+    try {
+      triageResult = await triageNeedsDecision();
+    } catch (e) {
+      console.warn("Post-webhook triage failed:", e.message);
+    }
+
     // Post to Slack if configured
     const slackWebhook = process.env.SLACK_SOP_WEBHOOK;
     if (slackWebhook) {
       try {
+        const triageNote = triageResult
+          ? ` → ${triageResult.advanced} to laser, ${triageResult.fromStock} from stock, ${triageResult.needsDesign} need design`
+          : "";
         await fetch(slackWebhook, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            text: `🛒 New Squarespace order #${orderNumber}: ${itemResults.length} item(s) for ${billingName || shippingName || "unknown"}`,
+            text: `🛒 New Squarespace order #${orderNumber}: ${itemResults.length} item(s) for ${billingName || shippingName || "unknown"}${triageNote}`,
           }),
         });
       } catch {}
@@ -211,6 +223,9 @@ export async function POST(request) {
       orderId: order.id,
       orderNumber,
       items: itemResults,
+      triage: triageResult
+        ? { advanced: triageResult.advanced, fromStock: triageResult.fromStock, needsDesign: triageResult.needsDesign }
+        : null,
       message: `Order ${orderNumber} created with ${itemResults.length} item(s)`,
     });
   } catch (err) {
