@@ -46,9 +46,21 @@ function isNow(start, end) {
   return new Date(start) <= now && now <= new Date(end);
 }
 
+function toETDateString(date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
 export default function DayPanel({ events = [], tasks = [], collapsed, onToggle }) {
   const [now, setNow] = useState(new Date());
   const [expandedId, setExpandedId] = useState(null);
+  const [dateOffset, setDateOffset] = useState(0); // 0 = today, -1 = yesterday, +1 = tomorrow
+  const [fetchedEvents, setFetchedEvents] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   // Update current time every 60 seconds
   useEffect(() => {
@@ -56,7 +68,40 @@ export default function DayPanel({ events = [], tasks = [], collapsed, onToggle 
     return () => clearInterval(interval);
   }, []);
 
-  const todayStr = now.toLocaleDateString("en-US", {
+  // Fetch events when navigating away from today
+  useEffect(() => {
+    if (dateOffset === 0) {
+      setFetchedEvents(null);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    const target = new Date(now);
+    target.setDate(target.getDate() + dateOffset);
+    const dateStr = toETDateString(target);
+    fetch(`/api/calendar?date=${dateStr}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setFetchedEvents(data.events || []);
+      })
+      .catch(() => {
+        if (!cancelled) setFetchedEvents([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [dateOffset, now]);
+
+  // Use fetched events when viewing another day, props events for today
+  const displayEvents = dateOffset === 0 ? events : (fetchedEvents || []);
+
+  const selectedDate = new Date(now);
+  selectedDate.setDate(selectedDate.getDate() + dateOffset);
+
+  const isToday = dateOffset === 0;
+
+  const dateLabel = selectedDate.toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -67,7 +112,7 @@ export default function DayPanel({ events = [], tasks = [], collapsed, onToggle 
   const { allDayEvents, timedEvents } = useMemo(() => {
     const allDay = [];
     const timed = [];
-    for (const ev of events) {
+    for (const ev of displayEvents) {
       if (ev.allDay || (ev.start && !ev.start.includes("T"))) {
         allDay.push(ev);
       } else if (ev.start) {
@@ -134,7 +179,7 @@ export default function DayPanel({ events = [], tasks = [], collapsed, onToggle 
   );
   const nowMinute = now.getMinutes();
   const nowOffset = (nowHour - START_HOUR) * HOUR_HEIGHT + (nowMinute / 60) * HOUR_HEIGHT;
-  const showNowLine = nowHour >= START_HOUR && nowHour < END_HOUR;
+  const showNowLine = isToday && nowHour >= START_HOUR && nowHour < END_HOUR;
 
   if (collapsed) {
     return (
@@ -168,33 +213,80 @@ export default function DayPanel({ events = [], tasks = [], collapsed, onToggle 
         style={{
           padding: "12px 14px 8px",
           borderBottom: "1px solid var(--border)",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
         }}
       >
-        <div>
-          <div style={{ color: "var(--text-bright)", fontWeight: 600, fontSize: 14 }}>
-            {todayStr}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <button
+              onClick={() => setDateOffset((d) => d - 1)}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--text-dim)",
+                cursor: "pointer",
+                fontSize: 14,
+                padding: "2px 4px",
+                lineHeight: 1,
+              }}
+              title="Previous day"
+            >
+              &#9664;
+            </button>
+            <div style={{ color: "var(--text-bright)", fontWeight: 600, fontSize: 14 }}>
+              {dateLabel}
+            </div>
+            <button
+              onClick={() => setDateOffset((d) => d + 1)}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--text-dim)",
+                cursor: "pointer",
+                fontSize: 14,
+                padding: "2px 4px",
+                lineHeight: 1,
+              }}
+              title="Next day"
+            >
+              &#9654;
+            </button>
           </div>
-          <div style={{ color: "var(--text-dim)", fontSize: 11, marginTop: 2 }}>
-            {timedEvents.length} events &middot; {taskOnly.length} tasks
-          </div>
+          <button
+            onClick={onToggle}
+            style={{
+              background: "none",
+              border: "none",
+              color: "var(--text-dim)",
+              cursor: "pointer",
+              fontSize: 16,
+              padding: 4,
+            }}
+            title="Collapse day view"
+          >
+            &raquo;
+          </button>
         </div>
-        <button
-          onClick={onToggle}
-          style={{
-            background: "none",
-            border: "none",
-            color: "var(--text-dim)",
-            cursor: "pointer",
-            fontSize: 16,
-            padding: 4,
-          }}
-          title="Collapse day view"
-        >
-          &raquo;
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
+          <div style={{ color: "var(--text-dim)", fontSize: 11 }}>
+            {loading ? "Loading..." : `${timedEvents.length} events \u00b7 ${taskOnly.length} tasks`}
+          </div>
+          {!isToday && (
+            <button
+              onClick={() => setDateOffset(0)}
+              style={{
+                background: "rgba(196, 162, 55, 0.15)",
+                border: "none",
+                color: "var(--gold)",
+                cursor: "pointer",
+                fontSize: 10,
+                padding: "1px 6px",
+                borderRadius: 3,
+              }}
+            >
+              Today
+            </button>
+          )}
+        </div>
       </div>
 
       {/* All-day events */}
@@ -273,8 +365,8 @@ export default function DayPanel({ events = [], tasks = [], collapsed, onToggle 
           const top = (topOffset / 60) * HOUR_HEIGHT;
           const height = Math.max((duration / 60) * HOUR_HEIGHT, 20);
           const roleColor = getEventColor(ev);
-          const past = isPast(ev.end);
-          const current = isNow(ev.start, ev.end);
+          const past = isToday && isPast(ev.end);
+          const current = isToday && isNow(ev.start, ev.end);
           const expanded = expandedId === ev.id;
 
           // Deconfliction: position side-by-side when overlapping

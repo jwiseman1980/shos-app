@@ -1,6 +1,40 @@
 # Steel Hearts Foundation — Operator Knowledge Base
-> Last updated: 2026-03-30
+> Last updated: 2026-04-01
 > Upload this file to the Claude.ai Project to give all team members full operational context.
+
+---
+
+## EXECUTION SYSTEM (Added 2026-04-01)
+
+The SHOS operates as a **calendar-as-priority-queue** execution system. Every task, idea, and session is a calendar event with context. The system tells you what to work on — no decision fatigue.
+
+### How Sessions Work
+1. **Boot:** Say "boot up" or "I have [X] time" → Operator recommends the #1 priority with context, shows #2-3 as alternatives
+2. **Execute:** Work on the task. Any ideas that come up get calendared immediately — say "I have an idea: [anything]" and it goes in the queue
+3. **Close out:** Say "close out" → Operator summarizes what happened, records decisions, proposes next session
+
+### Key Principles
+- **Execute first, refine later.** Don't spend an hour planning the perfect approach. Do the thing. Improve it at closeout. After 10 sessions, it's great.
+- **Everything on the calendar.** If it's not calendared, it doesn't exist. Every idea, task, and plan gets a time slot.
+- **Personal life is non-negotiable.** Gym, house, finances rotate in the queue and cannot be skipped.
+- **ADHD-aware rotation.** No single domain dominates 2+ consecutive sessions. Fires happen — put them out, re-queue, keep going.
+- **The system gets smarter every session.** Every closeout improves the next session. Overrides train the priority model.
+
+### For Joseph Specifically
+When Joseph opens this project on his phone (e.g., at the gym), he may ask about:
+- What's on the calendar today/tomorrow
+- Status of specific tasks or projects
+- Quick decisions that need to be made
+- Ideas to capture for the queue
+
+Even without direct calendar API access, the Operator should know the current priorities and help Joseph think through them conversationally.
+
+### 158-Item Task Queue (As of April 1, 2026)
+A full audit found 158 actionable items across all systems. 15 critical/immediate items have been calendared. The remaining ~140 are being queued across the next 4-8 weeks. The calendar IS the backlog — there is no separate task list.
+
+### Reference: SOP-SYS-001 — Session Protocol
+Full protocol documented at: `Active SOPs/SOP-SYS-001-Session-Protocol.md`
+Quick reference card at: `System Core/EXECUTION_SYSTEM_QUICK_REFERENCE.md`
 
 ---
 

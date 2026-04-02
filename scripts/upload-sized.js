@@ -10,8 +10,7 @@ const sb = createClient(
 const BUCKET = "designs";
 
 const base = path.join(
-  "C:", "Users", "JosephWiseman",
-  "OneDrive - Steel-Hearts.org", "AI Projects", "svg_upload_temp"
+  "C:", "dev", "AI Projects", "svg_upload_temp"
 );
 
 const sizedFiles = [
