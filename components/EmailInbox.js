@@ -296,7 +296,7 @@ function EmailDetail({ message, onBack, onArchive, onReply, onTask, draftLoading
   );
 }
 
-export default function EmailInbox({ initialMessages = [], initialNextPage = null, onEmailToTask }) {
+export default function EmailInbox({ initialMessages = [], initialNextPage = null, onEmailToTask, mailbox = "joseph" }) {
   const [messages, setMessages] = useState(initialMessages);
   const [nextPage, setNextPage] = useState(initialNextPage);
   const [selected, setSelected] = useState(new Set());
@@ -314,6 +314,7 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
       const params = new URLSearchParams();
       if (query) params.set("q", query);
       if (pageToken) params.set("pageToken", pageToken);
+      if (mailbox) params.set("mailbox", mailbox);
       const res = await fetch(`/api/email?${params}`);
       const data = await res.json();
       if (pageToken) {
@@ -327,6 +328,14 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
     } finally {
       setLoading(false);
     }
+  }, [mailbox]);
+
+  // Auto-fetch on mount if no initial messages provided
+  useEffect(() => {
+    if (initialMessages.length === 0) {
+      fetchInbox();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleArchive = useCallback(async (messageId) => {
@@ -335,7 +344,7 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
       await fetch("/api/email", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "archive", messageId }),
+        body: JSON.stringify({ action: "archive", messageId, mailbox }),
       });
       setMessages((prev) => prev.filter((m) => m.id !== messageId));
       setSelected((prev) => { const n = new Set(prev); n.delete(messageId); return n; });
@@ -345,7 +354,7 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
     } finally {
       setArchiving((prev) => { const n = new Set(prev); n.delete(messageId); return n; });
     }
-  }, [openMessage]);
+  }, [openMessage, mailbox]);
 
   const handleArchiveSelected = useCallback(async () => {
     if (selected.size === 0) return;
@@ -355,7 +364,7 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
       await fetch("/api/email", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "archiveMany", messageIds: ids }),
+        body: JSON.stringify({ action: "archiveMany", messageIds: ids, mailbox }),
       });
       setMessages((prev) => prev.filter((m) => !selected.has(m.id)));
       setSelected(new Set());
@@ -365,12 +374,13 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
     } finally {
       setArchiving(new Set());
     }
-  }, [selected, openMessage]);
+  }, [selected, openMessage, mailbox]);
 
   const handleOpen = useCallback(async (messageId) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/email/${messageId}`);
+      const mbParam = mailbox ? `?mailbox=${mailbox}` : "";
+      const res = await fetch(`/api/email/${messageId}${mbParam}`);
       const data = await res.json();
       setOpenMessage(data);
       // Mark as read in local state
@@ -382,7 +392,7 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [mailbox]);
 
   const handleSelect = useCallback((id, checked) => {
     setSelected((prev) => {
@@ -415,6 +425,7 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
           from: message.from,
           body: message.body,
           snippet: message.snippet,
+          mailbox,
         }),
       });
       const data = await res.json();
@@ -424,7 +435,7 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
     } finally {
       setDraftLoading(false);
     }
-  }, []);
+  }, [mailbox]);
 
   const handleSaveDraft = useCallback(async () => {
     if (!openMessage) return;
@@ -438,13 +449,14 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
           body: draft,
           threadId: openMessage.threadId,
           messageId: openMessage.id,
+          mailbox,
         }),
       });
       setDraftSaved(true);
     } catch {
       alert("Failed to save draft");
     }
-  }, [openMessage, draft]);
+  }, [openMessage, draft, mailbox]);
 
   const [sending, setSending] = useState(false);
   const [sendConfirm, setSendConfirm] = useState(false);
@@ -466,6 +478,7 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
           body: draft,
           threadId: openMessage.threadId,
           inReplyTo: openMessage.messageId || openMessage.id,
+          mailbox,
         }),
       });
       const data = await res.json();
@@ -482,13 +495,14 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
     } finally {
       setSending(false);
     }
-  }, [openMessage, draft]);
+  }, [openMessage, draft, mailbox]);
 
   // Open email and immediately start drafting a reply
   const handleQuickReply = useCallback(async (messageId) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/email/${messageId}`);
+      const mbParam = mailbox ? `?mailbox=${mailbox}` : "";
+      const res = await fetch(`/api/email/${messageId}${mbParam}`);
       const data = await res.json();
       setOpenMessage(data);
       setMessages((prev) =>
@@ -507,6 +521,7 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
           from: data.from,
           body: data.body,
           snippet: data.snippet,
+          mailbox,
         }),
       });
       const draftData = await draftRes.json();
@@ -517,7 +532,7 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
       setLoading(false);
       setDraftLoading(false);
     }
-  }, []);
+  }, [mailbox]);
 
   const handleConvertToTask = useCallback(async (message) => {
     try {
@@ -530,6 +545,7 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
           subject: message.subject,
           from: message.from,
           snippet: message.snippet,
+          mailbox,
         }),
       });
       if (res.ok) {
