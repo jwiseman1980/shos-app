@@ -13,6 +13,7 @@ export async function middleware(request) {
     pathname === "/reset-password" ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/sf-test") ||
+    pathname.startsWith("/api/slack/events") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/brand") ||
