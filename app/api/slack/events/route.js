@@ -201,9 +201,12 @@ export async function POST(request) {
 
     // Only handle direct messages to the bot (ignore bot's own messages)
     if (event.type === "message" && !event.bot_id && !event.subtype) {
+      console.log(`[slack/events] Message from user=${event.user} channel=${event.channel} text="${(event.text || "").slice(0, 50)}"`);
       // Process async so we respond within 3 seconds
       handleMessage(event).catch((err) => {
-        console.error("[slack/events] handleMessage error:", err.message);
+        console.error("[slack/events] handleMessage error:", err.message, err.stack);
+        // Try to reply with error
+        reply(event.channel, `Something went wrong: ${err.message}`, event.ts).catch(() => {});
       });
     }
   }
