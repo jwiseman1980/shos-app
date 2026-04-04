@@ -312,7 +312,9 @@ function parseFromName(from) {
 }
 
 function EmailTriagePanel({ initialEmails, onEmailTriaged, onEmailToTask, currentUser }) {
+  const [mailbox, setMailbox] = useState("joseph");
   const [emails, setEmails] = useState(initialEmails || []);
+  const [csEmails, setCsEmails] = useState(null);
   const [openEmail, setOpenEmail] = useState(null);
   const [draft, setDraft] = useState("");
   const [draftLoading, setDraftLoading] = useState(false);
@@ -320,8 +322,20 @@ function EmailTriagePanel({ initialEmails, onEmailTriaged, onEmailToTask, curren
 
   // Sync when parent refreshes email list (e.g. after Operator archives via tool)
   useEffect(() => {
-    if (initialEmails) setEmails(initialEmails);
-  }, [initialEmails]);
+    if (initialEmails && mailbox === "joseph") setEmails(initialEmails);
+  }, [initialEmails, mailbox]);
+
+  // Fetch CS inbox when tab switches to contact
+  useEffect(() => {
+    if (mailbox === "contact" && csEmails === null) {
+      fetch("/api/email?mailbox=contact&maxResults=30")
+        .then((r) => r.json())
+        .then((data) => setCsEmails(data.messages || []))
+        .catch(() => setCsEmails([]));
+    }
+  }, [mailbox, csEmails]);
+
+  const activeEmails = mailbox === "joseph" ? emails : (csEmails || []);
   const [loadingId, setLoadingId] = useState(null);
   const [archiving, setArchiving] = useState(new Set());
 
@@ -331,9 +345,11 @@ function EmailTriagePanel({ initialEmails, onEmailTriaged, onEmailToTask, curren
       await fetch("/api/email", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "archive", messageId }),
+        body: JSON.stringify({ action: "archive", messageId, mailbox }),
       });
-      setEmails((prev) => prev.filter((e) => e.id !== messageId));
+      const removeFrom = (prev) => prev.filter((e) => e.id !== messageId);
+      if (mailbox === "joseph") setEmails(removeFrom);
+      else setCsEmails((prev) => prev ? removeFrom(prev) : prev);
       if (openEmail?.id === messageId) setOpenEmail(null);
       onEmailTriaged?.(messageId);
     } catch (err) {
@@ -352,11 +368,11 @@ function EmailTriagePanel({ initialEmails, onEmailTriaged, onEmailToTask, curren
       await fetch("/api/email", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "read", messageId }),
+        body: JSON.stringify({ action: "read", messageId, mailbox }),
       });
-      setEmails((prev) =>
-        prev.map((e) => (e.id === messageId ? { ...e, isUnread: false } : e))
-      );
+      const markRead = (prev) => prev.map((e) => (e.id === messageId ? { ...e, isUnread: false } : e));
+      if (mailbox === "joseph") setEmails(markRead);
+      else setCsEmails((prev) => prev ? markRead(prev) : prev);
     } catch (err) {
       console.error("Mark read failed:", err);
     }
@@ -365,7 +381,8 @@ function EmailTriagePanel({ initialEmails, onEmailTriaged, onEmailToTask, curren
   const handleOpen = useCallback(async (messageId) => {
     setLoadingId(messageId);
     try {
-      const res = await fetch(`/api/email/${messageId}`);
+      const mbParam = mailbox !== "joseph" ? `?mailbox=${mailbox}` : "";
+      const res = await fetch(`/api/email/${messageId}${mbParam}`);
       if (res.ok) {
         const data = await res.json();
         setOpenEmail(data);
@@ -416,6 +433,7 @@ function EmailTriagePanel({ initialEmails, onEmailTriaged, onEmailToTask, curren
           from: openEmail.from,
           body: openEmail.body,
           snippet: openEmail.snippet,
+          mailbox,
         }),
       });
       const data = await res.json();
@@ -438,6 +456,7 @@ function EmailTriagePanel({ initialEmails, onEmailTriaged, onEmailToTask, curren
           body: draft,
           threadId: openEmail.threadId,
           messageId: openEmail.id,
+          mailbox,
         }),
       });
       setDraftSaved(true);
@@ -511,20 +530,46 @@ function EmailTriagePanel({ initialEmails, onEmailTriaged, onEmailToTask, curren
   return (
     <div className="email-triage-panel">
       <div className="email-triage-header">
-        <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-bright)", margin: 0 }}>
-          Email Triage
-        </h3>
+        <div style={{ display: "flex", gap: 4 }}>
+          <button
+            onClick={() => { setMailbox("joseph"); setOpenEmail(null); setDraft(""); }}
+            style={{
+              background: mailbox === "joseph" ? "var(--card-border)" : "none",
+              border: "1px solid var(--card-border)",
+              color: mailbox === "joseph" ? "var(--text-bright)" : "var(--text-dim)",
+              cursor: "pointer", padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600,
+            }}
+          >
+            Joseph
+          </button>
+          <button
+            onClick={() => { setMailbox("contact"); setOpenEmail(null); setDraft(""); }}
+            style={{
+              background: mailbox === "contact" ? "var(--status-yellow)22" : "none",
+              border: mailbox === "contact" ? "1px solid var(--status-yellow)" : "1px solid var(--card-border)",
+              color: mailbox === "contact" ? "var(--status-yellow)" : "var(--text-dim)",
+              cursor: "pointer", padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600,
+            }}
+          >
+            CS Inbox {csEmails ? `(${csEmails.length})` : ""}
+          </button>
+        </div>
         <span style={{ fontSize: 12, color: "var(--text-dim)" }}>
-          {emails.length} unread
+          {activeEmails.length} emails
         </span>
       </div>
       <div className="email-triage-list">
-        {emails.length === 0 && (
+        {mailbox === "contact" && csEmails === null && (
+          <div style={{ padding: 24, textAlign: "center", color: "var(--text-dim)", fontSize: 13 }}>
+            Loading customer service inbox...
+          </div>
+        )}
+        {activeEmails.length === 0 && (mailbox === "joseph" || csEmails !== null) && (
           <div style={{ padding: 24, textAlign: "center", color: "var(--text-dim)", fontSize: 13 }}>
             Inbox clear. Nice work.
           </div>
         )}
-        {emails.map((email) => (
+        {activeEmails.map((email) => (
           <div
             key={email.id}
             className={`email-triage-row ${loadingId === email.id ? "loading" : ""}`}
