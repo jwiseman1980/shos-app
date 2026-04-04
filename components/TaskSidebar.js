@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 
 const NAV_LINKS = [
   { href: "/",              label: "Dashboard",     icon: "⊞" },
+  { href: "/email",         label: "Email Triage",  icon: "✉" },
+  { href: "/cs",            label: "CS Inbox",      icon: "☎", highlight: true },
   { href: "/orders",        label: "Orders",        icon: "◈" },
   { href: "/laser",         label: "Laser",         icon: "◉" },
   { href: "/designs",       label: "Designs",       icon: "◇" },
@@ -139,18 +141,6 @@ export default function TaskSidebar({
           </button>
         </div>
       </div>
-
-      {/* Email triage button */}
-      {emailCount > 0 && (
-        <button
-          className={`task-sidebar-email-btn ${activeView === "email-triage" ? "active" : ""}`}
-          onClick={() => onViewChange("email-triage")}
-        >
-          <span style={{ fontSize: 14 }}>&#9993;</span>
-          <span>Email Triage</span>
-          <span className="task-sidebar-badge">{emailCount}</span>
-        </button>
-      )}
 
       {/* Nav */}
       <div className="task-sidebar-nav">
