@@ -346,6 +346,15 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Re-fetch when Operator finishes (may have archived/modified emails)
+  useEffect(() => {
+    function handleOperatorDone() {
+      fetchInbox();
+    }
+    window.addEventListener("operator:done", handleOperatorDone);
+    return () => window.removeEventListener("operator:done", handleOperatorDone);
+  }, [fetchInbox]);
+
   const handleArchive = useCallback(async (messageId) => {
     setArchiving((prev) => new Set(prev).add(messageId));
     try {
