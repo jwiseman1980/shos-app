@@ -15,14 +15,15 @@ const QUICK_ACTIONS = [
   { label: "Create task", text: "I need to create a task:" },
 ];
 
-export default function RoleChat({ pathname, onClose, currentUser, bottomMode }) {
+export default function RoleChat({ pathname, onClose, currentUser, bottomMode, onSessionChange }) {
   const router = useRouter();
   const [messages, setMessages] = useState([]);
   const [displayMessages, setDisplayMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [sessionStarted, setSessionStarted] = useState(false);
+  const [sessionActive, setSessionActive] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState([]);
   const sessionIdRef = useRef(null);
   const allToolsRef = useRef([]);
@@ -129,25 +130,43 @@ export default function RoleChat({ pathname, onClose, currentUser, bottomMode })
     sessionStorage.removeItem("shos_op_session_at");
   }
 
-  // Auto-start session (or restore if navigated away and back within 4 hours)
+  // On mount: check for existing session but do NOT auto-start or auto-brief
   useEffect(() => {
-    if (!sessionStarted) {
-      setSessionStarted(true);
+    if (!sessionChecked) {
+      setSessionChecked(true);
       const storedId = sessionStorage.getItem("shos_op_session_id");
       const storedAt = parseInt(sessionStorage.getItem("shos_op_session_at") || "0");
       const isRecent = storedId && (Date.now() - storedAt) < 4 * 60 * 60 * 1000;
       if (isRecent) {
-        // Restore existing session — no auto-brief, no API call
+        // Restore existing session — no API call, no briefing
         sessionIdRef.current = storedId;
-      } else {
-        // Fresh start — create session and fire opening brief
-        startChatSession();
-        const openingPrompt = `Brief me. Read the operator context file. Check open tasks. I'm currently viewing ${pathname} — lead with what's relevant to this page, but you can cover anything that needs attention. Then ask what I want to work on.`;
-        sendMessage(openingPrompt, true);
+        setSessionActive(true);
+        onSessionChange?.(true);
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Start a new session (called by user clicking Start)
+  async function handleStartSession() {
+    await startChatSession();
+    setSessionActive(true);
+    onSessionChange?.(true);
+    const openingPrompt = `Brief me. Read the operator context file. Check open tasks. I'm currently viewing ${pathname} — lead with what's relevant to this page, but you can cover anything that needs attention. Then ask what I want to work on.`;
+    sendMessage(openingPrompt, true);
+  }
+
+  // Close the session (called by user clicking Close)
+  async function handleStopSession() {
+    await endChatSession();
+    setSessionActive(false);
+    setMessages([]);
+    setDisplayMessages([]);
+    setInput("");
+    setError(null);
+    allToolsRef.current = [];
+    onSessionChange?.(false);
+  }
 
   function updateStreamMsg(id, patch) {
     setDisplayMessages((prev) =>
@@ -377,6 +396,33 @@ export default function RoleChat({ pathname, onClose, currentUser, bottomMode })
     }
   }
 
+  // Idle state — show Start Session button
+  if (!sessionActive && bottomMode) {
+    return (
+      <div className="role-chat-bottom">
+        <div className="role-chat-panel-bottom" style={{ "--chat-color": COLOR }}>
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "12px 20px", gap: 12,
+          }}>
+            <div className="role-chat-dot" style={{ background: COLOR, opacity: 0.4 }} />
+            <span style={{ fontSize: 13, color: "var(--text-dim)" }}>{NAME}</span>
+            <button
+              onClick={handleStartSession}
+              style={{
+                background: COLOR, color: "#000", border: "none",
+                padding: "6px 16px", borderRadius: 6, fontSize: 12,
+                fontWeight: 700, cursor: "pointer", letterSpacing: "0.03em",
+              }}
+            >
+              Start Session
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={bottomMode ? "role-chat-bottom" : "role-chat-overlay"}>
       <div className={bottomMode ? "role-chat-panel-bottom" : "role-chat-panel"} style={{ "--chat-color": COLOR }}>
@@ -398,6 +444,19 @@ export default function RoleChat({ pathname, onClose, currentUser, bottomMode })
                 title={voice.voiceMode ? "Voice mode on — auto-reads responses" : "Voice mode off"}
               >
                 {voice.voiceMode ? "🔊" : "🔇"}
+              </button>
+            )}
+            {bottomMode && (
+              <button
+                onClick={handleStopSession}
+                style={{
+                  background: "none", border: "1px solid var(--card-border)",
+                  color: "var(--text-dim)", cursor: "pointer",
+                  padding: "3px 10px", borderRadius: 4, fontSize: 11,
+                }}
+                title="Close session and archive"
+              >
+                Close Session
               </button>
             )}
             {!bottomMode && onClose && (
