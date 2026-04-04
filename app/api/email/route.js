@@ -7,6 +7,7 @@ import {
   markAsRead,
   starMessage,
   sendGmailMessage,
+  MAILBOXES,
 } from "@/lib/gmail";
 import { getServerClient } from "@/lib/supabase";
 
@@ -22,9 +23,11 @@ export async function GET(request) {
     const maxResults = parseInt(searchParams.get("maxResults") || "50");
     const pageToken = searchParams.get("pageToken") || undefined;
     const query = searchParams.get("q") || undefined;
+    const mailbox = searchParams.get("mailbox") || undefined;
 
-    const result = await listInbox({ maxResults, pageToken, query });
-    return NextResponse.json(result);
+    console.log(`[email] listInbox mailbox=${mailbox}, resolved=${mailbox || "joseph (default)"}`);
+    const result = await listInbox({ maxResults, pageToken, query, mailbox });
+    return NextResponse.json({ ...result, _mailbox: mailbox || "joseph" });
   } catch (err) {
     console.error("Email list error:", err.message);
     return NextResponse.json(
@@ -42,27 +45,27 @@ export async function GET(request) {
 export async function PATCH(request) {
   try {
     const body = await request.json();
-    const { action, messageId, messageIds, starred } = body;
+    const { action, messageId, messageIds, starred, mailbox } = body;
 
     switch (action) {
       case "archive": {
         if (!messageId) return NextResponse.json({ error: "messageId required" }, { status: 400 });
-        await archiveMessage(messageId);
+        await archiveMessage(messageId, { mailbox });
         return NextResponse.json({ success: true, action: "archived", messageId });
       }
       case "archiveMany": {
         if (!messageIds?.length) return NextResponse.json({ error: "messageIds required" }, { status: 400 });
-        const result = await archiveMessages(messageIds);
+        const result = await archiveMessages(messageIds, { mailbox });
         return NextResponse.json({ success: true, action: "archivedMany", ...result });
       }
       case "read": {
         if (!messageId) return NextResponse.json({ error: "messageId required" }, { status: 400 });
-        await markAsRead(messageId);
+        await markAsRead(messageId, { mailbox });
         return NextResponse.json({ success: true, action: "read", messageId });
       }
       case "star": {
         if (!messageId) return NextResponse.json({ error: "messageId required" }, { status: 400 });
-        await starMessage(messageId, starred !== false);
+        await starMessage(messageId, starred !== false, { mailbox });
         return NextResponse.json({ success: true, action: "starred", messageId, starred: starred !== false });
       }
       default:
@@ -84,7 +87,7 @@ export async function PATCH(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { action, messageId, subject, from, snippet } = body;
+    const { action, messageId, subject, from, snippet, mailbox } = body;
 
     if (action === "send") {
       const { to, subject: sendSubject, body: sendBody, threadId, inReplyTo } = body;
@@ -92,9 +95,10 @@ export async function POST(request) {
         return NextResponse.json({ error: "to, subject, and body required" }, { status: 400 });
       }
 
+      const mb = MAILBOXES[mailbox] || MAILBOXES.joseph;
       const result = await sendGmailMessage({
-        senderEmail: "joseph.wiseman@steel-hearts.org",
-        senderName: "Joseph Wiseman",
+        senderEmail: mb.email,
+        senderName: mb.name,
         to,
         subject: sendSubject,
         body: sendBody,
@@ -128,8 +132,8 @@ export async function POST(request) {
 
     // Archive the email after converting
     if (messageId) {
-      await archiveMessage(messageId).catch(() => {});
-      await markAsRead(messageId).catch(() => {});
+      await archiveMessage(messageId, { mailbox }).catch(() => {});
+      await markAsRead(messageId, { mailbox }).catch(() => {});
     }
 
     const task = {
