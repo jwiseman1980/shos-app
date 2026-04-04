@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerClient } from "@/lib/supabase";
+import { sendSlackDm, buildDesignNeededMessage } from "@/lib/slack-actions";
 
 /**
  * POST /api/designs/queue — Queue a proactive design task (no order required).
@@ -46,6 +47,17 @@ export async function POST(request) {
       .eq("id", heroId);
 
     if (updateErr) throw updateErr;
+
+    // Notify Ryan via Slack Bot API DM
+    const slackMsg = [
+      `🎨 *Proactive Design Request*`,
+      ``,
+      buildDesignNeededMessage(hero.name, hero.lineitem_sku, sizes.join('" + "'), 0, hero.id),
+      ``,
+      brief ? `📝 *Notes:* ${brief}` : "",
+    ].filter(Boolean).join("\n");
+
+    await sendSlackDm("ryan@steel-hearts.org", slackMsg);
 
     return NextResponse.json({
       success: true,

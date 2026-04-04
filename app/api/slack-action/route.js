@@ -148,33 +148,105 @@ async function handleCreateDraft(params) {
     });
   }
 
-  // Try to create the draft via the existing draft-email API
+  // Look up hero + assigned volunteer from Supabase to get all required fields
   try {
+    const sb = getServerClient();
+    const { data: hero, error: heroErr } = await sb
+      .from("heroes")
+      .select(`
+        id, sf_id, name, rank, branch, memorial_date, memorial_month, memorial_day,
+        anniversary_assigned_to,
+        family_contact:contacts!family_contact_id(first_name, last_name, email),
+        assigned_user:users!anniversary_assigned_to(name, email)
+      `)
+      .eq("id", heroId)
+      .single();
+
+    if (heroErr || !hero) {
+      return new Response(buildHtml("Hero Not Found", `Could not find hero record for ID: ${heroId}`), {
+        status: 404,
+        headers: { "Content-Type": "text/html" },
+      });
+    }
+
+    const familyEmail = hero.family_contact?.email;
+    if (!familyEmail) {
+      return new Response(buildHtml(
+        "No Family Email",
+        `No family email on file for ${hero.name}. Please update the family contact in the app before creating a draft.`,
+        `${APP_URL}/anniversaries`,
+      ), {
+        status: 200,
+        headers: { "Content-Type": "text/html" },
+      });
+    }
+
+    const senderEmail = hero.assigned_user?.email;
+    const senderName = hero.assigned_user?.name;
+    if (!senderEmail) {
+      return new Response(buildHtml(
+        "No Volunteer Assigned",
+        `No volunteer is assigned to ${hero.name}'s anniversary email. Please assign a volunteer in the app first.`,
+        `${APP_URL}/anniversaries`,
+      ), {
+        status: 200,
+        headers: { "Content-Type": "text/html" },
+      });
+    }
+
+    // Calculate years since passing
+    const now = new Date();
+    const memDate = hero.memorial_date ? new Date(hero.memorial_date) : null;
+    const years = memDate ? now.getFullYear() - memDate.getFullYear() : null;
+
+    const familyName = hero.family_contact
+      ? `${hero.family_contact.first_name || ""} ${hero.family_contact.last_name || ""}`.trim() || "Family"
+      : "Family";
+
     const draftRes = await fetch(`${APP_URL}/api/anniversaries/draft-email`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-API-Key": process.env.SHOS_API_KEY || "",
       },
-      body: JSON.stringify({ heroId, sfId: heroId }),
+      body: JSON.stringify({
+        heroName: hero.name,
+        branch: hero.branch,
+        years,
+        memorialDate: hero.memorial_date,
+        familyEmail,
+        familyName,
+        senderEmail,
+        senderName,
+        sfId: hero.sf_id || hero.id,
+      }),
     });
 
     if (draftRes.ok) {
       return new Response(buildHtml(
         "Draft Created",
-        `A Gmail draft has been created for ${name || "this hero"}'s remembrance email. Open Gmail to review, edit, and send (or schedule send for the anniversary date).`,
+        `A Gmail draft has been created in ${senderEmail} for ${hero.name}'s remembrance email. Open Gmail to review, edit, and send (or schedule send for the anniversary date).`,
         "https://mail.google.com",
       ), {
         status: 200,
         headers: { "Content-Type": "text/html" },
       });
     }
-  } catch {
-    // Fall through to app redirect
-  }
 
-  // Fallback: redirect to the app's anniversary page
-  return Response.redirect(`${APP_URL}/anniversaries?create_draft=${heroId}`, 302);
+    const errData = await draftRes.json().catch(() => ({}));
+    return new Response(buildHtml(
+      "Draft Failed",
+      `Could not create draft: ${errData.error || "Unknown error"}. Try using the app directly.`,
+      `${APP_URL}/anniversaries`,
+    ), {
+      status: 200,
+      headers: { "Content-Type": "text/html" },
+    });
+  } catch (err) {
+    console.error("[slack-action] create_draft error:", err.message);
+    // Fallback: redirect to the app's anniversary page
+    return Response.redirect(`${APP_URL}/anniversaries?create_draft=${heroId}`, 302);
+  }
 }
 
 async function handleMarkSent(params) {
