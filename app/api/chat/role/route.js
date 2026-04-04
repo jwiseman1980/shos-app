@@ -866,6 +866,7 @@ ${pageState ? `
 ${pageState.mailbox ? `Viewing ${pageState.mailbox === "contact" ? "CS Inbox (contact@steel-hearts.org)" : "Joseph's Inbox"} — ${pageState.emailCount || 0} emails loaded.` : ""}
 ${pageState.emails?.length ? `Emails visible:\n${pageState.emails.map(e => `- [${e.id}] ${e.isUnread ? "UNREAD" : "read"} | ${e.from} | ${e.subject}`).join("\n")}` : ""}
 ${pageState.openEmail ? `\nCurrently viewing email:\n- ID: ${pageState.openEmail.id}\n- From: ${pageState.openEmail.from}\n- To: ${pageState.openEmail.to}\n- Subject: ${pageState.openEmail.subject}\n- Reply-To: ${pageState.openEmail.replyTo || "same as from"}\n- Preview: ${pageState.openEmail.snippet || pageState.openEmail.body?.slice(0, 300) || ""}` : "No email open."}
+${pageState.draftInProgress ? `\nDraft reply in progress (user is editing this now):\n- Replying to: ${pageState.draftInProgress.replyingTo}\n- Subject: ${pageState.draftInProgress.subject}\n- Current draft text: ${pageState.draftInProgress.text}\n\nWhen the user asks to modify the draft, output the COMPLETE revised draft text they can copy-paste to replace it.` : ""}
 ` : ""}
 
 ## Core Rules
@@ -904,7 +905,21 @@ If the infrastructure isn't there → flag_to_role("architect", ...) and tell th
 - Only call read_email when explicitly asked to read a specific message.
 - Only call query_email when searching for something specific not visible in the current view.
 - After archiving emails, those message IDs are stale — use query_email to get fresh IDs before reading.
-- Flag bugs/features via log_friction or flag_to_role(target="architect"). Ideas → log_friction(type="idea").`;
+- Flag bugs/features via log_friction or flag_to_role(target="architect"). Ideas → log_friction(type="idea").
+
+## Email Drafting Rules
+- NEVER use em dashes in emails. Write like a human, not AI.
+- Be empathetic and respectful when responding to Gold Star families. These are parents, spouses, and siblings of fallen service members.
+- For new bracelet requests from families: express genuine gratitude, acknowledge their loved one by name, then ask for the specific info needed (full name/rank, unit, date of loss, charity designation for $10 obligation, bracelet size 6" or 7", shipping address).
+- For customer service inquiries: be warm, direct, and helpful.
+- Always use this signature block:
+  Joseph Wiseman
+  Steel Hearts Foundation 501(c)(3)
+  Executive Director/Co-Founder
+  USMA '08
+  www.steel-hearts.org
+  408.569.8449
+- When user asks to revise a draft, output the COMPLETE revised text so they can copy-paste it directly into the draft editor.`;
 
 }
 

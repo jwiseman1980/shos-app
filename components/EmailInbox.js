@@ -376,10 +376,15 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
         body: openMessage.body?.slice(0, 500),
         replyTo: openMessage.replyTo,
       } : null,
+      draftInProgress: draft ? {
+        text: draft.slice(0, 500),
+        replyingTo: openMessage?.from || null,
+        subject: openMessage?.subject || null,
+      } : null,
     };
     window.__shosPageState = state;
     window.dispatchEvent(new CustomEvent("shos:pagestate", { detail: state }));
-  }, [messages, openMessage, mailbox]);
+  }, [messages, openMessage, mailbox, draft]);
 
   const handleArchive = useCallback(async (messageId) => {
     setArchiving((prev) => new Set(prev).add(messageId));
