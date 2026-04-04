@@ -89,10 +89,10 @@ export default function ConsoleShell({ user, tasks, calendarEvents, emails, gree
     return () => window.removeEventListener("operator:done", handler);
   }, [refreshEmails]);
 
-  // Task handlers
+  // Task handlers — send task to Operator instead of switching dashboard views
   const handleTaskClick = useCallback((task) => {
     setActiveTaskId(task.id);
-    setActiveView(task.sourceType === "anniversary" ? "anniversary-detail" : "task-detail");
+    window.dispatchEvent(new CustomEvent("shos:task", { detail: task }));
   }, []);
 
   const handleTaskComplete = useCallback((taskId) => {

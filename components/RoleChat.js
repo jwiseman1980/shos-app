@@ -76,10 +76,32 @@ export default function RoleChat({ pathname, onClose, currentUser, bottomMode, o
       pageStateRef.current = e.detail;
     }
     window.addEventListener("shos:pagestate", handlePageState);
-    // Pick up any state that was set before we mounted
     if (window.__shosPageState) pageStateRef.current = window.__shosPageState;
     return () => window.removeEventListener("shos:pagestate", handlePageState);
   }, []);
+
+  // Listen for task injection from sidebar clicks
+  useEffect(() => {
+    function handleTaskInject(e) {
+      const task = e.detail;
+      if (!task || !sessionActive) return;
+      // Auto-start session if not active
+      if (!sessionActive) {
+        handleStartSession();
+        // Delay slightly so session is created before sending
+        setTimeout(() => {
+          const msg = buildTaskMessage(task);
+          sendMessage(msg);
+        }, 1500);
+      } else {
+        const msg = buildTaskMessage(task);
+        sendMessage(msg);
+      }
+    }
+    window.addEventListener("shos:task", handleTaskInject);
+    return () => window.removeEventListener("shos:task", handleTaskInject);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionActive, messages, loading]);
 
   // --- Chat persistence helpers ---
   async function startChatSession() {
@@ -406,6 +428,16 @@ export default function RoleChat({ pathname, onClose, currentUser, bottomMode, o
       e.preventDefault();
       sendMessage(input);
     }
+  }
+
+  function buildTaskMessage(task) {
+    const parts = [`I'm starting: "${task.title}"`];
+    if (task.sopId) parts.push(`This is SOP ${task.sopId}. Read the SOP and walk me through it, or ask if I already know the drill.`);
+    else if (task.source === "calendar") parts.push(`This is from my calendar. What's the context for this task and what do I need to do?`);
+    else parts.push(`What do I need to do for this? Walk me through it or ask if I already know how.`);
+    if (task.description) parts.push(`Description: ${task.description}`);
+    if (task.estimatedMinutes) parts.push(`Estimated: ${task.estimatedMinutes} minutes`);
+    return parts.join("\n");
   }
 
   // Idle state — show Start Session button
