@@ -1106,7 +1106,12 @@ p {
   border-left-color: #c4a237;
 }
 .task-sidebar-item.done {
-  opacity: 0.5;
+  opacity: 0.7;
+  border-left-color: #27ae60;
+}
+.task-sidebar-item.done .task-sidebar-item-title {
+  text-decoration: line-through;
+  color: #27ae60;
 }
 .task-sidebar-item.future {
   opacity: 0.6;

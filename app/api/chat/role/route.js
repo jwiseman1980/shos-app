@@ -1081,6 +1081,8 @@ export async function POST(request) {
         let currentMessages = [...messages];
         const toolsUsed = [];
         const maxIterations = 10;
+        let rateLimitRetries = 0;
+        const MAX_RATE_RETRIES = 3;
 
         // Route to Haiku for simple ops, Sonnet for complex reasoning / drafting / data work
         const selectedModel = classifyTask(currentMessages);
@@ -1104,18 +1106,23 @@ export async function POST(request) {
           });
 
           if (!apiResponse.ok) {
-            // Retry once on rate limit (429) after a short pause
-            if (apiResponse.status === 429 && i < maxIterations - 1) {
+            // Exponential backoff on rate limit (429) — up to 3 retries
+            if (apiResponse.status === 429 && rateLimitRetries < MAX_RATE_RETRIES) {
+              rateLimitRetries++;
               const retryAfter = apiResponse.headers.get("retry-after");
-              const wait = retryAfter ? parseInt(retryAfter, 10) * 1000 : 5000;
-              send({ type: "text", delta: "\n_Rate limited — retrying in a moment..._\n" });
-              await new Promise(r => setTimeout(r, Math.min(wait, 10000)));
+              const baseWait = retryAfter ? parseInt(retryAfter, 10) * 1000 : 5000 * rateLimitRetries;
+              const wait = Math.min(baseWait, 30000);
+              send({ type: "text", delta: `\n_Rate limited — retry ${rateLimitRetries}/${MAX_RATE_RETRIES} in ${Math.round(wait/1000)}s..._\n` });
+              await new Promise(r => setTimeout(r, wait));
+              i--; // Don't consume an iteration on rate limit
               continue;
             }
             const err = await apiResponse.text();
             send({ type: "error", message: `Claude API error (${apiResponse.status}): ${err}` });
             break;
           }
+
+          rateLimitRetries = 0; // Reset on success
 
           // Parse the streaming response — text deltas and tool_start events
           // are forwarded to the client in real time via `send`

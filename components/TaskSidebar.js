@@ -64,6 +64,7 @@ export default function TaskSidebar({
 
   const doneTasks = tasks.filter((t) => t.status === "done" && (t.date === today || !t.date));
   const futureTasks = tasks.filter((t) => t.date && t.date > today && t.status !== "done");
+  const doneCount = doneTasks.length;
 
   // Collapsed section state
   const [expandedGroups, setExpandedGroups] = useState(() => {
@@ -246,7 +247,7 @@ export default function TaskSidebar({
           >
             <span>Completed</span>
             <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ fontSize: 10, color: "var(--text-dim)", fontWeight: 400 }}>{doneTasks.length}</span>
+              <span style={{ fontSize: 10, color: "#27ae60", fontWeight: 400 }}>{doneTasks.length}</span>
               <span style={{ fontSize: 10, color: "var(--text-dim)", transition: "transform 0.15s", transform: expandedGroups.done ? "rotate(0)" : "rotate(-90deg)" }}>&#9660;</span>
             </span>
           </button>
