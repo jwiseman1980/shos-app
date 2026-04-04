@@ -2,6 +2,14 @@
 
 import { useState, useCallback, useEffect } from "react";
 
+// Decode HTML entities in Gmail snippets (&#39; → ', &amp; → &, etc.)
+function decodeEntities(str) {
+  if (!str || typeof document === "undefined") return str || "";
+  const el = document.createElement("textarea");
+  el.innerHTML = str;
+  return el.value;
+}
+
 // Parse "Name <email>" or just "email"
 function parseFrom(from) {
   if (!from) return { name: "", email: "" };
@@ -118,7 +126,7 @@ function EmailRow({ msg, isSelected, onSelect, onOpen, onArchive, onQuickReply }
           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           marginTop: 1,
         }}>
-          {msg.snippet}
+          {decodeEntities(msg.snippet)}
         </div>
       </div>
 
