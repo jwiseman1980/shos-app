@@ -355,6 +355,32 @@ export default function EmailInbox({ initialMessages = [], initialNextPage = nul
     return () => window.removeEventListener("operator:done", handleOperatorDone);
   }, [fetchInbox]);
 
+  // Broadcast current inbox state so Operator knows what's on screen
+  useEffect(() => {
+    const state = {
+      mailbox,
+      emailCount: messages.length,
+      emails: messages.slice(0, 20).map(m => ({
+        id: m.id,
+        from: m.from,
+        subject: m.subject,
+        snippet: m.snippet?.slice(0, 80),
+        isUnread: m.isUnread,
+      })),
+      openEmail: openMessage ? {
+        id: openMessage.id,
+        from: openMessage.from,
+        to: openMessage.to,
+        subject: openMessage.subject,
+        snippet: openMessage.snippet?.slice(0, 200),
+        body: openMessage.body?.slice(0, 500),
+        replyTo: openMessage.replyTo,
+      } : null,
+    };
+    window.__shosPageState = state;
+    window.dispatchEvent(new CustomEvent("shos:pagestate", { detail: state }));
+  }, [messages, openMessage, mailbox]);
+
   const handleArchive = useCallback(async (messageId) => {
     setArchiving((prev) => new Set(prev).add(messageId));
     try {

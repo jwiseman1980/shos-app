@@ -69,6 +69,18 @@ export default function RoleChat({ pathname, onClose, currentUser, bottomMode, o
     inputRef.current?.focus();
   }, [loading]);
 
+  // Track current page state from other components (inbox, etc.)
+  const pageStateRef = useRef(null);
+  useEffect(() => {
+    function handlePageState(e) {
+      pageStateRef.current = e.detail;
+    }
+    window.addEventListener("shos:pagestate", handlePageState);
+    // Pick up any state that was set before we mounted
+    if (window.__shosPageState) pageStateRef.current = window.__shosPageState;
+    return () => window.removeEventListener("shos:pagestate", handlePageState);
+  }, []);
+
   // --- Chat persistence helpers ---
   async function startChatSession() {
     try {
@@ -282,7 +294,7 @@ export default function RoleChat({ pathname, onClose, currentUser, bottomMode, o
       const res = await fetch("/api/chat/role", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "operator", pathname, messages: newMessages }),
+        body: JSON.stringify({ role: "operator", pathname, messages: newMessages, pageState: pageStateRef.current }),
       });
 
       if (!res.ok) {

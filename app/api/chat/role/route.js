@@ -829,7 +829,7 @@ function getPageContext(pathname) {
   return "General — brief on top priorities.";
 }
 
-async function buildSystemPrompt(pathname) {
+async function buildSystemPrompt(pathname, pageState) {
   const contextContent = await readKnowledge("operator");
   const pageHint = getPageContext(pathname);
 
@@ -861,6 +861,12 @@ ${learningContext}
 
 ## Page: ${pathname || "/"}
 ${pageHint}
+${pageState ? `
+## What's On Screen
+${pageState.mailbox ? `Viewing ${pageState.mailbox === "contact" ? "CS Inbox (contact@steel-hearts.org)" : "Joseph's Inbox"} — ${pageState.emailCount || 0} emails loaded.` : ""}
+${pageState.emails?.length ? `Emails visible:\n${pageState.emails.map(e => `- [${e.id}] ${e.isUnread ? "UNREAD" : "read"} | ${e.from} | ${e.subject}`).join("\n")}` : ""}
+${pageState.openEmail ? `\nCurrently viewing email:\n- ID: ${pageState.openEmail.id}\n- From: ${pageState.openEmail.from}\n- To: ${pageState.openEmail.to}\n- Subject: ${pageState.openEmail.subject}\n- Reply-To: ${pageState.openEmail.replyTo || "same as from"}\n- Preview: ${pageState.openEmail.snippet || pageState.openEmail.body?.slice(0, 300) || ""}` : "No email open."}
+` : ""}
 
 ## Core Rules
 - Supabase is primary DB. Use supabase_query for direct access, supabase_upsert to write records, app_query/app_mutation for API routes.
@@ -1021,7 +1027,7 @@ export async function POST(request) {
     return Response.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { role, pathname, messages } = body;
+  const { role, pathname, messages, pageState } = body;
 
   if (!messages) {
     return Response.json({ error: "messages is required" }, { status: 400 });
@@ -1029,7 +1035,7 @@ export async function POST(request) {
 
   let systemPrompt;
   try {
-    systemPrompt = await buildSystemPrompt(pathname || "/");
+    systemPrompt = await buildSystemPrompt(pathname || "/", pageState);
   } catch (e) {
     console.error("[chat/role] buildSystemPrompt failed:", e);
     return Response.json({
