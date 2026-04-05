@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Accomplishments from "@/components/Accomplishments";
 
 const CATEGORY_COLORS = {
   "FINANCIAL-CPA": "#2ecc71",
@@ -60,22 +61,24 @@ export default function MorningBriefing({
 }) {
   const [anniversaryData, setAnniversaryData] = useState(null);
   const [orderData, setOrderData] = useState(null);
+  const [accomplishments, setAccomplishments] = useState([]);
 
-  // Fetch anniversary + order data on mount
+  // Fetch anniversary + order + accomplishment data on mount
   useEffect(() => {
     const month = new Date().getMonth() + 1;
-    fetch(`/api/anniversaries?month=${month}`, {
-      headers: { "X-API-Key": "sh-api-dev-key-change-in-production" },
-    })
+    fetch(`/api/anniversaries?month=${month}`)
       .then((r) => r.json())
       .then((d) => setAnniversaryData(d))
       .catch(() => {});
 
-    fetch("/api/orders", {
-      headers: { "X-API-Key": "sh-api-dev-key-change-in-production" },
-    })
+    fetch("/api/orders")
       .then((r) => r.json())
       .then((d) => setOrderData(d))
+      .catch(() => {});
+
+    fetch("/api/execution-log")
+      .then((r) => r.json())
+      .then((d) => setAccomplishments(d.items || []))
       .catch(() => {});
   }, []);
 
@@ -540,6 +543,19 @@ export default function MorningBriefing({
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Section 8: Today's Accomplishments */}
+          <div
+            style={{
+              background: "var(--card-bg)",
+              border: accomplishments.length > 0 ? "1px solid var(--status-green)" : "1px solid var(--card-border)",
+              borderRadius: 8,
+              padding: 14,
+            }}
+          >
+            <SectionHeader title={`Completed Today (${accomplishments.length})`} accent="var(--status-green)" />
+            <Accomplishments items={accomplishments} />
           </div>
         </div>
       </div>

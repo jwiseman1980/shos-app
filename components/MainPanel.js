@@ -32,12 +32,12 @@ export default function MainPanel({
 }) {
   if (view === "email-triage") {
     return (
-      <div style={{ padding: 16, height: "100%", overflowY: "auto" }}>
-        <EmailInbox
-          initialMessages={initialEmails}
-          onEmailToTask={onEmailToTask}
-        />
-      </div>
+      <EmailTriagePanel
+        initialEmails={initialEmails}
+        onEmailTriaged={onEmailTriaged}
+        onEmailToTask={onEmailToTask}
+        currentUser={currentUser}
+      />
     );
   }
 

@@ -24,14 +24,17 @@ export async function middleware(request) {
 
   // Allow API routes with valid API key
   if (pathname.startsWith("/api/")) {
-    const apiKey = request.headers.get("x-api-key") || request.nextUrl.searchParams.get("key");
+    const apiKey = request.headers.get("x-api-key");
     if (apiKey && apiKey === process.env.SHOS_API_KEY) {
       return NextResponse.next();
     }
   }
 
   const session = request.cookies.get(SESSION_COOKIE);
-  const secret = process.env.SESSION_SECRET || "fallback-dev-secret";
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
 
   if (!session) {
     return NextResponse.redirect(new URL("/login", request.url));

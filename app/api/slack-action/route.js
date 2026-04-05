@@ -17,7 +17,11 @@ export async function GET(request) {
   const params = verifyActionUrl(searchParams);
 
   if (!params) {
-    return new Response(buildHtml("Link Expired or Invalid", "This action link has expired or is invalid. Please use the SHOS app directly."), {
+    return new Response(buildHtml(
+      "Link Expired",
+      "This action link has expired (links are valid for 7 days). Go to the SHOS app to take this action directly.",
+      APP_URL + "/anniversaries",
+    ), {
       status: 403,
       headers: { "Content-Type": "text/html" },
     });
@@ -56,7 +60,11 @@ export async function GET(request) {
     });
   } catch (error) {
     console.error("Slack action error:", error.message);
-    return new Response(buildHtml("Error", `Something went wrong: ${error.message}`), {
+    return new Response(buildHtml(
+      "Something Went Wrong",
+      `There was an error processing this action. Try again or use the SHOS app directly. If this keeps happening, let Joseph know.`,
+      APP_URL,
+    ), {
       status: 500,
       headers: { "Content-Type": "text/html" },
     });
@@ -171,10 +179,16 @@ async function handleCreateDraft(params) {
 
     const familyEmail = hero.family_contact?.email;
     if (!familyEmail) {
+      const familyName = hero.family_contact
+        ? `${hero.family_contact.first_name || ""} ${hero.family_contact.last_name || ""}`.trim()
+        : null;
+      const detail = familyName
+        ? `We have a family contact (${familyName}) but no email address on file.`
+        : `No family contact is linked to this hero record.`;
       return new Response(buildHtml(
-        "No Family Email",
-        `No family email on file for ${hero.name}. Please update the family contact in the app before creating a draft.`,
-        `${APP_URL}/anniversaries`,
+        "Family Email Needed",
+        `${detail} An email address is required to create the anniversary draft for ${hero.name}. Please ask Joseph or check the Families page in the app to add it.`,
+        `${APP_URL}/families`,
       ), {
         status: 200,
         headers: { "Content-Type": "text/html" },

@@ -18,7 +18,7 @@ async function handler(request) {
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
   const apiKey = process.env.SHOS_API_KEY;
-  const providedKey = new URL(request.url).searchParams.get("key") || request.headers.get("x-api-key");
+  const providedKey = request.headers.get("x-api-key");
 
   const isVercelCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
   const isApiKey = apiKey && providedKey === apiKey;

@@ -35,9 +35,7 @@ export async function GET(request) {
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
   const apiKey = process.env.SHOS_API_KEY;
-  const key =
-    new URL(request.url).searchParams.get("key") ||
-    request.headers.get("x-api-key");
+  const key = request.headers.get("x-api-key");
 
   const isVercelCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
   const isApiKey = apiKey && key === apiKey;
