@@ -30,7 +30,7 @@ function PipelineItem({ item, showDownload, showDone, doneStatus, doneLabel, don
     }}>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-bright)", lineHeight: 1.3 }}>
-          {hero}{size ? ` · ${size}` : ""}{qty > 1 ? ` (x${qty})` : ""}
+          {hero}{size ? ` · ${size}` : ""} (x{qty})
         </div>
         <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
           #{item.orderNumber}{item.customerName ? ` · ${item.customerName}` : ""}

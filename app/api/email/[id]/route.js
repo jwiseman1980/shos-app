@@ -10,12 +10,14 @@ export const dynamic = "force-dynamic";
 export async function GET(request, { params }) {
   try {
     const { id } = await params;
-    const message = await getMessage(id);
+    const { searchParams } = new URL(request.url);
+    const mailbox = searchParams.get("mailbox") || undefined;
+    const message = await getMessage(id, { mailbox });
 
     // Auto-mark as read when opened
     if (message.isUnread) {
       try {
-        await markAsRead(id);
+        await markAsRead(id, { mailbox });
         message.isUnread = false;
       } catch {}
     }

@@ -1,30 +1,35 @@
 import { NextResponse } from "next/server";
-import { getMessage, getGmailClient } from "@/lib/gmail";
-
-const JOSEPH_EMAIL = "joseph.wiseman@steel-hearts.org";
-const JOSEPH_NAME = "Joseph Wiseman";
+import { getMessage, getGmailClient, MAILBOXES } from "@/lib/gmail";
 
 /**
  * POST /api/email/draft-reply
- * Body: { messageId, subject, from, body, snippet }
+ * Body: { messageId, subject, from, body, snippet, mailbox }
  * Returns: { draft: string } — AI-generated reply text
  */
 export async function POST(request) {
   try {
-    const { messageId, subject, from, body, snippet } = await request.json();
+    const { messageId, subject, from, body, snippet, mailbox } = await request.json();
+    const mb = MAILBOXES[mailbox] || MAILBOXES.joseph;
 
     // Fetch full body if we only have a snippet
     let emailBody = body || snippet || "";
     if (!body && messageId) {
       try {
-        const msg = await getMessage(messageId);
+        const msg = await getMessage(messageId, { mailbox });
         emailBody = msg.body || msg.snippet || snippet || "";
       } catch {}
     }
 
-    const prompt = `You are drafting an email reply on behalf of Joseph Wiseman, Executive Director of Steel Hearts Foundation — a 501(c)(3) nonprofit that honors fallen military service members through memorial bracelets, family remembrance, and charitable giving.
+    const senderIdentity = mailbox === "contact"
+      ? "the Steel Hearts Customer Service team"
+      : "Joseph Wiseman, Executive Director of Steel Hearts Foundation";
+    const signOff = mailbox === "contact"
+      ? "Steel Hearts Customer Service"
+      : "Joseph Wiseman, Steel Hearts Foundation";
 
-Write a reply to the following email. Be warm, professional, and genuine. Match the tone of the original. Keep it concise. Sign off as Joseph Wiseman, Steel Hearts Foundation.
+    const prompt = `You are drafting an email reply on behalf of ${senderIdentity} — a 501(c)(3) nonprofit that honors fallen military service members through memorial bracelets, family remembrance, and charitable giving.
+
+Write a reply to the following email. Be warm, professional, and genuine. Match the tone of the original. Keep it concise. Sign off as ${signOff}.
 
 Do not include a subject line. Just write the body of the reply.
 
@@ -66,15 +71,16 @@ Write the reply now:`;
  */
 export async function PUT(request) {
   try {
-    const { to, subject, body, threadId, messageId } = await request.json();
+    const { to, subject, body, threadId, messageId, mailbox } = await request.json();
     if (!to || !body) {
       return NextResponse.json({ error: "to and body required" }, { status: 400 });
     }
 
+    const mb = MAILBOXES[mailbox] || MAILBOXES.joseph;
     const replySubject = subject.startsWith("Re:") ? subject : `Re: ${subject}`;
 
     const headers = [
-      `From: ${JOSEPH_NAME} <${JOSEPH_EMAIL}>`,
+      `From: ${mb.name} <${mb.email}>`,
       `To: ${to}`,
       `Subject: ${replySubject}`,
       `Content-Type: text/plain; charset=UTF-8`,
@@ -88,7 +94,7 @@ export async function PUT(request) {
       .replace(/\//g, "_")
       .replace(/=+$/, "");
 
-    const gmail = await getGmailClient(JOSEPH_EMAIL);
+    const gmail = await getGmailClient(mb.email);
     const draft = await gmail.users.drafts.create({
       userId: "me",
       requestBody: {

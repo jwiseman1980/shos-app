@@ -50,11 +50,10 @@ export default function TaskSidebar({
   const nowHour = new Date().getHours();
   const nowMin = new Date().getMinutes();
 
-  // Filter: active today tasks (not done, not past calendar events)
+  // Filter: today's tasks (including done — they stay green in-place until closeout)
   const todayActive = tasks.filter((t) => {
-    if (t.status === "done") return false;
-    // Past calendar events: if it has a time and it's already passed
-    if (t.source === "calendar" && t.time) {
+    // Past calendar events: if it has a time and it's already passed AND not done
+    if (t.status !== "done" && t.source === "calendar" && t.time) {
       const [h, m] = t.time.replace(/[^\d:]/g, "").split(":").map(Number);
       if (!isNaN(h) && (h < nowHour || (h === nowHour && (m || 0) < nowMin))) return false;
     }
@@ -62,9 +61,8 @@ export default function TaskSidebar({
     return t.date === today || !t.date;
   });
 
-  const doneTasks = tasks.filter((t) => t.status === "done" && (t.date === today || !t.date));
+  const doneCount = todayActive.filter((t) => t.status === "done").length;
   const futureTasks = tasks.filter((t) => t.date && t.date > today && t.status !== "done");
-  const doneCount = doneTasks.length;
 
   // Collapsed section state
   const [expandedGroups, setExpandedGroups] = useState(() => {
@@ -204,14 +202,16 @@ export default function TaskSidebar({
                 {items.map((task) => (
                   <button
                     key={task.id}
-                    className={`task-sidebar-item ${activeTaskId === task.id ? "active" : ""}`}
+                    className={`task-sidebar-item ${activeTaskId === task.id ? "active" : ""} ${task.status === "done" ? "done" : ""}`}
                     onClick={() => onTaskClick(task)}
                   >
                     <span className="task-sidebar-status" style={{ color: statusColor(task) }}>
                       {statusIcon(task)}
                     </span>
                     <div className="task-sidebar-item-content">
-                      <div className="task-sidebar-item-title">{task.title}</div>
+                      <div className="task-sidebar-item-title" style={task.status === "done" ? { textDecoration: "line-through", opacity: 0.7, color: "#27ae60" } : undefined}>
+                        {task.title}
+                      </div>
                       <div className="task-sidebar-item-meta">
                         {task.time && <span>{task.time}</span>}
                         {task.estimatedMinutes && <span>{task.estimatedMinutes}m</span>}
@@ -233,42 +233,22 @@ export default function TaskSidebar({
         );
       })}
 
-      {/* Completed */}
-      {doneTasks.length > 0 && (
-        <div>
-          <button
-            className="task-sidebar-section"
-            onClick={() => toggleGroup("done")}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              width: "100%", background: "none", border: "none", cursor: "pointer",
-              padding: "8px 12px 4px", textAlign: "left",
-            }}
-          >
-            <span>Completed</span>
-            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ fontSize: 10, color: "#27ae60", fontWeight: 400 }}>{doneTasks.length}</span>
-              <span style={{ fontSize: 10, color: "var(--text-dim)", transition: "transform 0.15s", transform: expandedGroups.done ? "rotate(0)" : "rotate(-90deg)" }}>&#9660;</span>
-            </span>
-          </button>
-          {expandedGroups.done && (
-            <div className="task-sidebar-list">
-              {doneTasks.map((task) => (
-                <button
-                  key={task.id}
-                  className={`task-sidebar-item done`}
-                  onClick={() => onTaskClick(task)}
-                >
-                  <span className="task-sidebar-status" style={{ color: "#27ae60" }}>
-                    &#10003;
-                  </span>
-                  <div className="task-sidebar-item-content">
-                    <div className="task-sidebar-item-title">{task.title}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
+      {/* Done counter — visible when items completed, encourages closeout */}
+      {doneCount > 0 && (
+        <div style={{
+          padding: "8px 12px",
+          fontSize: 11,
+          color: "#27ae60",
+          borderTop: "1px solid var(--border)",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+        }}>
+          <span>&#10003;</span>
+          <span>{doneCount} completed today</span>
+          <span style={{ marginLeft: "auto", fontSize: 10, color: "var(--text-dim)" }}>
+            closes at session end
+          </span>
         </div>
       )}
 

@@ -1081,12 +1081,11 @@ export async function POST(request) {
         let currentMessages = [...messages];
         const toolsUsed = [];
         const maxIterations = 10;
-        let rateLimitRetries = 0;
-        const MAX_RATE_RETRIES = 3;
 
         // Route to Haiku for simple ops, Sonnet for complex reasoning / drafting / data work
         const selectedModel = classifyTask(currentMessages);
 
+        let rateLimitRetries = 0;
         for (let i = 0; i < maxIterations; i++) {
           const apiResponse = await fetch("https://api.anthropic.com/v1/messages", {
             method: "POST",
@@ -1106,22 +1105,25 @@ export async function POST(request) {
           });
 
           if (!apiResponse.ok) {
-            // Exponential backoff on rate limit (429) — up to 3 retries
-            if (apiResponse.status === 429 && rateLimitRetries < MAX_RATE_RETRIES) {
-              rateLimitRetries++;
-              const retryAfter = apiResponse.headers.get("retry-after");
-              const baseWait = retryAfter ? parseInt(retryAfter, 10) * 1000 : 5000 * rateLimitRetries;
-              const wait = Math.min(baseWait, 30000);
-              send({ type: "text", delta: `\n_Rate limited — retry ${rateLimitRetries}/${MAX_RATE_RETRIES} in ${Math.round(wait/1000)}s..._\n` });
-              await new Promise(r => setTimeout(r, wait));
-              i--; // Don't consume an iteration on rate limit
-              continue;
+            // Retry with exponential backoff on rate limit (429) — up to 3 attempts
+            if (apiResponse.status === 429) {
+              rateLimitRetries = (rateLimitRetries || 0) + 1;
+              if (rateLimitRetries <= 3) {
+                const retryAfter = apiResponse.headers.get("retry-after");
+                const baseWait = retryAfter ? parseInt(retryAfter, 10) * 1000 : 5000;
+                const wait = Math.min(baseWait * rateLimitRetries, 30000);
+                send({ type: "text", delta: `\n_Rate limited — retry ${rateLimitRetries}/3 in ${Math.round(wait/1000)}s..._\n` });
+                await new Promise(r => setTimeout(r, wait));
+                i--; // Don't consume an iteration for rate limit retries
+                continue;
+              }
+              send({ type: "error", message: "Rate limited after 3 retries. Try again in a moment." });
+              break;
             }
             const err = await apiResponse.text();
             send({ type: "error", message: `Claude API error (${apiResponse.status}): ${err}` });
             break;
           }
-
           rateLimitRetries = 0; // Reset on success
 
           // Parse the streaming response — text deltas and tool_start events
