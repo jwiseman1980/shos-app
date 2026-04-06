@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { updateItemStatus, createDonatedOrder, getActiveOrderItems, getOrderStats } from "@/lib/data/orders";
-import { sfQuery } from "@/lib/salesforce";
 import { createOrder } from "@/lib/shipstation";
 import { getServerClient } from "@/lib/supabase";
 import { sendGmailMessage } from "@/lib/gmail";
@@ -24,66 +23,68 @@ const SLACK_DM_KRISTIN = process.env.SLACK_DM_KRISTIN;
  * (Paid Squarespace orders are already in ShipStation via direct integration.)
  */
 async function autoPushToShipStation(itemId) {
-  if (process.env.SF_LIVE !== "true") return;
+  const sb = getServerClient();
 
   // Get the parent order for this item
-  const items = await sfQuery(
-    `SELECT Squarespace_Order__c FROM Squarespace_Order_Item__c WHERE Id = '${itemId}'`
-  );
-  if (items.length === 0) return;
-  const orderId = items[0].Squarespace_Order__c;
+  const { data: item } = await sb
+    .from("order_items")
+    .select("order_id")
+    .eq("id", itemId)
+    .single();
+  if (!item) return;
 
   // Get the parent order details
-  const orders = await sfQuery(
-    `SELECT Id, Name, Order_Type__c, Shipping_Name__c, Shipping_Address1__c, Shipping_City__c,
-            Shipping_State__c, Shipping_Postal__c, Shipping_Country__c, Billing_Email__c
-     FROM Squarespace_Order__c WHERE Id = '${orderId}'`
-  );
-  if (orders.length === 0) return;
-  const order = orders[0];
+  const { data: order } = await sb
+    .from("orders")
+    .select("*")
+    .eq("id", item.order_id)
+    .single();
+  if (!order) return;
 
   // Only auto-push donated orders (paid orders already in ShipStation via Squarespace)
-  if (order.Order_Type__c !== "Donated") return;
+  if (order.order_type !== "donated") return;
 
-  // Check if ALL items in this order are Ready to Ship
-  const allItems = await sfQuery(
-    `SELECT Id, Name, Lineitem_sku__c, Quantity__c, Bracelet_Size__c, Production_Status__c
-     FROM Squarespace_Order_Item__c WHERE Squarespace_Order__c = '${orderId}'`
-  );
-  const allReady = allItems.every(
-    (i) => i.Production_Status__c === "ready_to_ship" || i.Production_Status__c === "shipped"
+  // Check if ALL items in this order are Ready to Ship or Shipped
+  const { data: allItems } = await sb
+    .from("order_items")
+    .select("id, lineitem_sku, quantity, bracelet_size, production_status, hero:heroes!hero_id(name)")
+    .eq("order_id", item.order_id);
+
+  const allReady = (allItems || []).every(
+    (i) => i.production_status === "ready_to_ship" || i.production_status === "shipped"
   );
   if (!allReady) return;
 
   // Don't push if no shipping address
-  if (!order.Shipping_Address1__c && !order.Shipping_City__c) {
-    await postToSlack(`\u26a0\ufe0f ${order.Name} — all items ready but no shipping address. Add address to push to ShipStation.`);
+  if (!order.shipping_address1 && !order.shipping_city) {
+    await postToSlack(`\u26a0\ufe0f ${order.order_number || "Donated order"} — all items ready but no shipping address. Add address to push to ShipStation.`);
     return;
   }
 
   // Build and push the ShipStation order
+  const orderName = order.order_number || `DON-${Date.now()}`;
   const ssOrder = {
-    orderNumber: order.Name,
+    orderNumber: orderName,
     orderDate: new Date().toISOString(),
     orderStatus: "awaiting_shipment",
     billTo: { name: "Steel Hearts", company: "Steel Hearts 501(c)(3)" },
     shipTo: {
-      name: order.Shipping_Name__c || "",
-      street1: order.Shipping_Address1__c || "",
-      city: order.Shipping_City__c || "",
-      state: order.Shipping_State__c || "",
-      postalCode: order.Shipping_Postal__c || "",
-      country: order.Shipping_Country__c || "US",
+      name: order.shipping_name || "",
+      street1: order.shipping_address1 || "",
+      city: order.shipping_city || "",
+      state: order.shipping_state || "",
+      postalCode: order.shipping_postal || "",
+      country: order.shipping_country || "US",
     },
-    items: allItems
-      .filter((i) => i.Production_Status__c === "ready_to_ship")
+    items: (allItems || [])
+      .filter((i) => i.production_status === "ready_to_ship")
       .map((i) => ({
-        sku: i.Lineitem_sku__c || "",
-        name: i.Name || "Memorial Bracelet",
-        quantity: i.Quantity__c || 1,
+        sku: i.lineitem_sku || "",
+        name: i.hero?.name || "Memorial Bracelet",
+        quantity: i.quantity || 1,
         unitPrice: 0,
       })),
-    customerEmail: order.Billing_Email__c || "",
+    customerEmail: order.billing_email || "",
     amountPaid: 0,
     shippingAmount: 0,
     taxAmount: 0,
@@ -92,7 +93,7 @@ async function autoPushToShipStation(itemId) {
 
   const ssResult = await createOrder(ssOrder);
   if (ssResult?.orderId) {
-    await postToSlack(`\ud83d\ude80 ${order.Name} auto-pushed to ShipStation — ready to print label and ship!`);
+    await postToSlack(`\ud83d\ude80 ${orderName} auto-pushed to ShipStation — ready to print label and ship!`);
   }
 }
 

@@ -7,7 +7,7 @@ import OrderBoard from "@/components/OrderBoard";
 import SyncOrdersButton from "@/components/SyncOrdersButton";
 import LaserDoneButton from "@/components/LaserDoneButton";
 import Link from "next/link";
-import { getGroupedOrders, getOrderStats, getItemsByStatus } from "@/lib/data/orders";
+import { getGroupedOrders, getOrderStats, getItemsByStatus, getDonatedStats, getCharityStats } from "@/lib/data/orders";
 
 const STATUS_LABEL = {
   not_started: "Not started",
@@ -130,9 +130,11 @@ function PipelineColumn({ title, items, href, accent, emptyText, showDownload, s
 export default async function OrdersPage() {
   let orders = [], stats = {};
   let designItems = [], laserItems = [], shipItems = [];
+  let donatedStats = { thisMonth: 0, thisYear: 0, allTime: 0 };
+  let charityStats = { thisMonth: 0, thisYear: 0, allTime: 0 };
 
   try {
-    [orders, stats, designItems, laserItems, shipItems] = await Promise.all([
+    [orders, stats, designItems, laserItems, shipItems, donatedStats, charityStats] = await Promise.all([
       getGroupedOrders(),
       getOrderStats(),
       Promise.all([
@@ -144,6 +146,8 @@ export default async function OrdersPage() {
         getItemsByStatus("in_production"),
       ]).then(([a, b]) => [...a, ...b]).catch(() => []),
       getItemsByStatus("ready_to_ship").catch(() => []),
+      getDonatedStats().catch(() => ({ thisMonth: 0, thisYear: 0, allTime: 0 })),
+      getCharityStats().catch(() => ({ thisMonth: 0, thisYear: 0, allTime: 0 })),
     ]);
   } catch (err) {
     console.error("Order page load error:", err.message);
@@ -175,6 +179,22 @@ export default async function OrdersPage() {
           value={(stats.totalPaid || 0) + (stats.totalDonated || 0)}
           note={`${stats.totalPaid || 0} paid \u00b7 ${stats.totalDonated || 0} donated`}
           accent="var(--gold)"
+        />
+      </div>
+
+      {/* KPIs */}
+      <div className="stat-grid">
+        <StatBlock
+          label="Donated Bracelets"
+          value={donatedStats.thisYear}
+          note={`${donatedStats.thisMonth} this month \u00b7 ${donatedStats.allTime} all-time`}
+          accent="var(--gold)"
+        />
+        <StatBlock
+          label="Charity Funds Raised"
+          value={`$${charityStats.thisYear.toLocaleString()}`}
+          note={`$${charityStats.thisMonth.toLocaleString()} this month \u00b7 $${charityStats.allTime.toLocaleString()} all-time`}
+          accent="var(--status-green)"
         />
       </div>
 
