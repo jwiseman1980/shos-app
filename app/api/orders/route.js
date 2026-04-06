@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { updateItemStatus, createDonatedOrder, getActiveOrderItems, getOrderStats } from "@/lib/data/orders";
 import { createOrder } from "@/lib/shipstation";
 import { getServerClient } from "@/lib/supabase";
-import { sendGmailMessage } from "@/lib/gmail";
+import { createGmailDraft } from "@/lib/gmail";
 import {
   buildDesignNeededMessage,
   buildReadyToLaserMessage,
@@ -141,30 +141,50 @@ export async function GET() {
 }
 
 /**
- * Send shipping notification email to customer when a bracelet ships.
- * Looks up the order/customer info from Supabase via the item ID.
+ * Create a Gmail DRAFT for shipping notification (human reviews before sending).
+ * Resolves hero name from Supabase rather than trusting the pass-through value,
+ * and handles class bracelets and first-name parsing correctly.
  */
-async function sendShippingEmail(itemId, heroName) {
+async function draftShippingEmail(itemId, fallbackName) {
   const sb = getServerClient();
   const { data: item } = await sb
     .from("order_items")
-    .select("order:orders!order_id(billing_email, billing_name, shipping_name)")
+    .select(`
+      hero:heroes!hero_id(name),
+      order:orders!order_id(billing_email, billing_name, shipping_name)
+    `)
     .eq("id", itemId)
     .single();
 
   const email = item?.order?.billing_email;
   if (!email) return;
 
-  const customerName = item.order.shipping_name || item.order.billing_name || "there";
-  const firstName = customerName.split(" ")[0];
+  // Resolve hero name from the hero record, not the passed-in value (which can be a raw SKU)
+  const heroName = item.hero?.name || fallbackName || "your hero";
 
-  await sendGmailMessage({
+  // Parse customer first name properly: "John Smith" -> "John", handle edge cases
+  const fullName = (item.order.shipping_name || item.order.billing_name || "").trim();
+  const firstName = fullName.split(/\s+/)[0].replace(/[,;]$/, "") || "there";
+
+  // Avoid doubled "Memorial Bracelet" for class/event bracelets that already contain "Bracelet"
+  const alreadyHasBracelet = /bracelet/i.test(heroName);
+  const subject = alreadyHasBracelet
+    ? `Shipped -- ${heroName}`
+    : `Shipped -- ${heroName} Memorial Bracelet`;
+
+  await createGmailDraft({
     senderEmail: "joseph.wiseman@steel-hearts.org",
     senderName: "Steel Hearts Foundation",
     to: email,
-    subject: `Shipped — ${heroName} Memorial Bracelet`,
+    subject,
     body: `Your bracelet is on its way, ${firstName}.\n\nThe memorial bracelet honoring ${heroName} has shipped. You should receive it within a few business days.\n\nThank you for carrying this name forward. Every bracelet is a promise that their sacrifice will not be forgotten.\n\nWith gratitude,\nJoseph Wiseman\nFounder, Steel Hearts Foundation\nsteel-hearts.org | EIN: 47-2511085`,
   });
+
+  // Notify Joseph that a draft is waiting for review
+  await postToSlack(
+    `📧 *Shipping email draft created* for ${heroName} → ${email}\nReview in Gmail Drafts before sending. (ShipStation also sends its own tracking notification.)`,
+    SLACK_DM_JOSEPH,
+  );
 }
 
 /**
@@ -227,10 +247,8 @@ export async function PATCH(request) {
         }
       } else if (status === "shipped") {
         await postToSlack(buildShippedMessage(name));
-        // Send shipping notification email to customer
-        sendShippingEmail(itemId, name).catch((err) =>
-          console.warn("Shipping email failed:", err.message)
-        );
+        // Shipping email disabled — ShipStation handles customer notifications.
+        // draftShippingEmail() is available when ready to build a branded follow-up.
       }
     }
 
