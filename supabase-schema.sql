@@ -211,6 +211,9 @@ CREATE TABLE heroes (
   -- Relationships
   family_contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
   organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
+  -- Sales history (populated by scripts/write-lifetime-sales.mjs)
+  lifetime_sold INTEGER DEFAULT 0,         -- total units sold all-time
+  legacy_skus   TEXT[]  DEFAULT '{}',      -- historical match-source tags from sales reconciliation
   -- Website
   bio_page_url TEXT,
   -- Metadata

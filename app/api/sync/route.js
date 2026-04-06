@@ -90,7 +90,7 @@ export async function GET(request) {
 
   // Sync each table
   const tables = [
-    { sb: "heroes", sf: "Memorial_Bracelet__c", map: r => r.sf_id ? { Id: r.sf_id, Active_Listing__c: r.active_listing, On_Hand_7in__c: r.on_hand_7in, On_Hand_6in__c: r.on_hand_6in, Anniversary_Status__c: r.anniversary_status } : null },
+    { sb: "heroes", sf: "Memorial_Bracelet__c", map: r => r.sf_id ? { Id: r.sf_id, Active_Listing__c: r.active_listing, On_Hand_7in__c: r.on_hand_7in, On_Hand_6in__c: r.on_hand_6in, Anniversary_Status__c: r.anniversary_status, Lifetime_Sold__c: r.lifetime_sold ?? 0, Legacy_SKUs__c: Array.isArray(r.legacy_skus) ? r.legacy_skus.join("|") : null } : null },
     { sb: "contacts", sf: "Contact", map: r => r.sf_id ? { Id: r.sf_id, FirstName: r.first_name, LastName: r.last_name, Email: r.email, Phone: r.phone } : null },
     { sb: "organizations", sf: "Account", map: r => r.sf_id ? { Id: r.sf_id, Name: r.name } : null },
     { sb: "donations", sf: "Donation__c", map: r => r.sf_id ? { Id: r.sf_id, Donation_Amount__c: r.amount, Source__c: r.source } : null },
