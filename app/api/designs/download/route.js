@@ -28,16 +28,14 @@ export async function GET(request) {
     const sb = getServerClient();
     const BUCKET = "designs";
 
-    // Try exact SKU first (e.g., USN-CAPODANNO-6.svg)
-    // When a size is specified, do NOT fall back to base SKU — wrong size is worse than no file
+    // Try exact SKU first, then sized variant, then base SKU as last resort
     const candidates = [sku];
     if (size) {
       const sizedName = `${baseSku}-${size}`;
       if (!candidates.includes(sizedName)) candidates.push(sizedName);
-    } else {
-      // Only fall back to base SKU when no size was requested
-      if (!candidates.includes(baseSku)) candidates.push(baseSku);
     }
+    // Always try base SKU as fallback — having the design beats a 404
+    if (!candidates.includes(baseSku)) candidates.push(baseSku);
 
     // Always label the download with the requested SKU (including size)
     const downloadName = `${sku}.svg`;

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 export default function LaserDoneButton({ itemId, heroName, toStatus = "ready_to_ship", label = "✓ Done", color = "var(--status-blue)" }) {
   const [state, setState] = useState("idle"); // idle | saving | done
+  const rowRef = useRef(null);
 
   async function handleDone(e) {
     e.preventDefault();
@@ -18,7 +19,18 @@ export default function LaserDoneButton({ itemId, heroName, toStatus = "ready_to
       const data = await res.json();
       if (data.success) {
         setState("done");
-        setTimeout(() => window.location.reload(), 800);
+        // Fade out the parent pipeline item row, then remove it from the DOM
+        const row = rowRef.current?.closest("[data-pipeline-item]");
+        if (row) {
+          row.style.transition = "opacity 0.4s, max-height 0.4s";
+          row.style.opacity = "0";
+          row.style.maxHeight = "0";
+          row.style.overflow = "hidden";
+          row.style.padding = "0";
+          row.style.margin = "0";
+          row.style.borderBottom = "none";
+          setTimeout(() => row.remove(), 500);
+        }
       } else {
         setState("idle");
       }
@@ -29,7 +41,7 @@ export default function LaserDoneButton({ itemId, heroName, toStatus = "ready_to
 
   if (state === "done") {
     return (
-      <span style={{ fontSize: 10, color: "var(--status-green)", fontWeight: 600 }}>
+      <span ref={rowRef} style={{ fontSize: 10, color: "var(--status-green)", fontWeight: 600 }}>
         {"\u2713"} Done
       </span>
     );

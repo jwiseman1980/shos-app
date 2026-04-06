@@ -20,15 +20,17 @@ const STATUS_LABEL = {
 function PipelineItem({ item, showDownload, showDone, doneStatus, doneLabel, doneColor }) {
   const hero = item.heroName || item.sku || "—";
   const size = item.size ? `${item.size}"` : "";
+  const qty = item.quantity || 1;
+  const needsDesign = showDownload && !item.hasDesign;
   return (
-    <div style={{
+    <div data-pipeline-item style={{
       padding: "7px 0",
       borderBottom: "1px solid var(--card-border)",
       display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8,
     }}>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-bright)", lineHeight: 1.3 }}>
-          {hero}{size ? ` · ${size}` : ""}
+          {hero}{size ? ` · ${size}` : ""}{qty > 1 ? ` (x${qty})` : ""}
         </div>
         <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
           #{item.orderNumber}{item.customerName ? ` · ${item.customerName}` : ""}
@@ -44,6 +46,15 @@ function PipelineItem({ item, showDownload, showDone, doneStatus, doneLabel, don
             {"\u2B07"} SVG
           </a>
         )}
+        {needsDesign && (
+          <span style={{
+            fontSize: 10, fontWeight: 600, color: "var(--status-orange)",
+            padding: "2px 6px", borderRadius: 4,
+            border: "1px solid var(--status-orange)", whiteSpace: "nowrap",
+          }}>
+            Needs Design
+          </span>
+        )}
         {showDone && (
           <LaserDoneButton
             itemId={item.id}
@@ -58,7 +69,7 @@ function PipelineItem({ item, showDownload, showDone, doneStatus, doneLabel, don
   );
 }
 
-function PipelineColumn({ title, items, href, accent, emptyText, showDownload, showDone, doneStatus, doneLabel, doneColor }) {
+function PipelineColumn({ title, items, href, accent, emptyText, showDownload, showDone, doneStatus, doneLabel, doneColor, unit }) {
   const shown = items.slice(0, 8);
   const overflow = items.length - shown.length;
   return (
@@ -80,7 +91,7 @@ function PipelineColumn({ title, items, href, accent, emptyText, showDownload, s
           <span style={{
             fontSize: 11, background: accent + "22", color: accent,
             borderRadius: 10, padding: "1px 7px", fontWeight: 600,
-          }}>{items.length}</span>
+          }}>{items.length}{unit ? ` ${unit}` : ""}</span>
         </div>
         <Link href={href} style={{ fontSize: 11, color: "var(--text-dim)", textDecoration: "none" }}>
           View all →
@@ -179,6 +190,7 @@ export default async function OrdersPage() {
             href="/designs"
             accent="var(--status-orange)"
             emptyText="No designs needed"
+            unit="items"
           />
           <PipelineColumn
             title="Laser"
@@ -191,6 +203,7 @@ export default async function OrdersPage() {
             doneStatus="ready_to_ship"
             doneLabel="✓ Done"
             doneColor="var(--status-blue)"
+            unit="items"
           />
           <PipelineColumn
             title="Ship"
@@ -202,6 +215,7 @@ export default async function OrdersPage() {
             doneStatus="shipped"
             doneLabel="📦 Shipped"
             doneColor="var(--status-green)"
+            unit="items"
           />
         </div>
       </div>
