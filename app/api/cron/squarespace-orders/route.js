@@ -76,11 +76,17 @@ async function fetchSquarespaceOrders(modifiedAfter) {
 
   const allOrders = [];
   let nextCursor = null;
+  const modifiedBefore = new Date().toISOString();
 
   do {
     const url = new URL(SQ_API_BASE);
-    if (modifiedAfter) url.searchParams.set("modifiedAfter", modifiedAfter);
-    if (nextCursor) url.searchParams.set("cursor", nextCursor);
+    if (nextCursor) {
+      // When paginating with cursor, no other params allowed
+      url.searchParams.set("cursor", nextCursor);
+    } else if (modifiedAfter) {
+      url.searchParams.set("modifiedAfter", modifiedAfter);
+      url.searchParams.set("modifiedBefore", modifiedBefore);
+    }
 
     const resp = await fetch(url.toString(), {
       headers: {
