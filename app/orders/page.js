@@ -1,21 +1,22 @@
 export const dynamic = "force-dynamic";
 
 import PageShell from "@/components/PageShell";
-import DataCard from "@/components/DataCard";
 import StatBlock from "@/components/StatBlock";
 import OrderBoard from "@/components/OrderBoard";
+import OrdersTable from "@/components/OrdersTable";
 import SyncOrdersButton from "@/components/SyncOrdersButton";
 import LaserDoneButton from "@/components/LaserDoneButton";
 import Link from "next/link";
-import { getGroupedOrders, getOrderStats, getItemsByStatus, getDonatedStats, getCharityStats } from "@/lib/data/orders";
+import {
+  getGroupedOrders,
+  getOrderStats,
+  getItemsByStatus,
+  getHistoricalStats,
+  getAllOrderItems,
+  getTopHeroesByOrders,
+} from "@/lib/data/orders";
 
-const STATUS_LABEL = {
-  not_started: "Not started",
-  design_needed: "Design needed",
-  ready_to_laser: "Ready",
-  in_production: "In progress",
-  ready_to_ship: "Ready",
-};
+// ─── Pipeline item row ────────────────────────────────────────────────────────
 
 function PipelineItem({ item, showDownload, showDone, doneStatus, doneLabel, doneColor }) {
   const hero = item.heroName || item.sku || "—";
@@ -43,7 +44,7 @@ function PipelineItem({ item, showDownload, showDone, doneStatus, doneLabel, don
             textDecoration: "none", padding: "2px 6px", borderRadius: 4,
             border: "1px solid var(--status-green)", whiteSpace: "nowrap",
           }}>
-            {"\u2B07"} SVG
+            ⬇ SVG
           </a>
         )}
         {needsDesign && (
@@ -127,45 +128,147 @@ function PipelineColumn({ title, items, href, accent, emptyText, showDownload, s
   );
 }
 
+// ─── Top Heroes card ──────────────────────────────────────────────────────────
+
+function TopHeroesCard({ heroes }) {
+  if (!heroes || heroes.length === 0) return null;
+  const max = heroes[0]?.totalQty || 1;
+  return (
+    <div style={{
+      background: "var(--card-bg)",
+      border: "1px solid var(--card-border)",
+      borderRadius: 8,
+      overflow: "hidden",
+    }}>
+      <div style={{
+        padding: "10px 16px",
+        borderBottom: "1px solid var(--card-border)",
+        display: "flex", alignItems: "center", gap: 8,
+      }}>
+        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />
+        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-bright)" }}>Top Heroes by Sales</span>
+        <span style={{
+          fontSize: 11, background: "var(--gold-soft)", color: "var(--gold)",
+          borderRadius: 10, padding: "1px 7px", fontWeight: 600,
+        }}>Paid orders</span>
+      </div>
+      <div style={{ padding: "8px 16px 12px" }}>
+        {heroes.map((h, i) => (
+          <div key={h.heroId} style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "5px 0",
+            borderBottom: i < heroes.length - 1 ? "1px solid var(--card-border)" : "none",
+          }}>
+            <span style={{
+              fontSize: 11, fontWeight: 700, color: "var(--text-dim)",
+              minWidth: 18, textAlign: "right",
+            }}>{i + 1}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-bright)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {h.heroName}
+              </div>
+              <div style={{ height: 4, marginTop: 3, borderRadius: 2, background: "var(--card-border)", overflow: "hidden" }}>
+                <div style={{
+                  height: "100%",
+                  width: `${Math.round((h.totalQty / max) * 100)}%`,
+                  background: "var(--gold)",
+                  borderRadius: 2,
+                }} />
+              </div>
+            </div>
+            <div style={{ textAlign: "right", flexShrink: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-bright)" }}>{h.totalQty}</div>
+              <div style={{ fontSize: 10, color: "var(--text-dim)" }}>
+                {h.lineCount} order{h.lineCount !== 1 ? "s" : ""}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Section label ────────────────────────────────────────────────────────────
+
+function SectionLabel({ children }) {
+  return (
+    <div style={{
+      fontSize: 12, fontWeight: 600, color: "var(--text-dim)",
+      textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default async function OrdersPage() {
   let orders = [], stats = {};
   let designItems = [], laserItems = [], shipItems = [];
-  let donatedStats = { thisMonth: 0, thisYear: 0, allTime: 0 };
-  let charityStats = { thisMonth: 0, thisYear: 0, allTime: 0 };
+  let historicalStats = {};
+  let allItems = [];
+  let topHeroes = [];
 
   try {
-    [orders, stats, designItems, laserItems, shipItems, donatedStats, charityStats] = await Promise.all([
-      getGroupedOrders(),
-      getOrderStats(),
-      Promise.all([
-        getItemsByStatus("design_needed"),
-        getItemsByStatus("not_started"),
-      ]).then(([a, b]) => [...a, ...b]).catch(() => []),
-      Promise.all([
-        getItemsByStatus("ready_to_laser"),
-        getItemsByStatus("in_production"),
-      ]).then(([a, b]) => [...a, ...b]).catch(() => []),
-      getItemsByStatus("ready_to_ship").catch(() => []),
-      getDonatedStats().catch(() => ({ thisMonth: 0, thisYear: 0, allTime: 0 })),
-      getCharityStats().catch(() => ({ thisMonth: 0, thisYear: 0, allTime: 0 })),
-    ]);
+    [orders, stats, designItems, laserItems, shipItems, historicalStats, allItems, topHeroes] =
+      await Promise.all([
+        getGroupedOrders(),
+        getOrderStats(),
+        Promise.all([
+          getItemsByStatus("design_needed"),
+          getItemsByStatus("not_started"),
+        ]).then(([a, b]) => [...a, ...b]).catch(() => []),
+        Promise.all([
+          getItemsByStatus("ready_to_laser"),
+          getItemsByStatus("in_production"),
+        ]).then(([a, b]) => [...a, ...b]).catch(() => []),
+        getItemsByStatus("ready_to_ship").catch(() => []),
+        getHistoricalStats().catch(() => ({})),
+        getAllOrderItems(750).catch(() => []),
+        getTopHeroesByOrders(12).catch(() => []),
+      ]);
   } catch (err) {
     console.error("Order page load error:", err.message);
   }
 
+  const hs = {
+    totalSold: 0, totalDonated: 0, totalRevenue: 0,
+    soldThisYear: 0, soldThisMonth: 0, revenueThisYear: 0, revenueThisMonth: 0,
+    ...historicalStats,
+  };
+
+  const activeTotal = (stats.designNeeded || 0) + (stats.readyToLaser || 0) + (stats.inProduction || 0) + (stats.readyToShip || 0);
+  const shippedLast30 = allItems.filter((i) => {
+    if (i.productionStatus !== "shipped") return false;
+    const d = i.orderDate || i.createdAt;
+    if (!d) return false;
+    const ms = new Date() - new Date(d);
+    return ms <= 30 * 24 * 60 * 60 * 1000;
+  }).length;
+
   return (
-    <PageShell title="Order Queue" subtitle="Fulfillment pipeline — Salesforce + ShipStation" action={<SyncOrdersButton />}>
+    <PageShell title="Orders" subtitle="Pipeline · History · Analytics" action={<SyncOrdersButton />}>
+
+      {/* ── Pipeline summary ── */}
       <div className="stat-grid">
         <StatBlock
-          label="Design Queue"
-          value={(stats.designNeeded || 0) + (stats.designInProgress || 0)}
-          note={`${stats.designNeeded || 0} needed \u00b7 ${stats.designInProgress || 0} in progress`}
+          label="Active Orders"
+          value={activeTotal}
+          note={`${stats.totalPaid || 0} paid · ${stats.totalDonated || 0} donated`}
+          accent="var(--gold)"
+        />
+        <StatBlock
+          label="Needs Design"
+          value={stats.designNeeded || 0}
+          note="Not started or design needed"
           accent="var(--status-orange)"
         />
         <StatBlock
           label="In Production"
           value={(stats.readyToLaser || 0) + (stats.inProduction || 0)}
-          note={`${stats.readyToLaser || 0} laser \u00b7 ${stats.inProduction || 0} active`}
+          note={`${stats.readyToLaser || 0} laser · ${stats.inProduction || 0} active`}
           accent="var(--status-blue)"
         />
         <StatBlock
@@ -175,34 +278,47 @@ export default async function OrdersPage() {
           accent="var(--status-green)"
         />
         <StatBlock
-          label="Total Orders"
-          value={(stats.totalPaid || 0) + (stats.totalDonated || 0)}
-          note={`${stats.totalPaid || 0} paid \u00b7 ${stats.totalDonated || 0} donated`}
-          accent="var(--gold)"
+          label="Shipped (30d)"
+          value={shippedLast30}
+          note={`${stats.shipped || 0} total shipped`}
+          accent="var(--status-gray)"
         />
       </div>
 
-      {/* KPIs */}
-      <div className="stat-grid">
-        <StatBlock
-          label="Donated Bracelets"
-          value={donatedStats.thisYear}
-          note={`${donatedStats.thisMonth} this month \u00b7 ${donatedStats.allTime} all-time`}
-          accent="var(--gold)"
-        />
-        <StatBlock
-          label="Charity Funds Raised"
-          value={`$${charityStats.thisYear.toLocaleString()}`}
-          note={`$${charityStats.thisMonth.toLocaleString()} this month \u00b7 $${charityStats.allTime.toLocaleString()} all-time`}
-          accent="var(--status-green)"
-        />
-      </div>
-
-      {/* Production Pipeline */}
+      {/* ── Historical stats ── */}
       <div className="section">
-        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
-          Production Pipeline
+        <SectionLabel>All-Time Stats</SectionLabel>
+        <div className="stat-grid">
+          <StatBlock
+            label="Bracelets Sold"
+            value={hs.totalSold.toLocaleString()}
+            note={`${hs.soldThisYear} this year · ${hs.soldThisMonth} this month`}
+            accent="var(--gold)"
+          />
+          <StatBlock
+            label="Bracelets Donated"
+            value={hs.totalDonated.toLocaleString()}
+            note="Donated orders all-time"
+            accent="var(--gold)"
+          />
+          <StatBlock
+            label="Total Revenue"
+            value={`$${hs.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+            note={`$${hs.revenueThisYear.toLocaleString()} this year · $${hs.revenueThisMonth.toLocaleString()} this month`}
+            accent="var(--status-green)"
+          />
+          <StatBlock
+            label="Charity Raised"
+            value={`$${(hs.totalSold * 10).toLocaleString()}`}
+            note="$10 obligation per bracelet sold"
+            accent="var(--status-green)"
+          />
         </div>
+      </div>
+
+      {/* ── Production Pipeline ── */}
+      <div className="section">
+        <SectionLabel>Production Pipeline</SectionLabel>
         <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
           <PipelineColumn
             title="Design"
@@ -240,9 +356,28 @@ export default async function OrdersPage() {
         </div>
       </div>
 
+      {/* ── Active orders board + Top heroes ── */}
       <div className="section">
-        <OrderBoard orders={orders} />
+        <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+          <div style={{ flex: "1 1 0", minWidth: 0 }}>
+            <SectionLabel>Active Order Board</SectionLabel>
+            <OrderBoard orders={orders} />
+          </div>
+          {topHeroes.length > 0 && (
+            <div style={{ flex: "0 0 260px", minWidth: 220 }}>
+              <SectionLabel>Top Heroes</SectionLabel>
+              <TopHeroesCard heroes={topHeroes} />
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* ── Full order history ── */}
+      <div className="section">
+        <SectionLabel>Order History ({allItems.length} items)</SectionLabel>
+        <OrdersTable items={allItems} />
+      </div>
+
     </PageShell>
   );
 }
