@@ -88,7 +88,7 @@ export default async function RootLayout({ children }) {
       fromName: msg.from?.match(/^"?([^"<]*)"?\s*</)?.[1]?.trim() || msg.from,
       snippet: msg.snippet || "",
       date: msg.date,
-      isUnread: msg.labelIds?.includes("UNREAD"),
+      isUnread: msg.isUnread || msg.labels?.includes("UNREAD") || false,
       category: msg.category,
     }));
   }

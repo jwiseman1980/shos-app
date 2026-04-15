@@ -133,7 +133,7 @@ export default function ConsoleShell({ user, tasks, calendarEvents, emails, gree
         onTaskClick={handleTaskClick}
         onViewChange={handleViewChange}
         activeView={isDashboard ? activeView : null}
-        emailCount={emailList.length}
+        emailCount={emailList.filter((e) => e.isUnread).length}
         greeting={greeting}
         collapsed={!sidebarOpen}
         onToggleCollapse={() => setSidebarOpen((v) => !v)}
@@ -152,8 +152,10 @@ export default function ConsoleShell({ user, tasks, calendarEvents, emails, gree
               calendarEvents={calendarEvents}
               tasks={taskList}
               currentUser={currentUser}
+              greeting={greeting}
               onTaskComplete={handleTaskComplete}
               onTaskStart={handleTaskStart}
+              onTaskClick={handleTaskClick}
               onEmailTriaged={handleEmailTriaged}
               onEmailToTask={handleEmailToTask}
               onViewChange={handleViewChange}
