@@ -34,6 +34,7 @@ const NAV_ROLES = [
       { href: "/cos", label: "Overview", exact: true },
       { href: "/sops", label: "SOPs" },
       { href: "/engagements", label: "Engagements" },
+      { href: "/compliance", label: "Compliance" },
       { href: "/email", label: "Inbox" },
       { href: "/email/composer", label: "Email Composer" },
       { href: "/org", label: "Org Chart" },
@@ -48,6 +49,7 @@ const NAV_ROLES = [
     items: [
       { href: "/finance", label: "Overview", exact: true },
       { href: "/finance/report", label: "Monthly Report" },
+      { href: "/reports", label: "Board Report" },
       { href: "/finance/disbursements", label: "Disbursements" },
       { href: "/finance/recon", label: "Recon Matrix" },
       { href: "/finance/expenses", label: "Expenses" },
@@ -89,6 +91,7 @@ const NAV_ROLES = [
     items: [
       { href: "/dev", label: "Overview", exact: true },
       { href: "/donors", label: "Donors" },
+      { href: "/events", label: "Events" },
     ],
   },
   {
