@@ -15,6 +15,11 @@ export const STATUS_META = {
   cancelled:      { label: "Cancelled",      color: "#ef4444" },
 };
 
+const STATUS_OPTIONS = [
+  "design_needed", "ready_to_laser", "in_production",
+  "ready_to_ship", "shipped", "delivered", "cancelled",
+];
+
 export const TYPE_META = {
   paid:        { label: "Paid",        color: "#22c55e" },
   donated:     { label: "Donated",     color: "#c4a237" },
@@ -23,9 +28,8 @@ export const TYPE_META = {
   replacement: { label: "Replacement", color: "#64748b" },
 };
 
-function Badge({ meta, small }) {
-  if (!meta) return null;
-  const c = meta.color;
+function StatusBadge({ status, small }) {
+  const meta = STATUS_META[status] || { label: status || "—", color: "#6b7280" };
   return (
     <span style={{
       display: "inline-block",
@@ -33,8 +37,8 @@ function Badge({ meta, small }) {
       borderRadius: 12,
       fontSize: small ? 10 : 11,
       fontWeight: 600,
-      background: c + "22",
-      color: c,
+      background: meta.color + "22",
+      color: meta.color,
       whiteSpace: "nowrap",
     }}>
       {meta.label}
@@ -42,9 +46,287 @@ function Badge({ meta, small }) {
   );
 }
 
-// ── Sort column header ───────────────────────────────────────────────────────
+function TypeBadge({ type, small }) {
+  const meta = TYPE_META[type] || { label: type || "—", color: "#6b7280" };
+  return (
+    <span style={{
+      display: "inline-block",
+      padding: small ? "1px 6px" : "2px 8px",
+      borderRadius: 12,
+      fontSize: small ? 10 : 11,
+      fontWeight: 600,
+      background: meta.color + "22",
+      color: meta.color,
+      whiteSpace: "nowrap",
+    }}>
+      {meta.label}
+    </span>
+  );
+}
 
-function Th({ label, sortKey, activeSortKey, dir, onClick, style = {} }) {
+// ── Inline item status updater ───────────────────────────────────────────────
+
+function ItemStatusSelect({ itemId, heroName, currentStatus, onUpdated }) {
+  const [value,    setValue]    = useState(currentStatus);
+  const [updating, setUpdating] = useState(false);
+
+  async function handleChange(e) {
+    const newStatus = e.target.value;
+    setValue(newStatus);
+    setUpdating(true);
+    try {
+      const res = await fetch("/api/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId, status: newStatus, heroName }),
+      });
+      const data = await res.json();
+      if (data.success && onUpdated) onUpdated(itemId, newStatus);
+    } catch (err) {
+      console.error("Status update failed:", err);
+      setValue(currentStatus); // rollback
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  const meta = STATUS_META[value] || { color: "#6b7280" };
+
+  return (
+    <select
+      value={value}
+      onChange={handleChange}
+      disabled={updating}
+      style={{
+        background: "var(--bg)",
+        color: meta.color,
+        border: `1px solid ${meta.color}44`,
+        borderRadius: 6,
+        padding: "3px 6px",
+        fontSize: 11,
+        fontWeight: 600,
+        cursor: updating ? "wait" : "pointer",
+        opacity: updating ? 0.6 : 1,
+      }}
+    >
+      {STATUS_OPTIONS.map((s) => (
+        <option key={s} value={s}>{STATUS_META[s]?.label || s}</option>
+      ))}
+    </select>
+  );
+}
+
+// ── Order row with expandable line items ─────────────────────────────────────
+
+function OrderRow({ order, defaultExpanded = false }) {
+  const [expanded, setExpanded]         = useState(defaultExpanded);
+  const [items,    setItems]            = useState(order.items || []);
+  const [worstStatus, setWorstStatus]   = useState(order.worstStatus || "");
+
+  // STATUS_RANK for re-computing order badge after inline updates
+  const STATUS_RANK = {
+    not_started: 0, design_needed: 1, ready_to_laser: 2,
+    in_production: 3, ready_to_ship: 4, shipped: 5,
+    delivered: 6, cancelled: 7,
+  };
+
+  function handleItemUpdated(itemId, newStatus) {
+    const updated = items.map((i) => i.id === itemId ? { ...i, productionStatus: newStatus } : i);
+    setItems(updated);
+    const worst = updated.reduce((w, i) => {
+      const r = STATUS_RANK[i.productionStatus] ?? 99;
+      return r < (STATUS_RANK[w] ?? 99) ? i.productionStatus : w;
+    }, updated[0]?.productionStatus || "");
+    setWorstStatus(worst);
+  }
+
+  const isDonated     = order.orderType === "donated";
+  const multiItem     = items.length > 1;
+  const accentColor   = isDonated ? "var(--gold)" : "var(--card-border)";
+
+  return (
+    <>
+      {/* Order header row */}
+      <tr
+        onClick={() => setExpanded((e) => !e)}
+        style={{
+          borderBottom: expanded ? "none" : "1px solid var(--card-border)",
+          cursor: "pointer",
+          background: expanded ? "var(--bg-2)" : "transparent",
+        }}
+      >
+        {/* Expand toggle + order number */}
+        <td style={{ ...tdStyle, paddingLeft: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{
+              fontSize: 10, color: "var(--text-dim)",
+              transition: "transform 0.15s",
+              display: "inline-block",
+              transform: expanded ? "rotate(90deg)" : "rotate(0deg)",
+            }}>▶</span>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color: "var(--text-bright)" }}>
+                  {order.orderNumber || "—"}
+                </span>
+                {isDonated && (
+                  <span style={{ fontSize: 9, padding: "0 5px", borderRadius: 8, background: "var(--gold)", color: "#000", fontWeight: 700 }}>
+                    DONATED
+                  </span>
+                )}
+                {multiItem && (
+                  <span style={{ fontSize: 9, padding: "0 5px", borderRadius: 8, background: "var(--card-border)", color: "var(--text-dim)", fontWeight: 600 }}>
+                    {items.length} items
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
+                {order.orderDate
+                  ? new Date(order.orderDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                  : "—"}
+              </div>
+            </div>
+          </div>
+        </td>
+
+        {/* Customer */}
+        <td style={tdStyle}>
+          <div style={{ fontSize: 13, color: "var(--text-bright)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {order.customerName || "—"}
+          </div>
+          {order.shipTo && (
+            <div style={{ fontSize: 11, color: "var(--text-dim)" }}>{order.shipTo}</div>
+          )}
+        </td>
+
+        {/* Summary: bracelets */}
+        <td style={{ ...tdStyle, textAlign: "center" }}>
+          <span style={{ fontWeight: 700, fontSize: 15, color: "var(--text-bright)" }}>
+            {order.totalQty}
+          </span>
+          <div style={{ fontSize: 10, color: "var(--text-dim)" }}>
+            bracelet{order.totalQty !== 1 ? "s" : ""}
+          </div>
+        </td>
+
+        {/* Revenue */}
+        <td style={{ ...tdStyle, textAlign: "right" }}>
+          {order.totalRevenue > 0 ? (
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-bright)" }}>
+              ${order.totalRevenue.toFixed(2)}
+            </span>
+          ) : (
+            <span style={{ fontSize: 11, color: "var(--text-dim)" }}>—</span>
+          )}
+        </td>
+
+        {/* Type */}
+        <td style={tdStyle}>
+          <TypeBadge type={order.orderType} small />
+        </td>
+
+        {/* Status (worst item status) */}
+        <td style={tdStyle}>
+          <StatusBadge status={worstStatus} small />
+          {multiItem && (
+            <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 2 }}>
+              {items.filter((i) => i.productionStatus === "shipped").length}/{items.length} shipped
+            </div>
+          )}
+        </td>
+      </tr>
+
+      {/* Expanded: line items */}
+      {expanded && (
+        <tr style={{ borderBottom: "1px solid var(--card-border)" }}>
+          <td colSpan={6} style={{ padding: 0 }}>
+            <div style={{
+              background: "var(--bg-3)",
+              borderLeft: `3px solid ${accentColor}`,
+              margin: "0 0 0 28px",
+            }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid var(--card-border)" }}>
+                    <ItemTh>Hero</ItemTh>
+                    <ItemTh>SKU</ItemTh>
+                    <ItemTh center>Qty</ItemTh>
+                    <ItemTh center>Size</ItemTh>
+                    <ItemTh right>Unit Price</ItemTh>
+                    <ItemTh>Status</ItemTh>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item, idx) => (
+                    <tr
+                      key={item.id}
+                      style={{
+                        borderBottom: idx < items.length - 1 ? "1px solid var(--card-border)" : "none",
+                        background: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)",
+                      }}
+                    >
+                      <td style={{ ...itemTdStyle, fontWeight: 500, color: "var(--text-bright)" }}>
+                        {item.heroName || "—"}
+                      </td>
+                      <td style={itemTdStyle}>
+                        <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-dim)" }}>
+                          {item.sku || "—"}
+                        </span>
+                      </td>
+                      <td style={{ ...itemTdStyle, textAlign: "center", fontWeight: 700, color: "var(--text-bright)" }}>
+                        {item.quantity}
+                      </td>
+                      <td style={{ ...itemTdStyle, textAlign: "center", color: "var(--text-dim)", fontSize: 12 }}>
+                        {item.size ? `${item.size}"` : "—"}
+                      </td>
+                      <td style={{ ...itemTdStyle, textAlign: "right" }}>
+                        {item.unitPrice > 0 ? (
+                          <span style={{ fontSize: 12, color: "var(--text-bright)" }}>
+                            ${item.unitPrice.toFixed(2)}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 11, color: "var(--text-dim)" }}>—</span>
+                        )}
+                      </td>
+                      <td style={itemTdStyle}>
+                        <ItemStatusSelect
+                          itemId={item.id}
+                          heroName={item.heroName}
+                          currentStatus={item.productionStatus}
+                          onUpdated={handleItemUpdated}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function ItemTh({ children, center, right }) {
+  return (
+    <th style={{
+      padding: "6px 12px",
+      fontSize: 10,
+      fontWeight: 700,
+      textTransform: "uppercase",
+      letterSpacing: "0.05em",
+      color: "var(--text-dim)",
+      textAlign: center ? "center" : right ? "right" : "left",
+    }}>
+      {children}
+    </th>
+  );
+}
+
+// ── Sort header ──────────────────────────────────────────────────────────────
+
+function Th({ label, sortKey, activeSortKey, dir, onClick }) {
   const isActive = activeSortKey === sortKey;
   return (
     <th
@@ -60,7 +342,6 @@ function Th({ label, sortKey, activeSortKey, dir, onClick, style = {} }) {
         cursor: "pointer",
         userSelect: "none",
         whiteSpace: "nowrap",
-        ...style,
       }}
     >
       {label}
@@ -71,7 +352,7 @@ function Th({ label, sortKey, activeSortKey, dir, onClick, style = {} }) {
   );
 }
 
-// ── Pagination button ────────────────────────────────────────────────────────
+// ── Pagination ───────────────────────────────────────────────────────────────
 
 function PagBtn({ label, disabled, active, onClick }) {
   return (
@@ -96,7 +377,7 @@ function PagBtn({ label, disabled, active, onClick }) {
   );
 }
 
-// ── Shared input styles ──────────────────────────────────────────────────────
+// ── Shared styles ────────────────────────────────────────────────────────────
 
 const inputStyle = {
   background: "var(--bg-2)",
@@ -108,70 +389,72 @@ const inputStyle = {
   outline: "none",
 };
 
+const tdStyle = {
+  padding: "10px 12px",
+  fontSize: 13,
+  verticalAlign: "middle",
+};
+
+const itemTdStyle = {
+  padding: "7px 12px",
+  fontSize: 12,
+  verticalAlign: "middle",
+};
+
 // ── Main component ───────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 50;
 
 /**
- * API-backed orders table. Fetches from /api/orders/history with server-side
- * filtering, sorting, and pagination. Handles 17k+ rows gracefully.
- *
- * Props:
- *   initialType   string  — pre-set the type filter (e.g. "donated")
- *   initialStatus string  — pre-set the status filter
+ * Orders history table — API-backed.
+ * Shows one row per ORDER. Click to expand and see individual line items.
+ * Each line item has its own production status with inline update.
  */
 export default function OrdersTable({ initialType = "", initialStatus = "" }) {
-  const [search,     setSearch]     = useState("");
-  const [status,     setStatus]     = useState(initialStatus);
-  const [type,       setType]       = useState(initialType);
-  const [dateFrom,   setDateFrom]   = useState("");
-  const [dateTo,     setDateTo]     = useState("");
-  const [sortBy,     setSortBy]     = useState("date");
-  const [sortDir,    setSortDir]    = useState("desc");
-  const [page,       setPage]       = useState(1);
+  const [search,   setSearch]   = useState("");
+  const [status,   setStatus]   = useState(initialStatus);
+  const [type,     setType]     = useState(initialType);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo,   setDateTo]   = useState("");
+  const [sortBy,   setSortBy]   = useState("date");
+  const [sortDir,  setSortDir]  = useState("desc");
+  const [page,     setPage]     = useState(1);
 
-  const [items,      setItems]      = useState([]);
+  const [orders,     setOrders]     = useState([]);
   const [total,      setTotal]      = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState(null);
 
-  // Debounce search: don't fire until the user pauses typing
-  const searchDebounceRef = useRef(null);
+  // Debounce search
+  const debounceRef = useRef(null);
   const [debouncedSearch, setDebouncedSearch] = useState("");
-
   useEffect(() => {
-    clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = setTimeout(() => {
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
       setDebouncedSearch(search);
       setPage(1);
     }, 350);
-    return () => clearTimeout(searchDebounceRef.current);
+    return () => clearTimeout(debounceRef.current);
   }, [search]);
 
-  // Fetch whenever any query param changes
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({
-        page:    String(page),
-        limit:   String(PAGE_SIZE),
-        sortBy,
-        sortDir,
-      });
-      if (debouncedSearch) params.set("search", debouncedSearch);
-      if (status)   params.set("status",   status);
-      if (type)     params.set("type",     type);
-      if (dateFrom) params.set("dateFrom", dateFrom);
-      if (dateTo)   params.set("dateTo",   dateTo);
+      const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE), sortBy, sortDir });
+      if (debouncedSearch) params.set("search",   debouncedSearch);
+      if (status)          params.set("status",   status);
+      if (type)            params.set("type",     type);
+      if (dateFrom)        params.set("dateFrom", dateFrom);
+      if (dateTo)          params.set("dateTo",   dateTo);
 
       const res = await fetch(`/api/orders/history?${params}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
-      setItems(data.items || []);
-      setTotal(data.total || 0);
+      setOrders(data.orders || []);
+      setTotal(data.total   || 0);
       setTotalPages(data.pages || 0);
     } catch (err) {
       setError(err.message);
@@ -180,9 +463,7 @@ export default function OrdersTable({ initialType = "", initialStatus = "" }) {
     }
   }, [page, debouncedSearch, status, type, dateFrom, dateTo, sortBy, sortDir]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   function toggleSort(key) {
     if (sortBy === key) {
@@ -203,23 +484,28 @@ export default function OrdersTable({ initialType = "", initialStatus = "" }) {
     setPage(1);
   }
 
-  const hasFilters = search || (status && status !== initialStatus) ||
-    (type && type !== initialType) || dateFrom || dateTo;
+  const hasFilters = search ||
+    (status && status !== initialStatus) ||
+    (type   && type   !== initialType)   ||
+    dateFrom || dateTo;
 
   const safePages = Math.max(1, totalPages);
   const safePage  = Math.min(page, safePages);
 
-  // Build pagination window (up to 7 buttons)
   function paginationPages() {
     if (safePages <= 7) return Array.from({ length: safePages }, (_, i) => i + 1);
-    if (safePage <= 4)          return [1, 2, 3, 4, 5, 6, 7];
-    if (safePage >= safePages - 3) return Array.from({ length: 7 }, (_, i) => safePages - 6 + i);
+    if (safePage <= 4)              return [1, 2, 3, 4, 5, 6, 7];
+    if (safePage >= safePages - 3)  return Array.from({ length: 7 }, (_, i) => safePages - 6 + i);
     return Array.from({ length: 7 }, (_, i) => safePage - 3 + i);
   }
 
+  // Aggregate totals across current page for the summary line
+  const pageTotalBracelets = orders.reduce((s, o) => s + o.totalQty, 0);
+  const pageRevenue        = orders.reduce((s, o) => s + o.totalRevenue, 0);
+
   return (
     <div>
-      {/* ── Filter bar ─────────────────────────────────────────────────────── */}
+      {/* ── Filter bar ────────────────────────────────────────────────────── */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14, alignItems: "center" }}>
         <input
           type="text"
@@ -252,193 +538,91 @@ export default function OrdersTable({ initialType = "", initialStatus = "" }) {
           ))}
         </select>
 
-        <input
-          type="date"
-          value={dateFrom}
+        <input type="date" value={dateFrom}
           onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
-          style={{ ...inputStyle, width: 138 }}
-          title="Order date from"
-        />
+          style={{ ...inputStyle, width: 138 }} title="Order date from" />
         <span style={{ color: "var(--text-dim)", fontSize: 12 }}>–</span>
-        <input
-          type="date"
-          value={dateTo}
+        <input type="date" value={dateTo}
           onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
-          style={{ ...inputStyle, width: 138 }}
-          title="Order date to"
-        />
+          style={{ ...inputStyle, width: 138 }} title="Order date to" />
 
         {hasFilters && (
-          <button
-            onClick={resetFilters}
-            style={{
-              background: "none",
-              border: "1px solid var(--card-border)",
-              color: "var(--text-dim)",
-              borderRadius: 6,
-              padding: "5px 10px",
-              fontSize: 11,
-              cursor: "pointer",
-            }}
-          >
-            Clear filters
+          <button onClick={resetFilters} style={{
+            background: "none", border: "1px solid var(--card-border)",
+            color: "var(--text-dim)", borderRadius: 6, padding: "5px 10px",
+            fontSize: 11, cursor: "pointer",
+          }}>
+            Clear
           </button>
         )}
 
         <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--text-dim)", whiteSpace: "nowrap" }}>
-          {loading ? "Loading…" : `${total.toLocaleString()} items`}
+          {loading ? "Loading…" : (
+            <>
+              {total.toLocaleString()} orders
+              {pageTotalBracelets > 0 && ` · ${pageTotalBracelets} bracelets`}
+              {pageRevenue > 0 && ` · $${pageRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+              {" (this page)"}
+            </>
+          )}
         </span>
       </div>
 
-      {/* ── Table ──────────────────────────────────────────────────────────── */}
+      {/* ── Table ─────────────────────────────────────────────────────────── */}
       <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid var(--card-border)", position: "relative" }}>
         {loading && (
           <div style={{
             position: "absolute", inset: 0,
-            background: "rgba(14,14,18,0.6)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            zIndex: 2, borderRadius: 8,
+            background: "rgba(14,14,18,0.65)", display: "flex",
+            alignItems: "center", justifyContent: "center", zIndex: 2, borderRadius: 8,
           }}>
             <span style={{ color: "var(--text-dim)", fontSize: 13 }}>Loading…</span>
           </div>
         )}
 
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 820 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
           <thead>
             <tr style={{ background: "var(--bg-2)", borderBottom: "1px solid var(--card-border)" }}>
-              <Th label="Date"     sortKey="date"   activeSortKey={sortBy} dir={sortDir} onClick={toggleSort} />
-              <Th label="Order #"  sortKey="orderNumber" activeSortKey={sortBy} dir={sortDir} onClick={toggleSort} />
-              <Th label="Customer" sortKey="customer"    activeSortKey={sortBy} dir={sortDir} onClick={toggleSort} />
-              <Th label="Hero"     sortKey="hero"        activeSortKey={sortBy} dir={sortDir} onClick={toggleSort} />
-              <Th label="SKU"      sortKey="sku"         activeSortKey={sortBy} dir={sortDir} onClick={toggleSort} />
-              <Th label="Qty"      sortKey="qty"         activeSortKey={sortBy} dir={sortDir} onClick={toggleSort} style={{ textAlign: "center" }} />
-              <Th label="Price"    sortKey="price"       activeSortKey={sortBy} dir={sortDir} onClick={toggleSort} style={{ textAlign: "right" }} />
-              <Th label="Type"     sortKey="type"        activeSortKey={sortBy} dir={sortDir} onClick={toggleSort} />
-              <Th label="Status"   sortKey="status"      activeSortKey={sortBy} dir={sortDir} onClick={toggleSort} />
+              <Th label="Order / Date" sortKey="date"        activeSortKey={sortBy} dir={sortDir} onClick={toggleSort} />
+              <Th label="Customer"     sortKey="customer"    activeSortKey={sortBy} dir={sortDir} onClick={toggleSort} />
+              <th style={thStyle}>Bracelets</th>
+              <th style={{ ...thStyle, textAlign: "right" }}>Revenue</th>
+              <Th label="Type"         sortKey="type"        activeSortKey={sortBy} dir={sortDir} onClick={toggleSort} />
+              <Th label="Status"       sortKey="status"      activeSortKey={sortBy} dir={sortDir} onClick={toggleSort} />
             </tr>
           </thead>
           <tbody>
             {error ? (
               <tr>
-                <td colSpan={9} style={{ padding: 32, textAlign: "center", color: "var(--status-red)", fontSize: 13 }}>
-                  Error loading orders: {error}
+                <td colSpan={6} style={{ padding: 32, textAlign: "center", color: "var(--status-red)", fontSize: 13 }}>
+                  Error: {error}
                 </td>
               </tr>
-            ) : !loading && items.length === 0 ? (
+            ) : !loading && orders.length === 0 ? (
               <tr>
-                <td colSpan={9} style={{ padding: 32, textAlign: "center", color: "var(--text-dim)", fontSize: 13 }}>
+                <td colSpan={6} style={{ padding: 32, textAlign: "center", color: "var(--text-dim)", fontSize: 13 }}>
                   No orders match the current filters.
                 </td>
               </tr>
             ) : (
-              items.map((item, idx) => (
-                <tr
-                  key={item.id}
-                  style={{
-                    borderBottom: "1px solid var(--card-border)",
-                    background: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.012)",
-                  }}
-                >
-                  {/* Date */}
-                  <td style={tdStyle}>
-                    <span style={{ fontSize: 12, color: "var(--text-dim)", whiteSpace: "nowrap" }}>
-                      {item.orderDate
-                        ? new Date(item.orderDate + "T12:00:00").toLocaleDateString("en-US", {
-                            month: "short", day: "numeric", year: "numeric",
-                          })
-                        : "—"}
-                    </span>
-                  </td>
-
-                  {/* Order # */}
-                  <td style={tdStyle}>
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-bright)" }}>
-                      {item.orderNumber || "—"}
-                    </span>
-                  </td>
-
-                  {/* Customer */}
-                  <td style={tdStyle}>
-                    <div style={{ fontSize: 13, color: "var(--text-bright)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {item.customerName || "—"}
-                    </div>
-                    {item.shipTo && (
-                      <div style={{ fontSize: 11, color: "var(--text-dim)" }}>{item.shipTo}</div>
-                    )}
-                  </td>
-
-                  {/* Hero */}
-                  <td style={tdStyle}>
-                    <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-bright)", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
-                      {item.heroName || "—"}
-                    </span>
-                  </td>
-
-                  {/* SKU */}
-                  <td style={tdStyle}>
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-dim)" }}>
-                      {item.sku || "—"}
-                    </span>
-                  </td>
-
-                  {/* Qty + size */}
-                  <td style={{ ...tdStyle, textAlign: "center" }}>
-                    <span style={{ fontWeight: 600, color: "var(--text-bright)", fontSize: 14 }}>
-                      {item.quantity}
-                    </span>
-                    {item.size && (
-                      <span style={{ fontSize: 10, color: "var(--text-dim)", display: "block" }}>
-                        {item.size}"
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Price */}
-                  <td style={{ ...tdStyle, textAlign: "right" }}>
-                    {item.unitPrice > 0 ? (
-                      <span style={{ fontSize: 13, color: "var(--text-bright)" }}>
-                        ${item.unitPrice.toFixed(2)}
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: 11, color: "var(--text-dim)" }}>—</span>
-                    )}
-                  </td>
-
-                  {/* Type */}
-                  <td style={tdStyle}>
-                    <Badge meta={TYPE_META[item.orderType]} small />
-                  </td>
-
-                  {/* Status */}
-                  <td style={tdStyle}>
-                    <Badge
-                      meta={STATUS_META[item.productionStatus] || {
-                        label: item.productionStatus || "—",
-                        color: "#6b7280",
-                      }}
-                      small
-                    />
-                  </td>
-                </tr>
+              orders.map((order) => (
+                <OrderRow key={order.id} order={order} />
               ))
             )}
           </tbody>
         </table>
       </div>
 
-      {/* ── Pagination ─────────────────────────────────────────────────────── */}
+      {/* ── Pagination ────────────────────────────────────────────────────── */}
       {safePages > 1 && (
-        <div style={{
-          display: "flex", justifyContent: "center", alignItems: "center",
-          gap: 6, marginTop: 14, flexWrap: "wrap",
-        }}>
-          <PagBtn label="← Prev" disabled={safePage <= 1}       onClick={() => setPage((p) => p - 1)} />
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginTop: 14, flexWrap: "wrap" }}>
+          <PagBtn label="← Prev" disabled={safePage <= 1}        onClick={() => setPage((p) => p - 1)} />
           {paginationPages().map((n) => (
             <PagBtn key={n} label={n} active={n === safePage} onClick={() => setPage(n)} />
           ))}
           <PagBtn label="Next →" disabled={safePage >= safePages} onClick={() => setPage((p) => p + 1)} />
           <span style={{ fontSize: 11, color: "var(--text-dim)", marginLeft: 8 }}>
-            {safePage} / {safePages} · {total.toLocaleString()} total
+            {safePage} / {safePages} · {total.toLocaleString()} orders total
           </span>
         </div>
       )}
@@ -446,8 +630,12 @@ export default function OrdersTable({ initialType = "", initialStatus = "" }) {
   );
 }
 
-const tdStyle = {
+const thStyle = {
   padding: "9px 12px",
-  fontSize: 13,
-  verticalAlign: "middle",
+  fontSize: 10,
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
+  color: "var(--text-dim)",
+  textAlign: "left",
 };
