@@ -1,193 +1,222 @@
-# SHOS — Steel Hearts Operating System
+# CLAUDE.md — Cross-Account Orientation File
 
-## Project Overview
+> This file is auto-loaded by any Claude Code session opened at `C:\dev`.  
+> It is the **cross-account sync mechanism** between Joseph's two Claude accounts (personal + work) — they share the same email but do NOT share session memory.  
+> Read this first. Then read `CONSOLIDATION_MASTER_PLAN.md` for the active to-do list.
 
-SHOS is the internal operations dashboard for Steel Hearts Foundation, a 501(c)(3) nonprofit (EIN: 47-2511085) that honors fallen military service members through memorial bracelets, family remembrance, and charitable giving. Founded by Joseph Wiseman, USMA Class of 2008.
+---
 
-This is a Next.js 15 App Router application with React 19. It serves as the operational brain — managing bracelet production, family intake, donor stewardship, finance, social media, email, and task prioritization.
+## 1. Who Joseph Is
 
-- **Live app:** https://shos-app.vercel.app
-- **GitHub:** https://github.com/jwiseman1980/shos-app
-- **Deployed on:** Vercel (GitHub auto-deploy)
-- **Primary database:** Supabase (Salesforce is nightly backup mirror)
+| Field | Value |
+|---|---|
+| Name | Joseph Wiseman |
+| Email | joseph.wiseman@steel-hearts.org (IS his personal email — not a separate org account) |
+| Background | USMA '08, solo operator, runs full personal + professional life through SHOS/GYST |
+| Claude accounts | Two accounts, same email, different sessions — **they don't share memory**. This file is the bridge. |
+| Memory may be thin | Joseph recently reinstalled Claude Desktop. If session memory feels sparse, it's real — use this file + the master plan. |
 
-## Commands
+**Working style:**
+- Decisive. When he says "yes" to a list, execute every item.
+- Prefers parallel execution over serial.
+- Terse, scannable outputs. Break at thought boundaries.
+- Default persistence: Supabase. Notion is deprecated. GDrive/Box fine for files.
+- Never auto-send external emails. Always draft → Joseph reviews → Joseph sends.
 
-```bash
-npm run dev     # Start dev server on port 3000
-npm run build   # Production build
-npm run lint    # Run linter
-```
+---
 
-## Tech Stack
-
-- Next.js 15 App Router, React 19
-- Supabase (primary database + storage)
-- Salesforce (backup mirror via nightly sync)
-- Google Workspace (Gmail, Calendar, Drive — domain-wide delegation)
-- Anthropic Claude API (AI chat, email drafting, message generation)
-- Stripe (donation webhooks)
-- ShipStation (shipping reconciliation)
-- Meta Graph API (Facebook/Instagram metrics)
-- Slack (webhook notifications)
-- Vercel Blob (file storage)
-
-## Auth
-
-Custom HMAC-SHA256 signed session cookies (`shos_session`, 7-day TTL). No NextAuth.
-- Passwords stored as bcrypt hashes in `data/volunteers.json` and Supabase `volunteers` table
-- API routes authenticate via `SHOS_API_KEY` header for cron/webhook access
-- Middleware in `middleware.js` protects all routes except `/login`, `/api/auth/*`, `/_next/*`
-
-## Directory Structure
+## 2. HonorBase Is the Trunk (CRITICAL)
 
 ```
-app/                          — Next.js pages and API routes
-  page.js                     — Dashboard (priority queue, scoreboard, calendar)
-  layout.js                   — Root layout with sidebar + floating role chat
-  login/                      — Login page
-  orders/                     — Order board (Kanban)
-  designs/                    — Design work queue
-  laser/                      — Laser engraving queue
-  shipping/                   — Shipping queue
-  bracelets/                  — Bracelet pipeline
-  inventory/                  — Inventory tracker
-  families/                   — Family management
-  family/                     — Family intake wizard
-  messages/                   — Supporter message tracker
-  donors/                     — Donor list + [email] detail
-  anniversaries/              — Anniversary tracker
-  finance/                    — Finance dashboard + sub-pages
-    donations/                — Donations received
-    disbursements/            — Disbursements
-    expenses/                 — Expenses + Chase CSV upload
-    report/                   — Monthly financial report
-    recon/                    — Reconciliation matrix
-    close/                    — Month close
-    archive/                  — Finance archive
-  email/                      — Gmail inbox + composer
-  comms/                      — Communications hub
-    social/                   — Social media dashboard (Meta)
-  engagements/                — Engagement log
-  tasks/                      — Task board
-  sops/                       — SOP list + [id] detail
-  volunteers/                 — Volunteer roster
-  settings/                   — App settings
-  memorials/                  — Memorials management
-  content/                    — Content management
-  coo/cos/dev/                — Role-specific views
-  gyst/                       — Personal productivity
-  api/                        — All API routes (see below)
+HonorBase (platform / OS for nonprofit EDs)
+├── Steel Hearts / SHOS  ← Joseph's own nonprofit; first tenant; primary dev surface
+├── DRMF                 ← Drew Ross Memorial Foundation; second tenant; event-focused
+└── GYST module          ← "Personal ED life-ops"; lives in Project A (not a separate project)
 
-components/                   — React components
-lib/                          — Server utilities and API clients
-  auth.js                     — Session management
-  calendar.js                 — Google Calendar (domain delegation)
-  gmail.js                    — Gmail API (domain delegation)
-  gdrive.js                   — Google Drive (design SVGs)
-  salesforce.js               — Salesforce REST API (OAuth, v62.0)
-  supabase.js                 — Supabase client factory
-  shipstation.js              — ShipStation API
-  meta.js                     — Meta Graph API v21.0
-  slack.js                    — Slack webhook poster
-  stripe.js                   — Stripe client (not present — uses raw API)
-  priority-engine.js          — Priority scoring: (urgency*3)+(impact*2)+(decay*1.5)+(rotation*1)
-  execution-logger.js         — Logs work to Supabase + Calendar
-  email-signature.js          — Dynamic email signatures
-  message-packet.js           — Family message delivery formatting
-  donation-sync.js            — Parse donation emails → backfill SF
-  social-persist.js           — Upsert Meta data to Supabase
-  text-repair.js              — Mojibake repair (FM-STD-004)
-  dates.js                    — Date utilities
-  data/                       — Data access layer modules
-    heroes.js                 — Heroes (Supabase + JSON fallback)
-    orders.js                 — Orders (Supabase + ShipStation + Drive)
-    designs.js                — Design queue
-    families.js               — Family contacts
-    messages.js               — Supporter messages
-    donations.js              — Donations by month
-    disbursements.js          — Disbursements by year
-    expenses.js               — Expenses + Chase CSV parser
-    obligations.js            — Org financial obligations
-    monthly-report.js         — 8-section financial report
-    pipeline.js               — Hero lifecycle pipeline
-    dashboard.js              — Priority queue aggregation
-    tasks.js                  — Task management
-    sops.js                   — SOP records
-    volunteers.js             — Volunteer records
-    learning.js               — Learning engine (task time estimates)
-  storage/                    — Storage abstraction (SF ↔ Supabase switch)
-
-data/                         — Static JSON files
-  heroes.json                 — Hero records fallback
-  volunteers.json             — Volunteer roster + auth
-  sops.json                   — SOP definitions
-  donation-receipts.json      — Gmail receipt cache for recon
-
-scripts/                      — One-time migration scripts
-*_CONTEXT.md                  — Role-specific operational context docs
-*-knowledge.md                — Live role knowledge files
+Side projects (NOT HonorBase):
+├── Unknown Signal
+└── Sandbox Game
 ```
 
-## Cron Jobs (vercel.json)
+**Priority order:** HonorBase trunk > Steel Hearts features > DRMF features > GYST module
 
-| Route | Schedule | Purpose |
-|-------|----------|---------|
-| `/api/orders/reconcile` | 6:07 AM daily | Reconcile orders vs ShipStation |
-| `/api/orders/triage` | 6:22 AM daily | Triage new/blocked orders |
-| `/api/sync` | 7:03 AM daily | Master data sync (Supabase → Salesforce) |
-| `/api/orders/sync-from-sf` | Every hour :15 | Sync orders from Salesforce |
-| `/api/daily-briefing` | 11:00 AM daily | Generate + post daily briefing to Slack |
-| `/api/cron/anniversary-outreach` | 11:30 AM daily | Email bracelet customers 14 days before hero anniversary |
+When a feature touches multiple products, build it for HonorBase first (shared tables, shared APIs), then wire the tenants in. Do not build DRMF or GYST features in isolation if they belong on the trunk.
 
-## Key Architecture Decisions
+---
 
-- **Supabase is primary, Salesforce is backup.** All reads come from Supabase. Nightly sync pushes to Salesforce as a mirror. `SF_LIVE=true` enables live SF writes alongside Supabase.
-- **Google Workspace domain-wide delegation.** Service account `shos-gmail-service@shos-490912.iam.gserviceaccount.com` impersonates `joseph.wiseman@steel-hearts.org` for Gmail, Calendar, and Drive.
-- **Priority engine drives the dashboard.** Every page feeds items into a single ranked queue. The homepage is the operating cockpit.
-- **Role chat uses Anthropic API.** Each role (COO, CFO, CMO, COS, etc.) has its own context doc that scopes the AI assistant to that domain.
-- **Path alias:** `@/` resolves to project root.
+## 3. Repo Map (`C:\dev`)
 
-## Bracelet Production Pipeline
+| Folder | What it is | Notes |
+|---|---|---|
+| `honorbase-chat/` | Next.js chat UI — HonorBase operator surface | Active. Commits b778b1f + c381109 on 2026-04-16. Multi-tenant routing live. |
+| `honorbase-drmf/` | Next.js, DRMF data/brief/metrics API | Mid-migration to Supabase Project A. JSON flat files being replaced. |
+| `AI Projects/SHOS/shos-app/` | Operator dashboard — HonorBase operator layer | Named for Steel Hearts but serves as the ED ops core |
+| `AI Projects/SHOS/steel-hearts-site/` | Public-facing Steel Hearts website | Separate Vercel project from shos-app — never merge |
+| `AI Projects/GYST/gyst-dashboard/` | Personal finance / property dashboard | Now points at Project A (Project B dead). Fully seeded. |
+| `AI-Projects/` (hyphen, no space) | Parallel folder — drifted from `AI Projects/` | Reconciliation queued. Blocked on OneDrive FileSyncHelper. |
+| `notion-export/` | Empty skeleton for Notion → Supabase migration | Content migration plan at `C:\dev\notion-content-migration-plan.md` |
+| `scripts/one-offs/` | Misc Python: Squarespace reconciliation, IRS form signing | Some may have loose copies in `C:\dev` root (cleanup queued) |
 
-Status enum (Supabase `order_items.production_status`):
-`not_started` → `design_needed` → `ready_to_laser` → `in_production` → `ready_to_ship` → `shipped`
+**Path friction:** `AI Projects` (with space) is the canonical live copy. `AI-Projects` (hyphen) is a drift copy. Shell scripts need quoting. Don't create more scatter.
 
-## SKU Format
+**GitHub:** All 7+ repos have GitHub remotes and are pushed. Workspace meta-repo: `github.com/jwiseman1980/dev-workspace`
 
-`BRANCH-LASTNAME-SIZE` (e.g., `USMA95-ADAMOUSKI-7`)
-- Sizes: `-6` (6 inch), `-7` (7 inch)
-- D variants (donated): `USMA95-ADAMOUSKI-7D` — being phased out
-- SVG design files match the SKU name
+**OneDrive:** Deprecated as dev sync mechanism. `C:\dev` is canonical. OneDrive `AI Projects` rename blocked on FileSyncHelper — pause OneDrive sync to unblock.
 
-## Slack Notifications
+---
 
-Status changes trigger Slack messages:
-- `design_needed` → Ryan's DM (he creates designs)
-- `ready_to_laser` → Joseph's DM (he runs the laser)
-- `ready_to_ship` → Kristin's DM (she handles shipping)
-- `shipped` → ops hub + shipping email to customer
+## 4. Supabase Architecture
 
-## Environment Variables
+| Project | Ref ID | Purpose | Status |
+|---|---|---|---|
+| **Project A — HonorBase** | `esoogmdwzcarvlodwbue` | Renamed "HonorBase" in dashboard. ~50 tables. Single backend for shos-app, honorbase-chat, honorbase-drmf, AND GYST | **Alive and canonical** |
+| **Project B — GYST** | `qaxgaeftopnzmvgpzuav` | Deprecated | **Dead — GYST folded into Project A. Do not use.** |
 
-**Auth:** `LOGIN_PASSWORD`, `SESSION_SECRET`, `SHOS_API_KEY`, `CRON_SECRET`, `WEBHOOK_SECRET`
-**Supabase:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-**Salesforce:** `SF_LIVE`, `SF_CLIENT_ID`, `SF_REFRESH_TOKEN`, `SF_INSTANCE_URL`
-**Google:** `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_SERVICE_ACCOUNT_KEY`, `GDRIVE_DESIGNS_FOLDER_ID`
-**Email (SendGrid):** `SENDGRID_API_KEY` — bulk outreach, newsletters, transactional email. Falls back to Gmail BCC draft if not set.
-**Slack:** `SLACK_SOP_WEBHOOK`, `SLACK_DM_JOSEPH`, `SLACK_DM_RYAN`, `SLACK_DM_KRISTIN`
-**Meta:** `META_APP_ID`, `META_APP_SECRET`, `META_PAGE_ACCESS_TOKEN`, `META_USER_TOKEN`, `META_PAGE_ID`, `IG_USER_ID`
-**Other:** `ANTHROPIC_API_KEY`, `SHIPSTATION_API_KEY`, `SHIPSTATION_API_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
+**Project A key tables (as of 2026-04-16):**
+- Core: `event_tasks`, `event_sponsors`, `properties` (3 rentals), `execution_log`, `context_log`, `knowledge_files`, `system_config`
+- HonorBase platform: `honorbase_orgs`, `org_members`, `org_stream`, `org_knowledge_artifacts`, `platform_knowledge_pool`, `hb_dashboard_cards`
+- GYST: `gyst_properties`, `gyst_debts` (4), `gyst_income_sources` (5), `gyst_budget_categories` (10), `gyst_action_items` (17), `gyst_transactions` (584), `gyst_monthly_snapshots`
 
-## Naming Convention
+**Applied migrations:**
+- `system_config` — applied 2026-04-16. Squarespace cron unblocked.
+- GYST baseline — all 9 gyst_* tables live, seeded with Mar 2026 data
+- DRMF org registered in `honorbase_orgs`, Sarah Ross Geisen in `org_members`
 
-- Always use **"Steel Hearts Foundation"** in user-facing copy.
-- The app itself is called **SHOS** (Steel Hearts Operating System).
+**`hb_dashboard_cards`** upgraded 2026-04-16: added `priority`, `card_type`, `action_url` columns. Daily 5am cron rebuilds cards from `org_stream`.
 
-## Critical Rules
+---
 
-- **Active listings only:** Only heroes with `active_listing = true` appear on the public website. The SHOS app can see all heroes for operational purposes.
-- **Never auto-send emails.** AI drafts emails, humans review and send.
-- **Never use browser automation for Instagram.** API only. Browser sent garbled "??" to memorial posts.
-- **Website and SHOS app are separate Vercel projects.** They share Supabase but must never be merged.
-- **Every action gets recorded.** Execution logger writes to Supabase + Google Calendar.
+## 5. What Was Built on 2026-04-16
+
+### Infrastructure
+- `C:\dev` is canonical. OneDrive deprecated as sync mechanism.
+- Workspace meta-repo created: `github.com/jwiseman1980/dev-workspace` (onboarding docs, architecture plan, consolidation tracker)
+- All 7+ repos pushed to GitHub with remotes
+- GCP SA key rotated. Stray GCP project `shos-490916` shut down.
+- Weekly Monday 8am automated health check scheduled
+
+### Supabase (Project A — renamed HonorBase in dashboard)
+- `system_config` migration applied — unblocked Squarespace cron
+- GYST fully folded into Project A: 9 gyst_* tables, fully seeded
+- No Project B. GYST decision is closed.
+- DRMF org + Sarah Ross Geisen registered
+- `hb_dashboard_cards` upgraded with priority/card_type/action columns
+- ~50 tables total
+
+### Code shipped to honorbase-chat (commits b778b1f, c381109)
+- `lib/stream.ts` — fire-and-forget org stream logger
+- `lib/router.ts` — complexity classifier (Haiku/Sonnet/Opus routing)
+- `lib/friction.ts` — behavioral friction detector
+- `lib/dashboard.ts` — real-time dashboard card injection
+- `lib/knowledge.ts` — knowledge base check + artifact save
+- `app/api/cron/generate-dashboard/route.ts` — daily 5am dashboard rebuild
+- `app/api/cron/deepen-knowledge/route.ts` — daily 3am knowledge synthesis
+- `app/org/[orgSlug]/page.tsx` — multi-tenant routing
+- `app/components/ChatApp.tsx` — extracted reusable chat component
+- `config/orgs/drmf.js` — DRMF operational context
+- `vercel.json` — cron schedules
+- `docs/STREAM_ARCHITECTURE.md` — **primary architecture doc** (8 sections, full spec)
+- Google auth for org routes (in progress)
+
+### Key architecture decisions
+- **HonorBase as a Service:** ED subscribes to HonorBase, not Claude. Claude is invisible engine.
+- **Org stream captures everything.** Friction auto-detected. Knowledge deepens daily.
+- **Dynamic dashboard** rebuilds from stream data — not static widgets.
+- **Knowledge-as-infrastructure:** expensive Opus answers become cheap Haiku lookups over time.
+- **Cost curve inverts** — longer a tenant uses HonorBase, cheaper they are to serve.
+- **Cross-tenant knowledge pool** — platform gets smarter for everyone.
+- **Proactive value:** HonorBase tells the ED what they need before they know to ask.
+
+### DRMF (first external customer)
+- URL: `honorbase-chat.vercel.app/org/drmf`
+- Sarah Ross Geisen, President, `sarah@drewross.org`
+- Knowledge seeded with event data (12 tasks, 6 sponsors, 7 milestones)
+- Google auth being wired up
+
+### Pending / open items
+- OneDrive `AI Projects` rename (blocked on FileSyncHelper — pause OneDrive sync to unblock)
+- Notion workspace recovery (Ester at Notion handling per email 2026-04-16)
+- DRMF data migration: JSON → `event_tasks`/`event_sponsors` in Supabase
+- USAA Mar-Apr 2026 CSV download for GYST transaction gap
+- Megan Moore email draft in Gmail (memorial bracelets for LTC Shah, ODU, 150 units)
+- Google auth for `honorbase-chat` org routes
+
+---
+
+## 6. Memory Mirrors
+
+These mirror the "other" Claude account's private session memory. Marked with `source:` as breadcrumbs.
+
+**`source: memory://user_profile`**  
+Joseph Wiseman, USMA '08, solo operator running Steel Hearts nonprofit + personal life through a single AI-augmented operating system (SHOS + GYST). Decisive. Voice-first workflow. Prefers the AI to execute, not propose. Every session recorded to calendar. No unrecorded work.
+
+**`source: memory://architecture_honorbase_trunk`**  
+HonorBase is the product; Steel Hearts/SHOS is tenant #1 and the primary dev surface. DRMF is tenant #2 (first external customer, live as of Apr 16 2026). GYST is a personal-finance module fully folded into HonorBase Project A. Side projects (Unknown Signal, Sandbox Game) are off-trunk. All architecture decisions should optimize for HonorBase reusability, not single-tenant convenience.
+
+**`source: memory://primary_store_supabase`**  
+Supabase is the primary operational database. Notion and Zapier are deprecated. Salesforce is a nightly backup mirror, not a source of truth. Google Drive / Box are fine for files. Never build new features against Notion. Never auto-push to external comms channels.
+
+**`source: memory://project_supabase_architecture`**  
+One Supabase project: Project A (`esoogmdwzcarvlodwbue`, renamed "HonorBase" in dashboard, alive, ~50 tables). Project B (`qaxgaeftopnzmvgpzuav`) is dead — GYST folded into Project A as of Apr 16 2026. `system_config` applied. All migrations current.
+
+**`source: memory://project_consolidation_effort`**  
+Apr 16 2026: consolidation complete for infrastructure phase. All repos on GitHub. GYST in Project A. DRMF org registered. honorbase-chat multi-tenant routing live. Stream/routing/friction/knowledge libs shipped. Pending: DRMF data migration, Google auth, OneDrive rename, Notion recovery.
+
+**`source: memory://security_gcp_key_exposure`**  
+RESOLVED 2026-04-16. Old GCP SA key for `shos-gmail-service@shos-490912.iam.gserviceaccount.com` rotated. Stray project `shos-490916` shut down. New key at `C:\Users\JosephWiseman\.secrets\shos-signer.json`. All `.bak` files and Downloads copies deleted. No plaintext key material on disk.
+
+---
+
+## 7. Access Checklist (What a Fresh Session Needs)
+
+| Resource | How to access |
+|---|---|
+| **Supabase** | Logged-in browser (Joseph's login persists in Chrome profile) OR DB password / PAT for `esoogmdwzcarvlodwbue` |
+| **Vercel** | Logged-in browser |
+| **GitHub** | Logged-in browser (required for pushes) |
+| **GCP Console** | Must be logged in as `joseph.wiseman@steel-hearts.org` — **not** `jwisener00@gmail.com` (lacks SA admin roles) |
+| **Notion** | Workspace recovery in progress (Ester at Notion handling); not reliably accessible yet |
+| **MCP connectors** | Gmail, Google Calendar, Google Drive, Slack, Canva, Notion read-API travel with the Claude install — no browser needed |
+| **Supabase CLI** | `supabase login` + `supabase link --project-ref esoogmdwzcarvlodwbue` if Joseph wants CLI-driven migrations |
+
+---
+
+## 8. Open Security Flags
+
+### GCP Key Exposure (2026-04-16) — RESOLVED
+
+- **Service account:** `shos-gmail-service@shos-490912.iam.gserviceaccount.com`
+- **Resolution (2026-04-16):** Old key rotated in GCP. New key at `C:\Users\JosephWiseman\.secrets\shos-signer.json`. All `.pre-rotation.py.bak` files and the Downloads copy of the key JSON deleted. Stray GCP project `shos-490916` shut down. No plaintext key material remains on disk.
+- **Git safety:** `.gitignore` in `SHOS\Finance\Document Signing\` covers `.env` and `*.pre-rotation.py.bak`. Safe to commit other files in that folder.
+
+---
+
+## 9. Working Style Cues
+
+- **"yes" means execute all items** — not "noted, proceed when ready"
+- Parallel over serial whenever possible
+- Terse reports. Scannable. Tables and bullets over prose.
+- No em dashes in emails (AI tell). Write human.
+- No auto-send on any external email. Draft → Joseph reviews → Joseph sends.
+- No generic recurring calendar blocks ("strategy time", "thinking block"). Real tasks from the scored backlog only.
+- Every session should end with a closeout: calendar event updated from planned → completed, with time tracking.
+- Supabase is the write target. If you're about to write to Notion or Salesforce for new data, stop and check.
+
+---
+
+## 10. Key File Locations
+
+| File | Purpose |
+|---|---|
+| `C:\dev\CONSOLIDATION_MASTER_PLAN.md` | Root mirror of the active to-do list |
+| `C:\dev\AI Projects\SHOS\shos-app\docs\CONSOLIDATION_MASTER_PLAN.md` | **Canonical versioned copy** — prefer this one |
+| `C:\dev\honorbase-chat\docs\STREAM_ARCHITECTURE.md` | **Primary architecture doc** for stream/routing/friction/knowledge system — read before touching any lib/ files |
+| `C:\dev\honorbase-drmf\MIGRATION_PLAN.md` | DRMF → Supabase migration steps |
+| `C:\dev\notion-content-migration-plan.md` | Notion content → knowledge_files migration plan |
+| `C:\dev\AI Projects\GYST\gyst-dashboard\supabase\migrations\000_baseline.sql` | GYST schema reference (tables now live in Project A) |
+
+---
+
+*Last synced: 2026-04-16 (end of day)*
+
+> This doc is a living mirror of cross-account memory. Update it whenever the consolidation moves forward — especially when the master plan changes, a Supabase decision lands, or a security flag is resolved. The canonical version should be committed to `shos-app/docs/` alongside the master plan.
