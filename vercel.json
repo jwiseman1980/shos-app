@@ -17,6 +17,10 @@
       "schedule": "15 * * * *"
     },
     {
+      "path": "/api/cron/anniversary-reminder",
+      "schedule": "0 9 * * *"
+    },
+    {
       "path": "/api/daily-briefing",
       "schedule": "0 11 * * *"
     },

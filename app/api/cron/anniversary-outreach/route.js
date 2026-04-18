@@ -179,8 +179,8 @@ export async function GET(request) {
         .join("\n");
 
       await postToSlack(
-        `📬 *Anniversary Message Outreach*\n\n${summary}\n\nDrafts in Joseph's Gmail — review and send.`,
-        process.env.SLACK_DM_JOSEPH
+        "joseph",
+        `📬 *Anniversary Message Outreach*\n\n${summary}\n\nDrafts in Joseph's Gmail — review and send.`
       ).catch(() => {});
     }
 
