@@ -639,7 +639,7 @@
 
 /* ── Mobile optimizations ── */
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   .today-header {
     padding: 16px 16px 12px;
   }
@@ -649,11 +649,21 @@
   }
 
   .today-body {
-    padding: 10px 12px 100px;
+    padding: 14px 20px 100px;
+  }
+
+  /* Collapsed cards: icon + title only — no subtitle */
+  .today-card:not(.expanded) .card-subtitle {
+    display: none;
+  }
+
+  /* More breathing room between cards */
+  .today-card {
+    margin-bottom: 16px;
   }
 
   .card-collapsed {
-    padding: 13px 14px 13px 18px;
+    padding: 14px 14px 14px 18px;
     min-height: 52px;
   }
 

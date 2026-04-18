@@ -55,7 +55,7 @@ function toETDateString(date) {
   }).format(date);
 }
 
-export default function DayPanel({ events = [], tasks = [], collapsed, onToggle }) {
+export default function DayPanel({ events = [], tasks = [], collapsed, onToggle, mobileOpen, onMobileClose }) {
   const [now, setNow] = useState(new Date());
   const [expandedId, setExpandedId] = useState(null);
   const [dateOffset, setDateOffset] = useState(0); // 0 = today, -1 = yesterday, +1 = tomorrow
@@ -181,7 +181,7 @@ export default function DayPanel({ events = [], tasks = [], collapsed, onToggle 
   const nowOffset = (nowHour - START_HOUR) * HOUR_HEIGHT + (nowMinute / 60) * HOUR_HEIGHT;
   const showNowLine = isToday && nowHour >= START_HOUR && nowHour < END_HOUR;
 
-  if (collapsed) {
+  if (collapsed && !mobileOpen) {
     return (
       <div className="day-panel day-panel--collapsed">
         <button
@@ -207,7 +207,7 @@ export default function DayPanel({ events = [], tasks = [], collapsed, onToggle 
   }
 
   return (
-    <div className="day-panel">
+    <div className={`day-panel${mobileOpen ? " mobile-open" : ""}`}>
       {/* Header */}
       <div
         style={{
@@ -252,7 +252,7 @@ export default function DayPanel({ events = [], tasks = [], collapsed, onToggle 
             </button>
           </div>
           <button
-            onClick={onToggle}
+            onClick={mobileOpen ? onMobileClose : onToggle}
             style={{
               background: "none",
               border: "none",
