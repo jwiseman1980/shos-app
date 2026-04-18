@@ -112,7 +112,7 @@
   border: 1px solid rgba(255, 255, 255, 0.07);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  margin-bottom: 8px;
+  margin-bottom: 16px;
   overflow: hidden;
   transition: background 0.15s ease, box-shadow 0.15s ease;
   cursor: pointer;
@@ -637,6 +637,22 @@
 .cashflow-pos { color: #22c55e; font-weight: 600; }
 .cashflow-neg { color: #ef4444; font-weight: 600; }
 
+/* ── Mobile: single-column, decluttered collapsed cards ── */
+
+@media (max-width: 767px) {
+  .today-body {
+    padding: 8px 16px 100px;
+  }
+
+  .card-subtitle {
+    display: none;
+  }
+
+  .section-header {
+    padding: 24px 0 8px;
+  }
+}
+
 /* ── Mobile optimizations ── */
 
 @media (max-width: 480px) {
@@ -649,7 +665,7 @@
   }
 
   .today-body {
-    padding: 10px 12px 100px;
+    padding: 8px 16px 100px;
   }
 
   .card-collapsed {

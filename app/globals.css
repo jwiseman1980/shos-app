@@ -971,6 +971,20 @@ p {
   }
 }
 
+@media (max-width: 767px) {
+  .day-panel,
+  .day-panel--collapsed {
+    display: none;
+  }
+  .task-sidebar,
+  .task-sidebar--collapsed {
+    display: none;
+  }
+  .app-content-inner {
+    padding: 16px;
+  }
+}
+
 /* ── Task Sidebar ── */
 
 .task-sidebar {
