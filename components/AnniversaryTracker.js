@@ -20,13 +20,15 @@ function statusLabel(status) {
   return "Not Sent";
 }
 
-function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onUpdate }) {
+function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onUpdate, currentUser }) {
   const [status, setStatus] = useState(hero.anniversaryStatus || "Not Started");
   const [assignedTo, setAssignedTo] = useState(hero.anniversaryAssignedTo || "");
   const [notes, setNotes] = useState(hero.anniversaryNotes || "");
   const [editingNotes, setEditingNotes] = useState(false);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
+  const [draftingEmail, setDraftingEmail] = useState(false);
+  const [draftResult, setDraftResult] = useState(null);
   const save = useCallback(async (fields) => {
     setSaving(true);
     setLastSaved(null);
@@ -67,6 +69,41 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
     setEditingNotes(false);
     save({ notes });
   };
+
+  const handleDraftEmail = useCallback(async () => {
+    setDraftingEmail(true);
+    setDraftResult(null);
+    try {
+      const res = await fetch("/api/anniversaries/draft-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          heroName: hero.fullName || hero.name || "",
+          branch: hero.serviceCode || hero.branch || "",
+          years: years || 0,
+          memorialDate: hero.memorialDate || "",
+          familyEmail: hero.familyContactEmail || "",
+          familyName: hero.familyContactName || "",
+          senderEmail: currentUser?.email || "joseph.wiseman@steel-hearts.org",
+          senderName: currentUser?.name || "Joseph Wiseman",
+          sfId: hero.sfId,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDraftResult("drafted");
+        setStatus("Scheduled");
+        if (onUpdate) onUpdate(hero.sfId, { status: "Scheduled" });
+      } else {
+        setDraftResult(data.mock ? "offline" : "error");
+      }
+    } catch {
+      setDraftResult("error");
+    } finally {
+      setDraftingEmail(false);
+      setTimeout(() => setDraftResult(null), 4000);
+    }
+  }, [hero, years, currentUser, onUpdate]);
 
   const normStatus = normalizeStatus(status);
 
@@ -232,28 +269,50 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
         )}
       </td>
 
-      {/* Contact Info */}
+      {/* Contact Info + Draft Email */}
       <td>
-        {!hero.familyContactId ? (
-          <span
-            style={{
-              fontSize: 10,
-              color: "var(--status-orange)",
-              fontWeight: 600,
-              padding: "3px 8px",
-              background: "rgba(245, 158, 11, 0.1)",
-              borderRadius: "var(--radius-sm)",
-              whiteSpace: "nowrap",
-            }}
-            title="No family contact on file"
-          >
-            Research Needed
-          </span>
-        ) : (
-          <span style={{ fontSize: 11, color: "var(--text-dim)" }} title={hero.familyContactEmail || ""}>
-            {hero.familyContactName || "On file"}
-          </span>
-        )}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {!hero.familyContactId ? (
+            <span
+              style={{
+                fontSize: 10,
+                color: "var(--status-orange)",
+                fontWeight: 600,
+                padding: "3px 8px",
+                background: "rgba(245, 158, 11, 0.1)",
+                borderRadius: "var(--radius-sm)",
+                whiteSpace: "nowrap",
+              }}
+              title="No family contact on file"
+            >
+              Research Needed
+            </span>
+          ) : (
+            <span style={{ fontSize: 11, color: "var(--text-dim)" }} title={hero.familyContactEmail || ""}>
+              {hero.familyContactName || "On file"}
+            </span>
+          )}
+          {hero.familyContactEmail && normStatus !== "sent" && (
+            <button
+              onClick={handleDraftEmail}
+              disabled={draftingEmail || draftResult === "drafted"}
+              title={`Draft anniversary email to ${hero.familyContactEmail}`}
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                padding: "3px 8px",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--gold)",
+                background: draftResult === "drafted" ? "rgba(34,197,94,0.15)" : "rgba(196,162,55,0.08)",
+                color: draftResult === "drafted" ? "var(--status-green)" : draftResult === "error" ? "var(--status-red)" : "var(--gold)",
+                cursor: draftingEmail ? "wait" : "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {draftingEmail ? "Drafting…" : draftResult === "drafted" ? "✓ Drafted" : draftResult === "error" ? "Error" : draftResult === "offline" ? "Offline" : "Draft Email"}
+            </button>
+          )}
+        </div>
       </td>
     </tr>
   );
@@ -335,6 +394,7 @@ export default function AnniversaryTracker({
                 monthName={monthName}
                 volunteers={volunteers}
                 onUpdate={handleUpdate}
+                currentUser={currentUser}
               />
             );
           })}
