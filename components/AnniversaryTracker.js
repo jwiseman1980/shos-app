@@ -3,8 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import StatusBadge from "@/components/StatusBadge";
 
-// Status is read-only in the app — changes happen via Slack buttons.
-// Assignment is the only editable field here.
+const STATUS_OPTIONS = ["Not Sent", "Scheduled", "Sent"];
 
 function normalizeStatus(status) {
   if (!status) return "not_sent";
@@ -56,6 +55,12 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
     const newAssign = e.target.value;
     setAssignedTo(newAssign);
     save({ assignedToName: newAssign || null });
+  };
+
+  const handleStatusChange = (e) => {
+    const newStatus = e.target.value;
+    setStatus(newStatus);
+    save({ status: newStatus });
   };
 
   const handleNotesSave = () => {
@@ -137,28 +142,30 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
         </select>
       </td>
 
-      {/* Status — Read-only badge (status changes happen in Slack) */}
+      {/* Status — Editable dropdown */}
       <td>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span
+          <select
+            value={statusLabel(status)}
+            onChange={handleStatusChange}
             style={{
-              fontSize: 11,
-              fontWeight: 600,
-              padding: "3px 8px",
-              borderRadius: "var(--radius-sm)",
-              whiteSpace: "nowrap",
-              background:
-                normStatus === "sent" ? "rgba(34, 197, 94, 0.15)" :
-                normStatus === "scheduled" ? "rgba(59, 130, 246, 0.15)" :
-                "rgba(245, 158, 11, 0.1)",
+              background: "var(--bg)",
               color:
                 normStatus === "sent" ? "var(--status-green)" :
                 normStatus === "scheduled" ? "var(--status-blue)" :
                 "var(--status-orange)",
+              border: "1px solid var(--card-border)",
+              borderRadius: "var(--radius-sm)",
+              padding: "3px 6px",
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: "pointer",
             }}
           >
-            {statusLabel(status)}
-          </span>
+            {STATUS_OPTIONS.map((o) => (
+              <option key={o} value={o}>{o}</option>
+            ))}
+          </select>
           {saving && (
             <span style={{ fontSize: 10, color: "var(--gold)" }}>saving...</span>
           )}
