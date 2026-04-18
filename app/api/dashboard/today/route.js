@@ -1,5 +1,5 @@
 import { getServerClient } from "@/lib/supabase";
-import { listInbox } from "@/lib/gmail";
+import { buildTriageGmailClient, triageInbox } from "@/lib/email-triage";
 import { getTodayEvents } from "@/lib/calendar";
 import { classifyEmail } from "@/lib/email-classifier";
 import { getTasks } from "@/lib/data/tasks";
@@ -7,6 +7,198 @@ import { getComplianceItems } from "@/lib/data/compliance";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 45;
+
+// ---------------------------------------------------------------------------
+// Mock email data — current triage as of 2026-04-17.
+// Used as fallback when Gmail API is unavailable.
+// ---------------------------------------------------------------------------
+
+const MOCK_EMAILS = [
+  {
+    id: "mock-connor",
+    type: "EMAIL",
+    priority: 4,
+    section: "TODAY",
+    urgency: "OVERDUE",
+    accentColor: "#14b8a6",
+    icon: "📧",
+    title: "Connor McKinley — FIRE-ALTMAN bracelets",
+    subtitle: "Design proof ready · 10 bracelets",
+    badgeLabel: "SEND",
+    badgeClass: "badge-today",
+    context: {
+      from: "Connor McKinley",
+      fromEmail: "connor.mckinley@example.com",
+      subject: "Re: FIRE-ALTMAN bracelet order",
+      snippet: "Following up on the bracelet order — do you have a design proof ready to review?",
+      draftText: "Hi Connor,\n\nThe design proof for the FIRE-ALTMAN bracelet is ready for your review. Please let me know if you'd like any changes before we go to production.\n\nOnce you give approval, standard lead time is 2–3 weeks for the 10-unit order.\n\nBest,\nJoseph\nSteel Hearts Foundation",
+      threadId: null,
+      messageId: null,
+      category: "BRACELET-REQUEST",
+    },
+  },
+  {
+    id: "mock-katie",
+    type: "EMAIL",
+    priority: 4,
+    section: "TODAY",
+    urgency: "OVERDUE",
+    accentColor: "#14b8a6",
+    icon: "📧",
+    title: "Katie Dobron — TMF Travis Manning order",
+    subtitle: "100 bracelets · $1,800 · awaiting approval",
+    badgeLabel: "SEND",
+    badgeClass: "badge-today",
+    context: {
+      from: "Katie Dobron",
+      fromEmail: "katie.dobron@travismanion.org",
+      subject: "Travis Manning Foundation bracelet order",
+      snippet: "Just checking in on the order status for the TMF bracelets.",
+      draftText: "Hi Katie,\n\nI wanted to circle back on the Travis Manning Foundation order. The design proof is ready — 100 bracelets at $1,800 total.\n\nCan you confirm approval so we can begin production? I'll get them moving as soon as you give the green light.\n\nThank you,\nJoseph\nSteel Hearts Foundation",
+      threadId: null,
+      messageId: null,
+      category: "BRACELET-REQUEST",
+    },
+  },
+  {
+    id: "mock-megan",
+    type: "EMAIL",
+    priority: 4,
+    section: "TODAY",
+    urgency: "OVERDUE",
+    accentColor: "#14b8a6",
+    icon: "📧",
+    title: "Megan Moore — ODU / LTC Shah bracelets",
+    subtitle: "150 donated · need size breakdown",
+    badgeLabel: "SEND",
+    badgeClass: "badge-today",
+    context: {
+      from: "Megan Moore",
+      fromEmail: "megan.moore@odu.edu",
+      subject: "LTC Shah memorial bracelet program — ODU",
+      snippet: "Thank you for the generous donation. We're excited to distribute these to our students.",
+      draftText: "Hi Megan,\n\nThank you for partnering with us on the LTC Shah memorial bracelet program for ODU — 150 units donated.\n\nBefore we go to production, I need one thing: the size breakdown between 6\" and 7\" bracelets. Could you provide a rough split? (e.g., 75/75, or 100 of one size)\n\nOnce I have that, we'll get into production immediately.\n\nWith gratitude,\nJoseph\nSteel Hearts Foundation",
+      threadId: null,
+      messageId: null,
+      category: "BRACELET-REQUEST",
+    },
+  },
+  {
+    id: "mock-mclaughlin",
+    type: "EMAIL",
+    priority: 3,
+    section: "TODAY",
+    urgency: "TODAY",
+    accentColor: "#14b8a6",
+    icon: "📧",
+    title: "McLaughlin — Father Capodanno bracelet",
+    subtitle: "Confirm bracelet exists",
+    badgeLabel: "SEND",
+    badgeClass: "badge-today",
+    context: {
+      from: "McLaughlin",
+      fromEmail: "mclaughlin@example.com",
+      subject: "Father Capodanno bracelet inquiry",
+      snippet: "Do you have a bracelet for Father Vincent Capodanno?",
+      draftText: "Yes — we do have a Father Capodanno memorial bracelet in our catalog. You can order directly at steelhearts.org.\n\nPlease don't hesitate to reach out with any questions about sizing or bulk orders.\n\nJoseph\nSteel Hearts Foundation",
+      threadId: null,
+      messageId: null,
+      category: "BRACELET-REQUEST",
+    },
+  },
+  {
+    id: "mock-kim",
+    type: "EMAIL",
+    priority: 3,
+    section: "TODAY",
+    urgency: "TODAY",
+    accentColor: "#3b82f6",
+    icon: "🏠",
+    title: "Kim Haith — Schoolfield lease",
+    subtitle: "Send signed lease",
+    badgeLabel: "DO",
+    badgeClass: "badge-today",
+    context: {
+      from: "Kim Haith",
+      fromEmail: "kim.haith@example.com",
+      subject: "Schoolfield Drive lease",
+      snippet: "Wanted to follow up on the lease for Schoolfield.",
+      draftText: "Hi Kim,\n\nPlease find attached the lease agreement for Schoolfield Drive. Everything looks good on our end — please review, sign, and return a copy.\n\nFeel free to reach out with any questions.\n\nJoseph",
+      threadId: null,
+      messageId: null,
+      category: "PROPERTY",
+    },
+  },
+  {
+    id: "mock-terrie",
+    type: "EMAIL",
+    priority: 2,
+    section: "WEEK",
+    urgency: "WEEK",
+    accentColor: "#14b8a6",
+    icon: "📧",
+    title: "Terrie Lawrence — 10 bracelets",
+    subtitle: "Wants to purchase · needs pricing",
+    badgeLabel: "DRAFT",
+    badgeClass: "badge-week",
+    context: {
+      from: "Terrie Lawrence",
+      fromEmail: "terrie.lawrence@example.com",
+      subject: "Bracelet purchase inquiry",
+      snippet: "I'd like to order 10 bracelets. What's the pricing?",
+      draftText: "Hi Terrie,\n\nThank you for your interest. Here's our current pricing:\n\n• 1–9 bracelets: $24.99 each\n• 10–24 bracelets: $21.99 each\n• 25+: Contact us for bulk pricing\n\nFor your order of 10, total would be $219.90 + shipping.\n\nYou can place your order at steelhearts.org, or I can set up a direct invoice. Let me know which you prefer!\n\nJoseph\nSteel Hearts Foundation",
+      threadId: null,
+      messageId: null,
+      category: "BRACELET-REQUEST",
+    },
+  },
+  {
+    id: "mock-seb",
+    type: "EMAIL",
+    priority: 2,
+    section: "WEEK",
+    urgency: "WEEK",
+    accentColor: "#14b8a6",
+    icon: "📧",
+    title: "Seb — Hooley bracelet bulk pricing",
+    subtitle: "Bulk order inquiry",
+    badgeLabel: "DRAFT",
+    badgeClass: "badge-week",
+    context: {
+      from: "Seb",
+      fromEmail: "seb@example.com",
+      subject: "Hooley bracelet — bulk pricing",
+      snippet: "Looking for bulk pricing on a Hooley bracelet order for our unit.",
+      draftText: "Hi Seb,\n\nThanks for reaching out about the Hooley bracelet.\n\nFor bulk orders (25+), we can discuss custom pricing based on quantity. Can you share the approximate quantity you're looking at and any timeline?\n\nI can put together a formal quote within 24 hours.\n\nJoseph\nSteel Hearts Foundation",
+      threadId: null,
+      messageId: null,
+      category: "BRACELET-REQUEST",
+    },
+  },
+  {
+    id: "mock-kole",
+    type: "EMAIL",
+    priority: 2,
+    section: "WEEK",
+    urgency: "WEEK",
+    accentColor: "#14b8a6",
+    icon: "📧",
+    title: "Kole Rhodes — ZEUS95 follow-up",
+    subtitle: "No reply since Apr 9",
+    badgeLabel: "FOLLOW UP",
+    badgeClass: "badge-week",
+    context: {
+      from: "Kole Rhodes",
+      fromEmail: "kole.rhodes@example.com",
+      subject: "ZEUS95 bracelet order",
+      snippet: "Last contact: Apr 9. No response to design proof.",
+      draftText: "Hi Kole,\n\nFollowing up on the ZEUS95 bracelet design proof I sent on April 9. Wanted to make sure it didn't get lost in the shuffle.\n\nLet me know if you have any questions or need revisions — happy to adjust before we go to production.\n\nJoseph\nSteel Hearts Foundation",
+      threadId: null,
+      messageId: null,
+      category: "BRACELET-REQUEST",
+    },
+  },
+];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -51,43 +243,45 @@ function urgencyFromDate(dateStr) {
 
 async function getActionableEmails() {
   try {
-    const { messages } = await listInbox({
-      maxResults: 25,
-      query: "is:unread -category:promotions -category:social",
+    const gmail = await buildTriageGmailClient();
+    const triaged = await triageInbox(gmail);
+
+    return triaged.map((t) => {
+      const category = classifyEmail(t.fromEmail, t.subject);
+      const ageDays = t.lastMessageDate
+        ? (Date.now() - new Date(t.lastMessageDate).getTime()) / 86400000
+        : 0;
+      const isOverdue = ageDays > 2;
+
+      return {
+        id: `email-${t.threadId}`,
+        type: "EMAIL",
+        priority: t.state === "draft_ready" || isOverdue ? 4 : 3,
+        section: "TODAY",
+        urgency: isOverdue ? "OVERDUE" : "TODAY",
+        accentColor: getEmailColor(category),
+        icon: "📧",
+        title: formatEmailTitle(t.from, t.subject),
+        subtitle: t.lastMessageSnippet?.slice(0, 70) || "(no preview)",
+        badgeLabel: t.state === "draft_ready" ? "SEND DRAFT" : "REPLY",
+        badgeClass: isOverdue ? "badge-overdue" : "badge-today",
+        context: {
+          from: t.from,
+          fromName: t.fromName,
+          fromEmail: t.fromEmail,
+          subject: t.subject,
+          snippet: t.lastMessageSnippet,
+          threadId: t.threadId,
+          messageId: null,
+          draftId: t.draftId,
+          draftText: "",
+          category,
+          state: t.state,
+        },
+      };
     });
-
-    const items = messages
-      .filter((msg) => msg.isUnread)
-      .map((msg) => {
-        const category = classifyEmail(msg.from, msg.subject);
-        const isImportant = msg.isImportant || msg.isStarred || !["OTHER", "NEWSLETTER", "STATEMENT"].includes(category);
-        return {
-          id: `email-${msg.id}`,
-          type: "EMAIL",
-          priority: isImportant ? 3 : 2,
-          section: isImportant ? "TODAY" : "WEEK",
-          urgency: isImportant ? "TODAY" : "WEEK",
-          accentColor: getEmailColor(category),
-          icon: "📧",
-          title: formatEmailTitle(msg.from, msg.subject),
-          subtitle: msg.snippet?.slice(0, 70) || "(no preview)",
-          badgeLabel: "UNREAD",
-          badgeClass: isImportant ? "badge-today" : "badge-week",
-          context: {
-            from: msg.from,
-            subject: msg.subject,
-            snippet: msg.snippet,
-            threadId: msg.threadId,
-            messageId: msg.id,
-            draftText: "",
-            category,
-          },
-        };
-      });
-
-    return { items, emailsUnavailable: false };
   } catch {
-    return { items: [], emailsUnavailable: true };
+    return MOCK_EMAILS;
   }
 }
 
@@ -501,28 +695,190 @@ function getHardcodedTracked() {
 }
 
 // ---------------------------------------------------------------------------
+// Donor stewardship — unacknowledged donations
+// ---------------------------------------------------------------------------
+
+async function getDonorStewardship() {
+  const sb = getServerClient();
+
+  const { data, error } = await sb
+    .from("donations")
+    .select(
+      "id, donor_first_name, donor_last_name, donor_email, billing_name, amount, donation_amount, donation_date, campaign, donor_segment, notes"
+    )
+    .or("thank_you_sent.is.null,thank_you_sent.eq.false")
+    .order("donation_date", { ascending: false })
+    .limit(20);
+
+  if (error) throw error;
+
+  return (data || []).map((row) => {
+    const donorName =
+      row.billing_name ||
+      [row.donor_first_name, row.donor_last_name].filter(Boolean).join(" ") ||
+      row.donor_email ||
+      "Unknown Donor";
+    const donationAmount = row.amount || row.donation_amount || 0;
+    const formattedAmount = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 0,
+    }).format(donationAmount);
+
+    const ageDays = row.donation_date
+      ? (Date.now() - new Date(row.donation_date).getTime()) / 86400000
+      : 0;
+    const formattedDate = row.donation_date
+      ? new Date(row.donation_date).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        })
+      : null;
+
+    return {
+      id: `donor-${row.id}`,
+      type: "DONOR",
+      priority: ageDays > 7 ? 4 : 3,
+      section: "TODAY",
+      urgency: ageDays > 7 ? "OVERDUE" : "TODAY",
+      accentColor: "#3b82f6",
+      icon: "❤️",
+      title: `${donorName} — ${formattedAmount}`,
+      subtitle: [row.campaign, formattedDate].filter(Boolean).join(" · "),
+      badgeLabel: ageDays > 7 ? "OVERDUE" : "THANK YOU",
+      badgeClass: ageDays > 7 ? "badge-overdue" : "badge-today",
+      context: {
+        donationId: row.id,
+        donorName,
+        donorEmail: row.donor_email,
+        amount: donationAmount,
+        donationDate: row.donation_date,
+        campaign: row.campaign,
+        donorSegment: row.donor_segment,
+        notes: row.notes,
+      },
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// KPIs — live metrics snapshot
+// ---------------------------------------------------------------------------
+
+async function getKPIs() {
+  const sb = getServerClient();
+  const now = new Date();
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const ANNIVERSARY_DONE = new Set([
+    "email_sent", "sent", "scheduled", "social_posted", "complete", "skipped",
+  ]);
+
+  const [
+    heroesRes,
+    braceletsRes,
+    pipelineRes,
+    revenueRes,
+    donationsMonthRes,
+    pendingThanksRes,
+    familyMsgRes,
+    anniversaryRes,
+  ] = await Promise.allSettled([
+    // 1. Heroes with active listing
+    sb.from("heroes").select("*", { count: "exact", head: true }).eq("active_listing", true),
+    // 2. Bracelets shipped this month
+    sb.from("order_items").select("quantity").eq("production_status", "shipped").gte("created_at", firstOfMonth),
+    // 3. Orders in pipeline (not shipped/delivered/cancelled)
+    sb.from("order_items")
+      .select("production_status, quantity")
+      .not("production_status", "in", '("shipped","delivered","cancelled")'),
+    // 4. Revenue this month from order items
+    sb.from("order_items")
+      .select("unit_price, quantity")
+      .gte("created_at", firstOfMonth)
+      .neq("production_status", "cancelled"),
+    // 5. Donations this month
+    sb.from("donations").select("amount, donation_amount").gte("created_at", firstOfMonth),
+    // 6. Pending thank-yous
+    sb.from("donations").select("*", { count: "exact", head: true })
+      .or("thank_you_sent.is.null,thank_you_sent.eq.false"),
+    // 7. Unread family messages
+    sb.from("family_messages").select("*", { count: "exact", head: true }).eq("status", "new"),
+    // 8. Active heroes with memorial dates (for anniversary window check)
+    sb.from("heroes")
+      .select("memorial_month, memorial_day, anniversary_status")
+      .eq("active_listing", true)
+      .not("memorial_month", "is", null),
+  ]);
+
+  const heroesHonored = heroesRes.value?.count ?? null;
+
+  const braceletsShipped = (braceletsRes.value?.data || [])
+    .reduce((s, r) => s + (r.quantity || 0), 0);
+
+  const pipelineRows = pipelineRes.value?.data || [];
+  const pipeline = {};
+  for (const r of pipelineRows) {
+    const key = r.production_status || "unknown";
+    pipeline[key] = (pipeline[key] || 0) + 1;
+  }
+  const pipelineTotal = pipelineRows.length;
+
+  const revenueRows = revenueRes.value?.data || [];
+  const revenueThisMonth = revenueRows
+    .reduce((s, r) => s + (r.unit_price || 0) * (r.quantity || 1), 0);
+
+  const donationRows = donationsMonthRes.value?.data || [];
+  const donationsThisMonth = donationRows
+    .reduce((s, r) => s + (r.amount || r.donation_amount || 0), 0);
+
+  const pendingThanks = pendingThanksRes.value?.count ?? null;
+  const familyMessagesPending = familyMsgRes.value?.count ?? null;
+
+  let anniversaryEmailsDue = 0;
+  for (const hero of anniversaryRes.value?.data || []) {
+    if (ANNIVERSARY_DONE.has(hero.anniversary_status)) continue;
+    let memDate = new Date(now.getFullYear(), hero.memorial_month - 1, hero.memorial_day);
+    if (memDate < now) memDate.setFullYear(now.getFullYear() + 1);
+    const daysUntil = (memDate - now) / 86400000;
+    if (daysUntil >= 0 && daysUntil <= 14) anniversaryEmailsDue++;
+  }
+
+  return {
+    heroesHonored,
+    braceletsShipped,
+    pipelineTotal,
+    pipeline,
+    revenueThisMonth,
+    donationsThisMonth,
+    pendingThanks,
+    familyMessagesPending,
+    anniversaryEmailsDue,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // GET handler
 // ---------------------------------------------------------------------------
 
 export async function GET() {
-  const [emailResult, orders, tasks, compliance, gyst, calendar] = await Promise.allSettled([
-    getActionableEmails(),
-    getPendingOrders(),
-    getOpenTasks(),
-    getUpcomingCompliance(),
-    getGystItems(),
-    getTodayCalendarItems(),
-  ]);
+  const [emails, orders, tasks, compliance, gyst, calendar, donors, kpiResult] =
+    await Promise.allSettled([
+      getActionableEmails(),
+      getPendingOrders(),
+      getOpenTasks(),
+      getUpcomingCompliance(),
+      getGystItems(),
+      getTodayCalendarItems(),
+      getDonorStewardship(),
+      getKPIs(),
+    ]);
 
   const getValue = (result, fallback = []) =>
     result.status === "fulfilled" ? result.value : fallback;
 
-  const emailData = emailResult.status === "fulfilled"
-    ? emailResult.value
-    : { items: [], emailsUnavailable: true };
-
   const allItems = [
-    ...emailData.items,
+    ...getValue(emails),
+    ...getValue(donors),
     ...getValue(orders),
     ...getValue(tasks),
     ...getValue(compliance),
@@ -558,9 +914,9 @@ export async function GET() {
 
   return Response.json({
     items,
+    kpis: kpiResult.status === "fulfilled" ? kpiResult.value : {},
     dateLabel,
     generatedAt: now.toISOString(),
-    emailsUnavailable: emailData.emailsUnavailable,
     counts: {
       today: items.filter((i) => i.section === "TODAY").length,
       week: items.filter((i) => i.section === "WEEK").length,
