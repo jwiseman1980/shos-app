@@ -205,7 +205,10 @@ export default function ProductionBoard({ columns: initialColumns = {}, stats = 
     }
     setPushResult((p) => ({ ...p, [key]: anyError || "pushed" }));
     setTimeout(() => setPushResult((p) => ({ ...p, [key]: null })), 5000);
-  }, []);
+    if (!anyError) {
+      moveCard(card, "ready_to_ship", "shipped");
+    }
+  }, [moveCard]);
 
   return (
     <div style={{

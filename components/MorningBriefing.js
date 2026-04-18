@@ -274,10 +274,21 @@ export default function MorningBriefing({
     "PARTNER-ORG": "#8e44ad",
   };
 
+  // ---------------------------------------------------------------------------
+  // KPI strip — derived from same data already loaded above
+  // ---------------------------------------------------------------------------
+  const kpiAnniversariesPending = useMemo(() => {
+    if (!anniversaryData?.data) return null;
+    return anniversaryData.data.filter((h) => {
+      const s = (h.anniversaryStatus || "").toLowerCase().replace(/\s+/g, "_");
+      return !["sent", "email_sent", "complete", "completed", "skipped", "scheduled"].includes(s);
+    }).length;
+  }, [anniversaryData]);
+
   return (
     <div style={{ padding: 20, height: "100%", overflowY: "auto" }}>
       {/* Greeting */}
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ marginBottom: 16 }}>
         <h2 style={{ color: "var(--text-bright)", fontSize: 20, fontWeight: 600, margin: 0 }}>
           {greeting || "Good morning"}
         </h2>
@@ -290,6 +301,63 @@ export default function MorningBriefing({
             timeZone: "America/New_York",
           })}
         </div>
+      </div>
+
+      {/* KPI Action Strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 16 }}>
+        {[
+          {
+            label: "Emails",
+            count: unreadCount,
+            color: "#3498db",
+            action: () => onViewChange?.("email-triage"),
+          },
+          {
+            label: "To Laser",
+            count: orderData ? (orderData.stats?.readyToLaser ?? 0) : null,
+            color: "var(--status-blue)",
+            href: "/laser",
+          },
+          {
+            label: "Anniversaries",
+            count: kpiAnniversariesPending,
+            color: "#e91e63",
+            href: "/anniversaries",
+          },
+          {
+            label: "Design Queue",
+            count: orderData ? (orderData.stats?.designNeeded ?? 0) : null,
+            color: "var(--status-orange)",
+            href: "/designs",
+          },
+        ].map(({ label, count, color, href, action }) => (
+          <div
+            key={label}
+            onClick={() => (action ? action() : href && (window.location.href = href))}
+            style={{
+              background: "var(--card-bg)",
+              border: `1px solid ${color}44`,
+              borderTop: `3px solid ${color}`,
+              borderRadius: 8,
+              padding: "10px 12px",
+              cursor: "pointer",
+              display: "flex",
+              flexDirection: "column",
+              gap: 3,
+              transition: "opacity 0.15s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.8")}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+          >
+            <div style={{ fontSize: 26, fontWeight: 700, color, lineHeight: 1 }}>
+              {count === null ? <span style={{ fontSize: 14, color: "var(--text-dim)" }}>…</span> : count}
+            </div>
+            <div style={{ fontSize: 10, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: 0.5 }}>
+              {label}
+            </div>
+            <div style={{ fontSize: 10, color }}>→ view</div>
+          </div>
+        ))}
       </div>
 
       {/* URGENT — operational urgencies only */}

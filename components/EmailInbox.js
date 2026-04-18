@@ -132,7 +132,8 @@ function ThreadRow({ thread, onOpen, onArchive }) {
         style={{
           background: "none", border: "none", cursor: "pointer",
           color: "var(--text-dim)", fontSize: 16, padding: "4px 8px",
-          borderRadius: 4, flexShrink: 0,
+          borderRadius: 4, flexShrink: 0, minWidth: 44, minHeight: 44,
+          display: "flex", alignItems: "center", justifyContent: "center",
         }}
         onMouseEnter={(e) => e.currentTarget.style.color = "var(--status-green)"}
         onMouseLeave={(e) => e.currentTarget.style.color = "var(--text-dim)"}
@@ -170,7 +171,6 @@ function MessageBubble({ message, defaultExpanded }) {
       borderBottom: "1px solid var(--card-border)",
       background: message.isDraft ? "rgba(255,200,0,0.04)" : "transparent",
     }}>
-      {/* Message header — always visible */}
       <div
         onClick={() => setExpanded((v) => !v)}
         style={{
@@ -200,7 +200,6 @@ function MessageBubble({ message, defaultExpanded }) {
         </span>
       </div>
 
-      {/* Message body */}
       {expanded && (
         <div style={{ padding: "0 16px 16px" }}>
           {message.bodyIsHtml ? (
@@ -240,27 +239,366 @@ function MessageBubble({ message, defaultExpanded }) {
 }
 
 // ---------------------------------------------------------------------------
+// Context panel — contact card, hero card, new-record prompts
+// ---------------------------------------------------------------------------
+
+function ContactCard({ contact, orderCount, donationTotal }) {
+  return (
+    <div style={{
+      flex: 1, minWidth: 200,
+      background: "var(--bg)", border: "1px solid var(--card-border)",
+      borderRadius: 8, padding: "10px 12px",
+    }}>
+      <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--status-blue)", marginBottom: 6 }}>
+        Known Contact
+      </div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-bright)" }}>{contact.name}</div>
+      <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>{contact.email}</div>
+      {(contact.city || contact.state) && (
+        <div style={{ fontSize: 11, color: "var(--text-dim)" }}>
+          {[contact.city, contact.state].filter(Boolean).join(", ")}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 12, marginTop: 8, fontSize: 11 }}>
+        {orderCount > 0 && (
+          <a href="/orders" style={{ color: "var(--gold)", textDecoration: "none" }}>
+            {orderCount} order{orderCount !== 1 ? "s" : ""}
+          </a>
+        )}
+        {donationTotal > 0 && (
+          <span style={{ color: "var(--status-green)" }}>${donationTotal.toLocaleString()} donated</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HeroContextCard({ hero }) {
+  const statusColor = {
+    not_started: "var(--text-dim)",
+    research: "var(--status-orange)",
+    in_progress: "var(--status-blue)",
+    review: "#c4a237",
+    approved: "var(--status-green)",
+    complete: "var(--status-green)",
+    Complete: "var(--status-green)",
+  }[hero.design_status] || "var(--text-dim)";
+
+  return (
+    <div style={{
+      flex: 1, minWidth: 200,
+      background: "var(--bg)", border: "1px solid var(--gold)44",
+      borderRadius: 8, padding: "10px 12px",
+    }}>
+      <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--gold)", marginBottom: 6 }}>
+        Hero Match
+      </div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-bright)" }}>{hero.name}</div>
+      <div style={{ fontSize: 11, fontFamily: "monospace", color: "var(--text-dim)", marginTop: 1 }}>{hero.sku}</div>
+      <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>{hero.branch}</div>
+      <div style={{ display: "flex", gap: 8, marginTop: 6, fontSize: 10, alignItems: "center" }}>
+        <span style={{ color: statusColor, fontWeight: 600 }}>
+          {hero.hasDesign ? "✓ Design ready" : `Design: ${(hero.design_status || "not started").replace(/_/g, " ")}`}
+        </span>
+        <a href="/production" style={{ color: "var(--text-dim)", textDecoration: "none", marginLeft: "auto" }}>→ Production</a>
+      </div>
+    </div>
+  );
+}
+
+function NoMatchPanel({ emailAddr, subject }) {
+  const heroIntakeUrl = `/families?new=1&name=${encodeURIComponent(subject || "")}`;
+  return (
+    <div style={{
+      flex: 1, minWidth: 200,
+      background: "var(--bg)", border: "1px dashed var(--card-border)",
+      borderRadius: 8, padding: "10px 12px",
+    }}>
+      <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-dim)", marginBottom: 6 }}>
+        New Contact
+      </div>
+      <div style={{ fontSize: 12, color: "var(--text-dim)", marginBottom: 8 }}>
+        {emailAddr || "Unknown sender"} not in system
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <a
+          href={heroIntakeUrl}
+          style={{
+            fontSize: 11, padding: "4px 8px", borderRadius: 4,
+            background: "var(--gold)15", border: "1px solid var(--gold)44",
+            color: "var(--gold)", textDecoration: "none",
+          }}
+        >
+          + New Hero
+        </a>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Inline order form
+// ---------------------------------------------------------------------------
+
+function InlineOrderForm({ context, thread, threadId, mailbox, onSuccess }) {
+  const lastMsg = thread?.messages?.filter((m) => !m.isDraft).at(-1);
+  const { name: senderName, email: senderEmail } = parseFrom(lastMsg?.from || "");
+
+  // Pre-fill from context
+  const defaultHeroName = context?.heroes?.[0]?.name || "";
+  const defaultHeroSku = context?.heroes?.[0]?.sku || "";
+  const defaultRecipient = context?.contact?.name || senderName || "";
+  const defaultEmail = context?.contact?.email || senderEmail || "";
+
+  const [heroQuery, setHeroQuery] = useState(defaultHeroName);
+  const [heroSku, setHeroSku] = useState(defaultHeroSku);
+  const [heroSearchResults, setHeroSearchResults] = useState(context?.heroes || []);
+  const [heroSearching, setHeroSearching] = useState(false);
+  const [recipientName, setRecipientName] = useState(defaultRecipient);
+  const [recipientEmail, setRecipientEmail] = useState(defaultEmail);
+  const [qty7, setQty7] = useState(1);
+  const [qty6, setQty6] = useState(0);
+  const [shippingName, setShippingName] = useState(defaultRecipient);
+  const [shippingAddr, setShippingAddr] = useState("");
+  const [shippingCity, setShippingCity] = useState("");
+  const [shippingState, setShippingState] = useState("");
+  const [shippingPostal, setShippingPostal] = useState("");
+  const [notes, setNotes] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [result, setResult] = useState(null);
+  const searchTimeout = useRef(null);
+
+  const handleHeroSearch = useCallback((q) => {
+    setHeroQuery(q);
+    setHeroSku("");
+    clearTimeout(searchTimeout.current);
+    if (q.length < 2) { setHeroSearchResults([]); return; }
+    searchTimeout.current = setTimeout(async () => {
+      setHeroSearching(true);
+      try {
+        const res = await fetch(`/api/heroes/search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        setHeroSearchResults(data.heroes || []);
+      } catch {}
+      setHeroSearching(false);
+    }, 300);
+  }, []);
+
+  const selectHero = (hero) => {
+    setHeroQuery(hero.name);
+    setHeroSku(hero.sku);
+    setHeroSearchResults([]);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!heroQuery.trim() || !recipientName.trim()) return;
+    setCreating(true);
+    try {
+      const res = await fetch("/api/orders/from-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threadId,
+          mailbox,
+          heroName: heroQuery.trim(),
+          recipientName: recipientName.trim(),
+          recipientEmail: recipientEmail.trim(),
+          sku: heroSku,
+          quantity7: qty7,
+          quantity6: qty6,
+          notes: notes.trim(),
+          shippingName: shippingName.trim(),
+          shippingAddress1: shippingAddr.trim(),
+          shippingCity: shippingCity.trim(),
+          shippingState: shippingState.trim(),
+          shippingPostal: shippingPostal.trim(),
+        }),
+      });
+      const data = await res.json();
+      setResult(data);
+      if (data.success) onSuccess?.(data);
+    } catch (err) {
+      setResult({ error: err.message });
+    }
+    setCreating(false);
+  };
+
+  if (result?.success) {
+    return (
+      <div style={{ padding: "12px 16px", background: "rgba(39,174,96,0.08)", borderRadius: 8, border: "1px solid var(--status-green)44" }}>
+        <div style={{ fontSize: 13, color: "var(--status-green)", fontWeight: 600, marginBottom: 4 }}>
+          ✓ Order created — {result.orderName}
+        </div>
+        <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
+          Status: {result.initialStatus?.replace(/_/g, " ")}
+          {result.autoAdvanced && " → auto-advanced (design found)"}
+        </div>
+        <a href="/production" style={{ fontSize: 12, color: "var(--gold)", textDecoration: "none", display: "inline-block", marginTop: 6 }}>
+          → View in Production
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={{ padding: "0 16px 16px" }}>
+      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--gold)", padding: "10px 0 8px" }}>
+        Create Donated Order
+      </div>
+
+      {result?.error && (
+        <div style={{ fontSize: 12, color: "var(--status-red)", marginBottom: 8 }}>⚠ {result.error}</div>
+      )}
+
+      {/* Hero search */}
+      <div style={{ position: "relative", marginBottom: 10 }}>
+        <label style={labelStyle}>Hero</label>
+        <input
+          value={heroQuery}
+          onChange={(e) => handleHeroSearch(e.target.value)}
+          placeholder="Search hero name or SKU…"
+          required
+          style={inputStyle}
+          autoComplete="off"
+        />
+        {heroSku && (
+          <div style={{ fontSize: 10, fontFamily: "monospace", color: "var(--text-dim)", marginTop: 2 }}>SKU: {heroSku}</div>
+        )}
+        {heroSearchResults.length > 0 && !heroSku && (
+          <div style={{
+            position: "absolute", left: 0, right: 0, top: "100%", zIndex: 50,
+            background: "var(--card-bg)", border: "1px solid var(--card-border)",
+            borderRadius: "0 0 6px 6px", maxHeight: 180, overflowY: "auto",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+          }}>
+            {heroSearching && (
+              <div style={{ padding: "8px 12px", fontSize: 12, color: "var(--text-dim)" }}>Searching…</div>
+            )}
+            {heroSearchResults.map((h) => (
+              <button
+                key={h.id}
+                type="button"
+                onClick={() => selectHero(h)}
+                style={{
+                  display: "block", width: "100%", textAlign: "left",
+                  padding: "8px 12px", background: "none", border: "none",
+                  borderBottom: "1px solid var(--card-border)", cursor: "pointer",
+                  color: "var(--text-bright)", fontSize: 12,
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "var(--card-border)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+              >
+                <span style={{ fontWeight: 600 }}>{h.name}</span>
+                <span style={{ fontFamily: "monospace", fontSize: 10, color: "var(--text-dim)", marginLeft: 8 }}>{h.sku}</span>
+                {h.hasDesign && <span style={{ fontSize: 10, color: "var(--status-green)", marginLeft: 6 }}>✓ design</span>}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Two column: recipient + quantities */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+        <div>
+          <label style={labelStyle}>Recipient Name</label>
+          <input value={recipientName} onChange={(e) => { setRecipientName(e.target.value); setShippingName(e.target.value); }} required style={inputStyle} placeholder="Full name" />
+        </div>
+        <div>
+          <label style={labelStyle}>Recipient Email</label>
+          <input value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} style={inputStyle} placeholder="email@example.com" type="email" />
+        </div>
+      </div>
+
+      {/* Quantities */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+        <div>
+          <label style={labelStyle}>Qty 7" (Regular)</label>
+          <input value={qty7} onChange={(e) => setQty7(Math.max(0, parseInt(e.target.value) || 0))} type="number" min="0" max="20" style={inputStyle} />
+        </div>
+        <div>
+          <label style={labelStyle}>Qty 6" (Small)</label>
+          <input value={qty6} onChange={(e) => setQty6(Math.max(0, parseInt(e.target.value) || 0))} type="number" min="0" max="20" style={inputStyle} />
+        </div>
+      </div>
+
+      {/* Shipping (collapsible) */}
+      <details style={{ marginBottom: 10 }}>
+        <summary style={{ fontSize: 11, color: "var(--text-dim)", cursor: "pointer", padding: "4px 0" }}>
+          Shipping address (optional)
+        </summary>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label style={labelStyle}>Ship to Name</label>
+            <input value={shippingName} onChange={(e) => setShippingName(e.target.value)} style={inputStyle} placeholder="Recipient name" />
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label style={labelStyle}>Address</label>
+            <input value={shippingAddr} onChange={(e) => setShippingAddr(e.target.value)} style={inputStyle} placeholder="Street address" />
+          </div>
+          <div>
+            <label style={labelStyle}>City</label>
+            <input value={shippingCity} onChange={(e) => setShippingCity(e.target.value)} style={inputStyle} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 3fr", gap: 6 }}>
+            <div>
+              <label style={labelStyle}>State</label>
+              <input value={shippingState} onChange={(e) => setShippingState(e.target.value)} style={inputStyle} maxLength={2} placeholder="VA" />
+            </div>
+            <div>
+              <label style={labelStyle}>ZIP</label>
+              <input value={shippingPostal} onChange={(e) => setShippingPostal(e.target.value)} style={inputStyle} placeholder="22304" />
+            </div>
+          </div>
+        </div>
+      </details>
+
+      {/* Notes */}
+      <div style={{ marginBottom: 12 }}>
+        <label style={labelStyle}>Notes (optional)</label>
+        <input value={notes} onChange={(e) => setNotes(e.target.value)} style={inputStyle} placeholder="Any context…" />
+      </div>
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          type="submit"
+          disabled={creating || (!qty7 && !qty6)}
+          style={{
+            background: creating ? "var(--card-border)" : "var(--gold)",
+            border: "none", color: creating ? "var(--text-dim)" : "#000",
+            padding: "8px 16px", borderRadius: 6, fontSize: 12, fontWeight: 700,
+            cursor: creating ? "wait" : "pointer", flex: 1,
+            opacity: (!qty7 && !qty6) ? 0.5 : 1,
+          }}
+        >
+          {creating ? "Creating…" : "Create Order + Archive Email"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+const labelStyle = { fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-dim)", display: "block", marginBottom: 3 };
+const inputStyle = { width: "100%", background: "var(--bg)", border: "1px solid var(--card-border)", borderRadius: 6, color: "var(--text-bright)", fontSize: 12, padding: "5px 9px", boxSizing: "border-box", fontFamily: "inherit" };
+
+// ---------------------------------------------------------------------------
 // Thread detail view
 // ---------------------------------------------------------------------------
 
-const WORKFLOWS = [
-  { id: "donated-order",   label: "Donated Order",   domain: "orders" },
-  { id: "hero-intake",     label: "New Hero Intake",  domain: "intake" },
-  { id: "design-request",  label: "Design Request",   domain: "design" },
-  { id: "donor-followup",  label: "Donor Follow-up",  domain: "donor" },
-  { id: "general",         label: "General Response", domain: "general" },
-];
-
 const SNOOZE_OPTIONS = [
-  { label: "Tomorrow",  hours: 24 },
+  { label: "Tomorrow", hours: 24 },
   { label: "This Weekend", hours: 48 },
   { label: "Next Week", hours: 168 },
 ];
 
-function ThreadDetail({ threadId, mailbox, onBack, onArchived, onTaskCreated }) {
-  const [thread, setThread] = useState(null);
-  const [loadingThread, setLoadingThread] = useState(true);
+function ThreadDetail({ threadId, mailbox, onBack, onArchived, onTaskCreated, thread: preloadedThread }) {
+  const [thread, setThread] = useState(preloadedThread || null);
+  const [loadingThread, setLoadingThread] = useState(!preloadedThread);
   const [threadError, setThreadError] = useState(null);
+
+  // Context panel
+  const [context, setContext] = useState(null);
+  const [contextLoading, setContextLoading] = useState(false);
 
   const [draft, setDraft] = useState("");
   const [draftLoading, setDraftLoading] = useState(false);
@@ -270,15 +608,12 @@ function ThreadDetail({ threadId, mailbox, onBack, onArchived, onTaskCreated }) 
   const [sendConfirm, setSendConfirm] = useState(false);
   const [archiving, setArchiving] = useState(false);
 
-  const [showWorkflow, setShowWorkflow] = useState(false);
+  const [activeAction, setActiveAction] = useState(null); // "order" | "task" | null
   const [showSnooze, setShowSnooze] = useState(false);
-  const workflowRef = useRef(null);
   const snoozeRef = useRef(null);
 
-  // Close dropdowns on outside click
   useEffect(() => {
     function handler(e) {
-      if (workflowRef.current && !workflowRef.current.contains(e.target)) setShowWorkflow(false);
       if (snoozeRef.current && !snoozeRef.current.contains(e.target)) setShowSnooze(false);
     }
     document.addEventListener("mousedown", handler);
@@ -288,19 +623,36 @@ function ThreadDetail({ threadId, mailbox, onBack, onArchived, onTaskCreated }) 
   useEffect(() => {
     setLoadingThread(true);
     setThreadError(null);
+    setContext(null);
+    setActiveAction(null);
+    setDraft("");
+    setShowReply(false);
     fetch(`/api/email/thread/${threadId}?mailbox=${mailbox}`)
       .then((r) => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); })
-      .then((data) => setThread(data))
+      .then((data) => {
+        setThread(data);
+        // Fetch context once thread data is available
+        const lastMsg = data.messages?.filter((m) => !m.isDraft).at(-1);
+        if (lastMsg) {
+          setContextLoading(true);
+          const params = new URLSearchParams({
+            email: lastMsg.from || "",
+            subject: lastMsg.subject || data.messages?.[0]?.subject || "",
+            snippet: lastMsg.snippet || "",
+          });
+          fetch(`/api/email/context?${params}`)
+            .then((r) => r.json())
+            .then((d) => setContext(d))
+            .catch(() => {})
+            .finally(() => setContextLoading(false));
+        }
+      })
       .catch((err) => setThreadError(err.message))
       .finally(() => setLoadingThread(false));
   }, [threadId, mailbox]);
 
   const lastMessage = thread?.messages?.filter((m) => !m.isDraft).at(-1);
-  const subject = thread?.messages?.[0] ? (parseHeaders(thread.messages[0])?.subject || thread.messages[0].subject) : "";
-
-  function parseHeaders(msg) {
-    return { subject: msg?.subject };
-  }
+  const threadSubject = thread?.messages?.[0]?.subject || "(no subject)";
 
   const handleArchive = useCallback(async () => {
     setArchiving(true);
@@ -319,6 +671,7 @@ function ThreadDetail({ threadId, mailbox, onBack, onArchived, onTaskCreated }) 
     setDraftLoading(true);
     setDraftSaved(false);
     setShowReply(true);
+    setActiveAction(null);
     try {
       const res = await fetch("/api/email/draft-reply", {
         method: "POST",
@@ -383,7 +736,7 @@ function ThreadDetail({ threadId, mailbox, onBack, onArchived, onTaskCreated }) 
       const data = await res.json();
       if (data.success) {
         setDraft(""); setShowReply(false); setSendConfirm(false);
-        onArchived(threadId); // after sending, remove from inbox
+        onArchived(threadId);
       } else {
         alert("Send failed: " + (data.error || "Unknown error"));
       }
@@ -391,25 +744,23 @@ function ThreadDetail({ threadId, mailbox, onBack, onArchived, onTaskCreated }) 
     finally { setSending(false); }
   }, [lastMessage, draft, threadId, mailbox, onArchived]);
 
-  const handleCreateTask = useCallback(async (workflow) => {
+  const handleCreateTask = useCallback(async () => {
     if (!lastMessage) return;
-    setShowWorkflow(false);
+    setActiveAction(null);
     try {
-      const prefix = workflow ? `[${WORKFLOWS.find((w) => w.id === workflow)?.label}] ` : "";
       await fetch("/api/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "convert_to_task",
           messageId: lastMessage.id,
-          subject: prefix + (lastMessage.subject || "Email task"),
+          subject: lastMessage.subject || "Email task",
           from: lastMessage.from,
           snippet: lastMessage.snippet,
           mailbox,
         }),
       });
       onTaskCreated?.();
-      // Don't archive — keep in inbox unless user explicitly archives
     } catch (err) {
       console.error("Task creation failed:", err);
     }
@@ -423,8 +774,17 @@ function ThreadDetail({ threadId, mailbox, onBack, onArchived, onTaskCreated }) 
       map[threadId] = until;
       sessionStorage.setItem("email_snoozed", JSON.stringify(map));
     } catch {}
-    onArchived(threadId); // remove from view
+    onArchived(threadId);
   }, [threadId, onArchived]);
+
+  const handleOrderSuccess = useCallback((orderData) => {
+    // Archive after successful order creation
+    setTimeout(() => {
+      fetch(`/api/email/thread/${threadId}?mailbox=${mailbox}`, { method: "DELETE" })
+        .catch(() => {});
+      setTimeout(() => onArchived(threadId), 1500);
+    }, 800);
+  }, [threadId, mailbox, onArchived]);
 
   if (loadingThread) {
     return (
@@ -438,80 +798,64 @@ function ThreadDetail({ threadId, mailbox, onBack, onArchived, onTaskCreated }) 
     return (
       <div style={{ padding: 32, textAlign: "center" }}>
         <div style={{ color: "#ef4444", marginBottom: 12 }}>Failed to load thread: {threadError}</div>
-        <button onClick={onBack} style={{ background: "var(--card-border)", border: "none", color: "var(--text-bright)", padding: "6px 16px", borderRadius: 6, cursor: "pointer" }}>
-          ← Back
-        </button>
+        <button onClick={onBack} style={btnStyle}>← Back</button>
       </div>
     );
   }
 
-  const threadSubject = thread?.messages?.[0]?.subject || "(no subject)";
+  const hasContact = context?.contact;
+  const hasHeroes = context?.heroes?.length > 0;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      {/* Action bar */}
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+      {/* ── Action bar ─────────────────────────────────────────────────────── */}
       <div style={{
-        padding: "10px 16px",
+        padding: "10px 12px",
         borderBottom: "1px solid var(--card-border)",
-        display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+        display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap",
       }}>
         <button onClick={onBack} style={btnStyle}>← Back</button>
         <div style={{ flex: 1 }} />
 
-        {/* Reply */}
-        <button onClick={handleGenerateDraft} disabled={draftLoading} style={btnStyle}>
+        <button
+          onClick={handleGenerateDraft}
+          disabled={draftLoading}
+          style={{ ...btnStyle, ...(showReply ? { borderColor: "var(--status-blue)", color: "var(--status-blue)" } : {}) }}
+        >
           {draftLoading ? "Drafting…" : "↩ Reply"}
         </button>
 
-        {/* Archive */}
-        <button onClick={handleArchive} disabled={archiving} style={{ ...btnStyle, borderColor: "var(--status-green)", color: "var(--status-green)" }}>
-          {archiving ? "…" : "✓ Archive"}
+        <button
+          onClick={() => { setActiveAction(activeAction === "order" ? null : "order"); setShowReply(false); }}
+          style={{
+            ...btnStyle,
+            ...(activeAction === "order" ? { borderColor: "var(--gold)", color: "var(--gold)", background: "var(--gold)15" } : {}),
+          }}
+        >
+          📦 Order
         </button>
 
-        {/* + Task */}
-        <button onClick={() => handleCreateTask(null)} style={btnStyle}>+ Task</button>
+        <button onClick={handleCreateTask} style={btnStyle}>+ Task</button>
 
-        {/* + Order */}
+        {/* New Hero shortcut */}
         <a
-          href={`/orders/new?from=email&threadId=${threadId}&subject=${encodeURIComponent(threadSubject)}&sender=${encodeURIComponent(lastMessage?.from || "")}`}
-          style={{ ...btnStyle, textDecoration: "none", display: "inline-block" }}
+          href={`/families?new=1&name=${encodeURIComponent(threadSubject)}`}
+          style={{ ...btnStyle, textDecoration: "none", display: "inline-flex", alignItems: "center" }}
         >
-          + Order
+          + Hero
         </a>
 
-        {/* Assign Workflow */}
-        <div ref={workflowRef} style={{ position: "relative" }}>
-          <button onClick={() => { setShowWorkflow((v) => !v); setShowSnooze(false); }} style={btnStyle}>
-            Assign ▾
-          </button>
-          {showWorkflow && (
-            <div style={{
-              position: "absolute", right: 0, top: "100%", marginTop: 4, zIndex: 100,
-              background: "var(--card-bg)", border: "1px solid var(--card-border)",
-              borderRadius: 8, minWidth: 160, boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
-            }}>
-              {WORKFLOWS.map((w) => (
-                <button
-                  key={w.id}
-                  onClick={() => handleCreateTask(w.id)}
-                  style={{
-                    display: "block", width: "100%", padding: "8px 14px", textAlign: "left",
-                    background: "none", border: "none", color: "var(--text-bright)",
-                    fontSize: 12, cursor: "pointer", borderBottom: "1px solid var(--card-border)",
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = "var(--card-border)"}
-                  onMouseLeave={(e) => e.currentTarget.style.background = "none"}
-                >
-                  {w.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <button
+          onClick={handleArchive}
+          disabled={archiving}
+          style={{ ...btnStyle, borderColor: "var(--status-green)", color: "var(--status-green)" }}
+        >
+          {archiving ? "…" : "✓ Done"}
+        </button>
 
         {/* Snooze */}
         <div ref={snoozeRef} style={{ position: "relative" }}>
-          <button onClick={() => { setShowSnooze((v) => !v); setShowWorkflow(false); }} style={btnStyle}>
+          <button onClick={() => setShowSnooze((v) => !v)} style={btnStyle}>
             Snooze ▾
           </button>
           {showSnooze && (
@@ -540,15 +884,16 @@ function ThreadDetail({ threadId, mailbox, onBack, onArchived, onTaskCreated }) 
         </div>
       </div>
 
-      {/* Subject */}
-      <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid var(--card-border)" }}>
-        <h2 style={{ fontSize: 17, fontWeight: 600, color: "var(--text-bright)", margin: 0 }}>
+      {/* ── Subject ─────────────────────────────────────────────────────────── */}
+      <div style={{ padding: "12px 16px 8px", borderBottom: "1px solid var(--card-border)" }}>
+        <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-bright)", margin: 0 }}>
           {threadSubject}
         </h2>
       </div>
 
-      {/* Messages */}
-      <div style={{ flex: 1, overflow: "auto" }}>
+      {/* ── Scrollable content area ─────────────────────────────────────────── */}
+      <div style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
+        {/* Messages */}
         {(thread?.messages || []).map((msg, i) => (
           <MessageBubble
             key={msg.id}
@@ -556,87 +901,129 @@ function ThreadDetail({ threadId, mailbox, onBack, onArchived, onTaskCreated }) 
             defaultExpanded={i === thread.messages.length - 1}
           />
         ))}
-      </div>
 
-      {/* Reply compose */}
-      {showReply && (
-        <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--card-border)" }}>
-          <div style={{
-            fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
-            textTransform: "uppercase", color: "var(--text-dim)", padding: "12px 0 8px",
-          }}>
-            Draft Reply — to {parseFrom(lastMessage?.from).name || lastMessage?.from}
-          </div>
-          {draftLoading ? (
-            <div style={{ color: "var(--text-dim)", fontSize: 13, padding: "8px 0" }}>Generating…</div>
-          ) : (
-            <>
-              <textarea
-                value={draft}
-                onChange={(e) => { setDraft(e.target.value); setDraftSaved(false); }}
-                rows={8}
-                style={{
-                  width: "100%", background: "var(--bg)", border: "1px solid var(--card-border)",
-                  borderRadius: 6, color: "var(--text-bright)", fontSize: 13, lineHeight: 1.6,
-                  padding: 12, resize: "vertical", fontFamily: "inherit", boxSizing: "border-box",
-                }}
-              />
-              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                <button
-                  onClick={handleSaveDraft}
-                  disabled={draftSaved}
-                  style={{
-                    background: draftSaved ? "var(--status-green)22" : "var(--card-border)",
-                    border: `1px solid ${draftSaved ? "var(--status-green)" : "var(--card-border)"}`,
-                    color: draftSaved ? "var(--status-green)" : "var(--text-bright)",
-                    cursor: draftSaved ? "default" : "pointer",
-                    padding: "6px 14px", borderRadius: 6, fontSize: 12, fontWeight: 600,
-                  }}
-                >
-                  {draftSaved ? "✓ Saved to Drafts" : "Save Draft"}
-                </button>
-                {!sendConfirm ? (
-                  <button
-                    onClick={() => setSendConfirm(true)}
-                    disabled={!draft.trim()}
-                    style={{
-                      background: "var(--status-blue)", border: "1px solid var(--status-blue)",
-                      color: "#fff", cursor: draft.trim() ? "pointer" : "not-allowed",
-                      padding: "6px 14px", borderRadius: 6, fontSize: 12, fontWeight: 600,
-                      opacity: draft.trim() ? 1 : 0.5,
-                    }}
-                  >
-                    Send
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleSend}
-                    disabled={sending}
-                    style={{
-                      background: sending ? "var(--card-border)" : "#e74c3c",
-                      border: "1px solid #e74c3c", color: "#fff",
-                      cursor: sending ? "wait" : "pointer",
-                      padding: "6px 14px", borderRadius: 6, fontSize: 12, fontWeight: 600,
-                    }}
-                  >
-                    {sending ? "Sending…" : "Confirm Send"}
-                  </button>
-                )}
-                <button
-                  onClick={() => { setShowReply(false); setDraft(""); setSendConfirm(false); }}
-                  style={{
-                    background: "none", border: "1px solid var(--card-border)",
-                    color: "var(--text-dim)", cursor: "pointer",
-                    padding: "6px 14px", borderRadius: 6, fontSize: 12,
-                  }}
-                >
-                  Discard
-                </button>
-              </div>
-            </>
+        {/* ── Context panel ─────────────────────────────────────────────────── */}
+        <div style={{
+          padding: "12px 16px",
+          borderTop: "2px solid var(--card-border)",
+          background: "rgba(255,255,255,0.015)",
+        }}>
+          {contextLoading && (
+            <div style={{ fontSize: 11, color: "var(--text-dim)", fontStyle: "italic" }}>
+              Identifying contact…
+            </div>
+          )}
+          {context && (
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {hasContact ? (
+                <ContactCard
+                  contact={context.contact}
+                  orderCount={context.orderCount}
+                  donationTotal={context.donationTotal}
+                />
+              ) : (
+                <NoMatchPanel emailAddr={context.emailAddr} subject={threadSubject} />
+              )}
+              {hasHeroes && context.heroes.map((h) => (
+                <HeroContextCard key={h.id} hero={h} />
+              ))}
+            </div>
           )}
         </div>
-      )}
+
+        {/* ── Inline order form ─────────────────────────────────────────────── */}
+        {activeAction === "order" && (
+          <div style={{ borderTop: "1px solid var(--gold)44", background: "rgba(196,162,55,0.04)" }}>
+            <InlineOrderForm
+              context={context}
+              thread={thread}
+              threadId={threadId}
+              mailbox={mailbox}
+              onSuccess={handleOrderSuccess}
+            />
+          </div>
+        )}
+
+        {/* ── Reply compose ─────────────────────────────────────────────────── */}
+        {showReply && (
+          <div style={{ padding: "0 16px 16px", borderTop: "1px solid var(--card-border)" }}>
+            <div style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
+              textTransform: "uppercase", color: "var(--text-dim)", padding: "12px 0 8px",
+            }}>
+              Reply — to {parseFrom(lastMessage?.from).name || lastMessage?.from}
+            </div>
+            {draftLoading ? (
+              <div style={{ color: "var(--text-dim)", fontSize: 13, padding: "8px 0" }}>Generating draft…</div>
+            ) : (
+              <>
+                <textarea
+                  value={draft}
+                  onChange={(e) => { setDraft(e.target.value); setDraftSaved(false); }}
+                  rows={7}
+                  style={{
+                    width: "100%", background: "var(--bg)", border: "1px solid var(--card-border)",
+                    borderRadius: 6, color: "var(--text-bright)", fontSize: 13, lineHeight: 1.6,
+                    padding: 12, resize: "vertical", fontFamily: "inherit", boxSizing: "border-box",
+                  }}
+                />
+                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                  <button
+                    onClick={handleSaveDraft}
+                    disabled={draftSaved}
+                    style={{
+                      background: draftSaved ? "var(--status-green)22" : "var(--card-border)",
+                      border: `1px solid ${draftSaved ? "var(--status-green)" : "var(--card-border)"}`,
+                      color: draftSaved ? "var(--status-green)" : "var(--text-bright)",
+                      cursor: draftSaved ? "default" : "pointer",
+                      padding: "6px 14px", borderRadius: 6, fontSize: 12, fontWeight: 600,
+                    }}
+                  >
+                    {draftSaved ? "✓ Saved to Drafts" : "Save Draft"}
+                  </button>
+                  {!sendConfirm ? (
+                    <button
+                      onClick={() => setSendConfirm(true)}
+                      disabled={!draft.trim()}
+                      style={{
+                        background: "var(--status-blue)", border: "1px solid var(--status-blue)",
+                        color: "#fff", cursor: draft.trim() ? "pointer" : "not-allowed",
+                        padding: "6px 14px", borderRadius: 6, fontSize: 12, fontWeight: 600,
+                        opacity: draft.trim() ? 1 : 0.5,
+                      }}
+                    >
+                      Send
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleSend}
+                      disabled={sending}
+                      style={{
+                        background: sending ? "var(--card-border)" : "#e74c3c",
+                        border: "1px solid #e74c3c", color: "#fff",
+                        cursor: sending ? "wait" : "pointer",
+                        padding: "6px 14px", borderRadius: 6, fontSize: 12, fontWeight: 600,
+                      }}
+                    >
+                      {sending ? "Sending…" : "Confirm Send"}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { setShowReply(false); setDraft(""); setSendConfirm(false); }}
+                    style={{
+                      background: "none", border: "1px solid var(--card-border)",
+                      color: "var(--text-dim)", cursor: "pointer",
+                      padding: "6px 14px", borderRadius: 6, fontSize: 12,
+                    }}
+                  >
+                    Discard
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -644,7 +1031,8 @@ function ThreadDetail({ threadId, mailbox, onBack, onArchived, onTaskCreated }) 
 const btnStyle = {
   background: "none", border: "1px solid var(--card-border)",
   color: "var(--text-bright)", cursor: "pointer",
-  padding: "5px 12px", borderRadius: 6, fontSize: 12,
+  padding: "6px 12px", borderRadius: 6, fontSize: 12,
+  minHeight: 36, display: "inline-flex", alignItems: "center",
 };
 
 // ---------------------------------------------------------------------------
@@ -659,16 +1047,12 @@ export default function EmailInbox({ mailbox = "joseph" }) {
   const [openThreadId, setOpenThreadId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Load snoozed from sessionStorage on mount
   const [snoozed, setSnoozed] = useState(() => {
     if (typeof window === "undefined") return new Set();
     try {
       const map = JSON.parse(sessionStorage.getItem("email_snoozed") || "{}");
       const now = Date.now();
-      const active = Object.entries(map)
-        .filter(([, until]) => until > now)
-        .map(([id]) => id);
-      return new Set(active);
+      return new Set(Object.entries(map).filter(([, until]) => until > now).map(([id]) => id));
     } catch { return new Set(); }
   });
 
@@ -701,51 +1085,78 @@ export default function EmailInbox({ mailbox = "joseph" }) {
 
   useEffect(() => { fetchThreads(); }, []);
 
-  // Re-fetch when operator finishes
   useEffect(() => {
     function handler() { fetchThreads(); }
     window.addEventListener("operator:done", handler);
     return () => window.removeEventListener("operator:done", handler);
   }, [fetchThreads]);
 
-  // Broadcast page state for operator
   useEffect(() => {
     const state = {
       mailbox, view: openThreadId ? "thread" : "list",
-      threadCount: threads.length,
-      openThreadId,
+      threadCount: threads.length, openThreadId,
     };
     window.__shosPageState = state;
     window.dispatchEvent(new CustomEvent("shos:pagestate", { detail: state }));
   }, [threads, openThreadId, mailbox]);
 
+  const visibleThreads = threads.filter((t) => !snoozed.has(t.threadId));
+
   const handleArchived = useCallback((threadId) => {
+    const currentIdx = visibleThreads.findIndex((t) => t.threadId === threadId);
+    const nextThread = visibleThreads[currentIdx + 1] || null;
+
     setThreads((prev) => prev.filter((t) => t.threadId !== threadId));
-    if (openThreadId === threadId) setOpenThreadId(null);
-  }, [openThreadId]);
+
+    if (openThreadId === threadId) {
+      // Auto-advance to next unread thread, or back to list if none
+      setOpenThreadId(nextThread?.threadId || null);
+    }
+  }, [openThreadId, visibleThreads]);
 
   const handleSearch = useCallback((e) => {
     e.preventDefault();
     fetchThreads(searchQuery);
   }, [fetchThreads, searchQuery]);
 
-  // Filter snoozed threads
-  const visibleThreads = threads.filter((t) => !snoozed.has(t.threadId));
-
-  // Group by age
   const todayGroup  = visibleThreads.filter((t) => threadAgeGroup(t.date) === "today");
   const weekGroup   = visibleThreads.filter((t) => threadAgeGroup(t.date) === "week");
   const olderGroup  = visibleThreads.filter((t) => threadAgeGroup(t.date) === "older");
-
   const unreadCount = visibleThreads.filter((t) => t.isUnread).length;
 
   // Thread detail view
   if (openThreadId) {
+    const openIndex = visibleThreads.findIndex((t) => t.threadId === openThreadId);
+    const totalRemaining = visibleThreads.length;
+
     return (
       <div style={{
         background: "var(--card-bg)", border: "1px solid var(--card-border)",
-        borderRadius: 8, overflow: "hidden", minHeight: 500, display: "flex", flexDirection: "column",
+        borderRadius: 8, overflow: "hidden",
+        minHeight: "calc(100vh - 260px)",
+        display: "flex", flexDirection: "column",
       }}>
+        {/* Queue position indicator */}
+        {totalRemaining > 1 && (
+          <div style={{
+            padding: "4px 16px",
+            background: "rgba(255,255,255,0.02)",
+            borderBottom: "1px solid var(--card-border)",
+            fontSize: 11, color: "var(--text-dim)",
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            <span>Thread {openIndex + 1} of {totalRemaining}</span>
+            {openIndex < totalRemaining - 1 && (
+              <button
+                onClick={() => setOpenThreadId(visibleThreads[openIndex + 1].threadId)}
+                style={{ background: "none", border: "none", color: "var(--gold)", cursor: "pointer", fontSize: 11, padding: "0 4px" }}
+              >
+                Skip →
+              </button>
+            )}
+          </div>
+        )}
+
         <ThreadDetail
           threadId={openThreadId}
           mailbox={mailbox}
@@ -777,7 +1188,7 @@ export default function EmailInbox({ mailbox = "joseph" }) {
             style={{
               flex: 1, background: "var(--bg)", color: "var(--text-bright)",
               border: "1px solid var(--card-border)", borderRadius: 6,
-              padding: "4px 12px", fontSize: 12,
+              padding: "6px 12px", fontSize: 12,
             }}
           />
           <button type="submit" style={btnStyle}>Search</button>
@@ -795,10 +1206,7 @@ export default function EmailInbox({ mailbox = "joseph" }) {
         </span>
       </div>
 
-      {/* Thread list */}
       <div style={{ maxHeight: "calc(100vh - 260px)", overflow: "auto" }}>
-
-        {/* Error state */}
         {error && (
           <div style={{ padding: "20px 16px", textAlign: "center" }}>
             <div style={{ color: "#ef4444", fontSize: 13, marginBottom: 8 }}>
@@ -808,21 +1216,18 @@ export default function EmailInbox({ mailbox = "joseph" }) {
           </div>
         )}
 
-        {/* Loading state */}
         {loading && visibleThreads.length === 0 && !error && (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-dim)", fontSize: 13 }}>
             Loading inbox…
           </div>
         )}
 
-        {/* Empty state — only when loaded successfully with no results */}
         {!loading && !error && visibleThreads.length === 0 && (
           <div style={{ padding: 32, textAlign: "center", color: "var(--status-green)", fontSize: 14 }}>
             ✓ Inbox zero. All caught up.
           </div>
         )}
 
-        {/* Today group */}
         {todayGroup.length > 0 && (
           <>
             <GroupHeader label="Today" count={todayGroup.length} />
@@ -832,7 +1237,6 @@ export default function EmailInbox({ mailbox = "joseph" }) {
           </>
         )}
 
-        {/* This Week group */}
         {weekGroup.length > 0 && (
           <>
             <GroupHeader label="This Week" count={weekGroup.length} />
@@ -842,7 +1246,6 @@ export default function EmailInbox({ mailbox = "joseph" }) {
           </>
         )}
 
-        {/* Older group */}
         {olderGroup.length > 0 && (
           <>
             <GroupHeader label="Older" count={olderGroup.length} />
@@ -853,7 +1256,6 @@ export default function EmailInbox({ mailbox = "joseph" }) {
         )}
       </div>
 
-      {/* Load more */}
       {nextPage && (
         <div style={{ padding: "12px 16px", borderTop: "1px solid var(--card-border)", textAlign: "center" }}>
           <button

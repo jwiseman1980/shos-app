@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -48,6 +48,20 @@ export default function TaskSidebar({
 }) {
   const pathname = usePathname();
   const today = new Date().toISOString().split("T")[0];
+
+  const [navCounts, setNavCounts] = useState({});
+  useEffect(() => {
+    fetch("/api/dashboard/counts")
+      .then((r) => r.json())
+      .then((d) =>
+        setNavCounts({
+          "/laser": d.ordersToLaser || 0,
+          "/designs": d.ordersNeedDesign || 0,
+          "/anniversaries": d.anniversariesPending || 0,
+        })
+      )
+      .catch(() => {});
+  }, []);
   const nowHour = new Date().getHours();
   const nowMin = new Date().getMinutes();
 
@@ -148,14 +162,34 @@ export default function TaskSidebar({
           const isActive = link.href === "/"
             ? pathname === "/" || pathname === ""
             : pathname.startsWith(link.href);
+          const badge = link.href === "/email"
+            ? (emailCount > 0 ? emailCount : 0)
+            : (navCounts[link.href] || 0);
           return (
             <Link
               key={link.href}
               href={link.href}
               className={`task-sidebar-nav-item${isActive ? " active" : ""}`}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}
             >
-              <span className="task-sidebar-nav-icon">{link.icon}</span>
-              <span>{link.label}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span className="task-sidebar-nav-icon">{link.icon}</span>
+                <span>{link.label}</span>
+              </span>
+              {badge > 0 && (
+                <span style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  background: link.href === "/email" ? "#3498db" : "var(--gold)",
+                  color: "#000",
+                  borderRadius: 8,
+                  padding: "1px 6px",
+                  minWidth: 18,
+                  textAlign: "center",
+                }}>
+                  {badge}
+                </span>
+              )}
             </Link>
           );
         })}
@@ -280,6 +314,43 @@ export default function TaskSidebar({
           </div>
         </>
       )}
+
+      {/* Quick-action bar */}
+      <div style={{
+        marginTop: "auto",
+        borderTop: "1px solid var(--border)",
+        padding: "8px 10px",
+        display: "flex",
+        gap: 6,
+        flexWrap: "wrap",
+      }}>
+        {[
+          { label: "+ Order", href: "/orders?new=1" },
+          { label: "+ Hero", href: "/families?new=1" },
+          { label: "✉ Compose", href: "/email?compose=1" },
+        ].map(({ label, href }) => (
+          <a
+            key={label}
+            href={href}
+            style={{
+              flex: 1,
+              minWidth: 60,
+              fontSize: 10,
+              fontWeight: 600,
+              color: "var(--gold)",
+              background: "rgba(196, 162, 55, 0.08)",
+              border: "1px solid rgba(196, 162, 55, 0.3)",
+              borderRadius: 4,
+              padding: "5px 4px",
+              textAlign: "center",
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {label}
+          </a>
+        ))}
+      </div>
 
     </div>
   );
