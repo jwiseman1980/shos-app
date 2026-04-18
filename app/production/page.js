@@ -17,20 +17,21 @@ export default async function ProductionPage() {
     console.error("Production page load error:", err.message);
   }
 
-  const designCount = (columns.design_needed || []).length;
-  const laserCount = (columns.ready_to_laser || []).length;
-  const prodCount = (columns.in_production || []).length;
-  const shipCount = (columns.ready_to_ship || []).length;
-  const totalActive = designCount + laserCount + prodCount + shipCount;
+  const queuedCount   = (columns.not_started    || []).length;
+  const designCount   = (columns.design_needed  || []).length;
+  const laserCount    = (columns.ready_to_laser || []).length;
+  const prodCount     = (columns.in_production  || []).length;
+  const shipCount     = (columns.ready_to_ship  || []).length;
+  const totalActive   = queuedCount + designCount + laserCount + prodCount + shipCount;
 
   return (
     <PageShell
-      title="Production"
-      subtitle="Bracelet pipeline \u2014 cards move left to right through production"
+      title="Production Pipeline"
+      subtitle="Every active order — from design request through laser to shipped"
     >
       <div className="stat-grid" style={{ marginBottom: 20 }}>
         <StatBlock
-          label="Active Orders"
+          label="Active Items"
           value={totalActive}
           note={`${stats.totalShipped?.toLocaleString() || 0} shipped all time`}
           accent="var(--gold)"
@@ -44,13 +45,19 @@ export default async function ProductionPage() {
         <StatBlock
           label="Ready to Laser"
           value={laserCount}
-          note="Waiting on Joseph"
+          note="Download SVG → burn"
           accent="var(--status-blue)"
+        />
+        <StatBlock
+          label="In Production"
+          value={prodCount}
+          note="Actively lasering"
+          accent="#00bcd4"
         />
         <StatBlock
           label="Ready to Ship"
           value={shipCount}
-          note="Waiting on Kristin"
+          note="Push to ShipStation"
           accent="var(--status-green)"
         />
       </div>
