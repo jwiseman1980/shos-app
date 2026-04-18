@@ -1,5 +1,5 @@
 import { getServerClient } from "@/lib/supabase";
-import { listInbox } from "@/lib/gmail";
+import { buildTriageGmailClient, triageInbox } from "@/lib/email-triage";
 import { getTodayEvents } from "@/lib/calendar";
 import { classifyEmail } from "@/lib/email-classifier";
 import { getTasks } from "@/lib/data/tasks";
@@ -243,41 +243,43 @@ function urgencyFromDate(dateStr) {
 
 async function getActionableEmails() {
   try {
-    const { messages } = await listInbox({
-      maxResults: 25,
-      query: "is:unread -category:promotions -category:social",
+    const gmail = await buildTriageGmailClient();
+    const triaged = await triageInbox(gmail);
+
+    return triaged.map((t) => {
+      const category = classifyEmail(t.fromEmail, t.subject);
+      const ageDays = t.lastMessageDate
+        ? (Date.now() - new Date(t.lastMessageDate).getTime()) / 86400000
+        : 0;
+      const isOverdue = ageDays > 2;
+
+      return {
+        id: `email-${t.threadId}`,
+        type: "EMAIL",
+        priority: t.state === "draft_ready" || isOverdue ? 4 : 3,
+        section: "TODAY",
+        urgency: isOverdue ? "OVERDUE" : "TODAY",
+        accentColor: getEmailColor(category),
+        icon: "📧",
+        title: formatEmailTitle(t.from, t.subject),
+        subtitle: t.lastMessageSnippet?.slice(0, 70) || "(no preview)",
+        badgeLabel: t.state === "draft_ready" ? "SEND DRAFT" : "REPLY",
+        badgeClass: isOverdue ? "badge-overdue" : "badge-today",
+        context: {
+          from: t.from,
+          fromName: t.fromName,
+          fromEmail: t.fromEmail,
+          subject: t.subject,
+          snippet: t.lastMessageSnippet,
+          threadId: t.threadId,
+          messageId: null,
+          draftId: t.draftId,
+          draftText: "",
+          category,
+          state: t.state,
+        },
+      };
     });
-
-    const items = messages
-      .filter((msg) => msg.isUnread)
-      .map((msg) => {
-        const category = classifyEmail(msg.from, msg.subject);
-        const isImportant = msg.isImportant || msg.isStarred || !["OTHER", "NEWSLETTER", "STATEMENT"].includes(category);
-        return {
-          id: `email-${msg.id}`,
-          type: "EMAIL",
-          priority: isImportant ? 3 : 2,
-          section: isImportant ? "TODAY" : "WEEK",
-          urgency: isImportant ? "TODAY" : "WEEK",
-          accentColor: getEmailColor(category),
-          icon: "📧",
-          title: formatEmailTitle(msg.from, msg.subject),
-          subtitle: msg.snippet?.slice(0, 70) || "(no preview)",
-          badgeLabel: "UNREAD",
-          badgeClass: isImportant ? "badge-today" : "badge-week",
-          context: {
-            from: msg.from,
-            subject: msg.subject,
-            snippet: msg.snippet,
-            threadId: msg.threadId,
-            messageId: msg.id,
-            draftText: "",
-            category,
-          },
-        };
-      });
-
-    return items.length > 0 ? items : MOCK_EMAILS;
   } catch {
     return MOCK_EMAILS;
   }
