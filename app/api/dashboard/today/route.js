@@ -695,17 +695,85 @@ function getHardcodedTracked() {
 }
 
 // ---------------------------------------------------------------------------
+// Donor stewardship — unacknowledged donations
+// ---------------------------------------------------------------------------
+
+async function getDonorStewardship() {
+  const sb = getServerClient();
+
+  const { data, error } = await sb
+    .from("donations")
+    .select(
+      "id, donor_first_name, donor_last_name, donor_email, billing_name, amount, donation_amount, donation_date, campaign, donor_segment, notes"
+    )
+    .or("thank_you_sent.is.null,thank_you_sent.eq.false")
+    .order("donation_date", { ascending: false })
+    .limit(20);
+
+  if (error) throw error;
+
+  return (data || []).map((row) => {
+    const donorName =
+      row.billing_name ||
+      [row.donor_first_name, row.donor_last_name].filter(Boolean).join(" ") ||
+      row.donor_email ||
+      "Unknown Donor";
+    const donationAmount = row.amount || row.donation_amount || 0;
+    const formattedAmount = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 0,
+    }).format(donationAmount);
+
+    const ageDays = row.donation_date
+      ? (Date.now() - new Date(row.donation_date).getTime()) / 86400000
+      : 0;
+    const formattedDate = row.donation_date
+      ? new Date(row.donation_date).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        })
+      : null;
+
+    return {
+      id: `donor-${row.id}`,
+      type: "DONOR",
+      priority: ageDays > 7 ? 4 : 3,
+      section: "TODAY",
+      urgency: ageDays > 7 ? "OVERDUE" : "TODAY",
+      accentColor: "#3b82f6",
+      icon: "❤️",
+      title: `${donorName} — ${formattedAmount}`,
+      subtitle: [row.campaign, formattedDate].filter(Boolean).join(" · "),
+      badgeLabel: ageDays > 7 ? "OVERDUE" : "THANK YOU",
+      badgeClass: ageDays > 7 ? "badge-overdue" : "badge-today",
+      context: {
+        donationId: row.id,
+        donorName,
+        donorEmail: row.donor_email,
+        amount: donationAmount,
+        donationDate: row.donation_date,
+        campaign: row.campaign,
+        donorSegment: row.donor_segment,
+        notes: row.notes,
+      },
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
 // GET handler
 // ---------------------------------------------------------------------------
 
 export async function GET() {
-  const [emails, orders, tasks, compliance, gyst, calendar] = await Promise.allSettled([
+  const [emails, orders, tasks, compliance, gyst, calendar, donors] = await Promise.allSettled([
     getActionableEmails(),
     getPendingOrders(),
     getOpenTasks(),
     getUpcomingCompliance(),
     getGystItems(),
     getTodayCalendarItems(),
+    getDonorStewardship(),
   ]);
 
   const getValue = (result, fallback = []) =>
@@ -713,6 +781,7 @@ export async function GET() {
 
   const allItems = [
     ...getValue(emails),
+    ...getValue(donors),
     ...getValue(orders),
     ...getValue(tasks),
     ...getValue(compliance),
