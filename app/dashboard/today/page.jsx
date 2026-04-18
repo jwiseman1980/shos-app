@@ -549,6 +549,160 @@ function CalendarBody({ item, onClose }) {
 }
 
 // ---------------------------------------------------------------------------
+// KPI row
+// ---------------------------------------------------------------------------
+
+function KpiCard({ label, value, sub, health, active, onClick }) {
+  const healthColor = {
+    green:   "#22c55e",
+    amber:   "#f59e0b",
+    red:     "#ef4444",
+    blue:    "#3b82f6",
+    neutral: "#4b5563",
+  }[health] || "#4b5563";
+
+  return (
+    <button
+      className={`kpi-card${active ? " kpi-card-active" : ""}`}
+      onClick={onClick}
+    >
+      <div className="kpi-dot" style={{ background: healthColor }} />
+      <div className="kpi-label">{label}</div>
+      <div className="kpi-value">{value ?? "—"}</div>
+      {sub && <div className="kpi-sub">{sub}</div>}
+    </button>
+  );
+}
+
+function KpiRow({ kpis }) {
+  const [activeIdx, setActiveIdx] = useState(null);
+
+  if (!kpis) return null;
+
+  const fmtC = (n) =>
+    n == null
+      ? "—"
+      : new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: "USD",
+          maximumFractionDigits: 0,
+        }).format(n);
+  const fmtN = (n) => (n == null ? "—" : n.toLocaleString());
+  const month = new Date().toLocaleString("en-US", { month: "long" });
+
+  const cards = [
+    {
+      label: "Heroes Honored",
+      value: fmtN(kpis.heroesHonored),
+      sub: "active listings",
+      health: "blue",
+      detail: `${fmtN(kpis.heroesHonored)} heroes actively listed on the Steel Hearts website.`,
+    },
+    {
+      label: "Bracelets Shipped",
+      value: fmtN(kpis.braceletsShipped),
+      sub: month,
+      health: kpis.braceletsShipped > 0 ? "green" : "amber",
+      detail: `${fmtN(kpis.braceletsShipped)} bracelets shipped so far in ${month}.`,
+    },
+    {
+      label: "In Pipeline",
+      value: fmtN(kpis.pipelineTotal),
+      sub: "orders",
+      health: kpis.pipelineTotal === 0 ? "neutral" : kpis.pipelineTotal <= 5 ? "amber" : "red",
+      detail:
+        kpis.pipeline && Object.keys(kpis.pipeline).length
+          ? Object.entries(kpis.pipeline)
+              .map(([s, c]) => `${s.replace(/_/g, " ")}: ${c}`)
+              .join("\n")
+          : "No orders in pipeline.",
+    },
+    {
+      label: "Revenue",
+      value: fmtC(kpis.revenueThisMonth),
+      sub: month,
+      health:
+        kpis.revenueThisMonth > 500
+          ? "green"
+          : kpis.revenueThisMonth > 0
+          ? "amber"
+          : "neutral",
+      detail: `${fmtC(kpis.revenueThisMonth)} in order revenue in ${month}.`,
+    },
+    {
+      label: "Donations",
+      value: fmtC(kpis.donationsThisMonth),
+      sub: month,
+      health: kpis.donationsThisMonth > 0 ? "green" : "amber",
+      detail: `${fmtC(kpis.donationsThisMonth)} donated in ${month}.`,
+    },
+    {
+      label: "Thank-Yous Due",
+      value: fmtN(kpis.pendingThanks),
+      health:
+        kpis.pendingThanks === 0 ? "green" : kpis.pendingThanks <= 3 ? "amber" : "red",
+      detail:
+        kpis.pendingThanks === 0
+          ? "All donors have been thanked."
+          : `${fmtN(kpis.pendingThanks)} donors haven't received a thank-you yet.`,
+    },
+    {
+      label: "Family Messages",
+      value: fmtN(kpis.familyMessagesPending),
+      health: kpis.familyMessagesPending === 0 ? "green" : "red",
+      detail:
+        kpis.familyMessagesPending === 0
+          ? "No pending family messages."
+          : `${fmtN(kpis.familyMessagesPending)} new family message${
+              kpis.familyMessagesPending !== 1 ? "s" : ""
+            } need attention.`,
+    },
+    {
+      label: "Anniversaries",
+      value: fmtN(kpis.anniversaryEmailsDue),
+      sub: "next 14 days",
+      health: kpis.anniversaryEmailsDue === 0 ? "green" : "red",
+      detail:
+        kpis.anniversaryEmailsDue === 0
+          ? "No anniversary emails due in the next 14 days."
+          : `${kpis.anniversaryEmailsDue} memorial anniversary${
+              kpis.anniversaryEmailsDue !== 1 ? "ies" : ""
+            } in the next 14 days need email preparation.`,
+    },
+  ];
+
+  const activeCard = activeIdx !== null ? cards[activeIdx] : null;
+
+  return (
+    <div className="kpi-section">
+      <div className="kpi-row">
+        {cards.map((c, i) => (
+          <KpiCard
+            key={c.label}
+            label={c.label}
+            value={c.value}
+            sub={c.sub}
+            health={c.health}
+            active={activeIdx === i}
+            onClick={() => setActiveIdx(activeIdx === i ? null : i)}
+          />
+        ))}
+      </div>
+      {activeCard && (
+        <div className="kpi-detail-panel">
+          <div className="kpi-detail-heading">{activeCard.label}</div>
+          <div className="kpi-detail-text">
+            {activeCard.detail.split("\n").map((line, i) => (
+              <div key={i}>{line}</div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Card
 // ---------------------------------------------------------------------------
 
@@ -710,6 +864,9 @@ export default function TodayPage() {
           </span>
         </div>
       </div>
+
+      {/* KPI strip */}
+      <KpiRow kpis={data?.kpis} />
 
       {/* Body */}
       <div className="today-body">

@@ -762,19 +762,116 @@ async function getDonorStewardship() {
 }
 
 // ---------------------------------------------------------------------------
+// KPIs — live metrics snapshot
+// ---------------------------------------------------------------------------
+
+async function getKPIs() {
+  const sb = getServerClient();
+  const now = new Date();
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const ANNIVERSARY_DONE = new Set([
+    "email_sent", "sent", "scheduled", "social_posted", "complete", "skipped",
+  ]);
+
+  const [
+    heroesRes,
+    braceletsRes,
+    pipelineRes,
+    revenueRes,
+    donationsMonthRes,
+    pendingThanksRes,
+    familyMsgRes,
+    anniversaryRes,
+  ] = await Promise.allSettled([
+    // 1. Heroes with active listing
+    sb.from("heroes").select("*", { count: "exact", head: true }).eq("active_listing", true),
+    // 2. Bracelets shipped this month
+    sb.from("order_items").select("quantity").eq("production_status", "shipped").gte("created_at", firstOfMonth),
+    // 3. Orders in pipeline (not shipped/delivered/cancelled)
+    sb.from("order_items")
+      .select("production_status, quantity")
+      .not("production_status", "in", '("shipped","delivered","cancelled")'),
+    // 4. Revenue this month from order items
+    sb.from("order_items")
+      .select("unit_price, quantity")
+      .gte("created_at", firstOfMonth)
+      .neq("production_status", "cancelled"),
+    // 5. Donations this month
+    sb.from("donations").select("amount, donation_amount").gte("created_at", firstOfMonth),
+    // 6. Pending thank-yous
+    sb.from("donations").select("*", { count: "exact", head: true })
+      .or("thank_you_sent.is.null,thank_you_sent.eq.false"),
+    // 7. Unread family messages
+    sb.from("family_messages").select("*", { count: "exact", head: true }).eq("status", "new"),
+    // 8. Active heroes with memorial dates (for anniversary window check)
+    sb.from("heroes")
+      .select("memorial_month, memorial_day, anniversary_status")
+      .eq("active_listing", true)
+      .not("memorial_month", "is", null),
+  ]);
+
+  const heroesHonored = heroesRes.value?.count ?? null;
+
+  const braceletsShipped = (braceletsRes.value?.data || [])
+    .reduce((s, r) => s + (r.quantity || 0), 0);
+
+  const pipelineRows = pipelineRes.value?.data || [];
+  const pipeline = {};
+  for (const r of pipelineRows) {
+    const key = r.production_status || "unknown";
+    pipeline[key] = (pipeline[key] || 0) + 1;
+  }
+  const pipelineTotal = pipelineRows.length;
+
+  const revenueRows = revenueRes.value?.data || [];
+  const revenueThisMonth = revenueRows
+    .reduce((s, r) => s + (r.unit_price || 0) * (r.quantity || 1), 0);
+
+  const donationRows = donationsMonthRes.value?.data || [];
+  const donationsThisMonth = donationRows
+    .reduce((s, r) => s + (r.amount || r.donation_amount || 0), 0);
+
+  const pendingThanks = pendingThanksRes.value?.count ?? null;
+  const familyMessagesPending = familyMsgRes.value?.count ?? null;
+
+  let anniversaryEmailsDue = 0;
+  for (const hero of anniversaryRes.value?.data || []) {
+    if (ANNIVERSARY_DONE.has(hero.anniversary_status)) continue;
+    let memDate = new Date(now.getFullYear(), hero.memorial_month - 1, hero.memorial_day);
+    if (memDate < now) memDate.setFullYear(now.getFullYear() + 1);
+    const daysUntil = (memDate - now) / 86400000;
+    if (daysUntil >= 0 && daysUntil <= 14) anniversaryEmailsDue++;
+  }
+
+  return {
+    heroesHonored,
+    braceletsShipped,
+    pipelineTotal,
+    pipeline,
+    revenueThisMonth,
+    donationsThisMonth,
+    pendingThanks,
+    familyMessagesPending,
+    anniversaryEmailsDue,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // GET handler
 // ---------------------------------------------------------------------------
 
 export async function GET() {
-  const [emails, orders, tasks, compliance, gyst, calendar, donors] = await Promise.allSettled([
-    getActionableEmails(),
-    getPendingOrders(),
-    getOpenTasks(),
-    getUpcomingCompliance(),
-    getGystItems(),
-    getTodayCalendarItems(),
-    getDonorStewardship(),
-  ]);
+  const [emails, orders, tasks, compliance, gyst, calendar, donors, kpiResult] =
+    await Promise.allSettled([
+      getActionableEmails(),
+      getPendingOrders(),
+      getOpenTasks(),
+      getUpcomingCompliance(),
+      getGystItems(),
+      getTodayCalendarItems(),
+      getDonorStewardship(),
+      getKPIs(),
+    ]);
 
   const getValue = (result, fallback = []) =>
     result.status === "fulfilled" ? result.value : fallback;
@@ -817,6 +914,7 @@ export async function GET() {
 
   return Response.json({
     items,
+    kpis: kpiResult.status === "fulfilled" ? kpiResult.value : {},
     dateLabel,
     generatedAt: now.toISOString(),
     counts: {
