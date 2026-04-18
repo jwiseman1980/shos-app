@@ -47,16 +47,44 @@ export async function PATCH(request) {
       sfUpdate.Anniversary_Status__c = status;
     }
 
-    // Assignment by name — look up in volunteers/users
+    // Assignment by name — look up in users table; auto-create from volunteers.json if missing
     if (assignedToName !== undefined && assignedTo === undefined) {
       if (assignedToName) {
-        // Look up user in Supabase by name
-        const { data: user } = await supabase
+        let { data: user } = await supabase
           .from("users")
           .select("id")
           .ilike("name", assignedToName)
           .limit(1)
           .single();
+
+        if (!user) {
+          // Volunteer exists in volunteers.json but not yet in the users table.
+          // Upsert a minimal user record so the FK assignment can be stored.
+          try {
+            const { default: volunteerList } = await import("@/data/volunteers.json");
+            const vol = volunteerList.find(
+              (v) => v.name.toLowerCase() === assignedToName.toLowerCase()
+            );
+            if (vol?.email) {
+              const { data: upserted } = await supabase
+                .from("users")
+                .upsert(
+                  {
+                    email: vol.email,
+                    name: vol.name,
+                    color: vol.color || null,
+                    initials: vol.initials || null,
+                  },
+                  { onConflict: "email" }
+                )
+                .select("id")
+                .single();
+              if (upserted) user = upserted;
+            }
+          } catch (lookupErr) {
+            console.warn("[heroes/update] Volunteer user upsert failed:", lookupErr.message);
+          }
+        }
 
         if (user) {
           sbUpdate.anniversary_assigned_to = user.id;
