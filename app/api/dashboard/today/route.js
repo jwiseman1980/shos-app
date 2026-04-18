@@ -797,7 +797,7 @@ async function getKPIs() {
       .gte("created_at", firstOfMonth)
       .neq("production_status", "cancelled"),
     // 5. Donations this month
-    sb.from("donations").select("amount, donation_amount").gte("created_at", firstOfMonth),
+    sb.from("donations").select("donation_amount").gte("donation_date", firstOfMonth),
     // 6. Pending thank-yous
     sb.from("donations").select("*", { count: "exact", head: true })
       .or("thank_you_sent.is.null,thank_you_sent.eq.false"),
@@ -829,7 +829,7 @@ async function getKPIs() {
 
   const donationRows = donationsMonthRes.value?.data || [];
   const donationsThisMonth = donationRows
-    .reduce((s, r) => s + (r.amount || r.donation_amount || 0), 0);
+    .reduce((s, r) => s + (r.donation_amount || 0), 0);
 
   const pendingThanks = pendingThanksRes.value?.count ?? null;
   const familyMessagesPending = familyMsgRes.value?.count ?? null;
