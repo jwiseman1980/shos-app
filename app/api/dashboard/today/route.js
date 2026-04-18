@@ -876,8 +876,10 @@ export async function GET() {
   const getValue = (result, fallback = []) =>
     result.status === "fulfilled" ? result.value : fallback;
 
+  // Emails are shown via the dedicated Inbox page — just expose the count here
+  const emailCount = getValue(emails, []).length;
+
   const allItems = [
-    ...getValue(emails),
     ...getValue(donors),
     ...getValue(orders),
     ...getValue(tasks),
@@ -914,6 +916,7 @@ export async function GET() {
 
   return Response.json({
     items,
+    emailCount,
     kpis: kpiResult.status === "fulfilled" ? kpiResult.value : {},
     dateLabel,
     generatedAt: now.toISOString(),

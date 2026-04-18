@@ -868,6 +868,24 @@ export default function TodayPage() {
       {/* KPI strip */}
       <KpiRow kpis={data?.kpis} />
 
+      {/* Inbox banner */}
+      {data?.emailCount > 0 && (
+        <a
+          href="/email"
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            margin: "0 0 4px", padding: "10px 16px",
+            background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.25)",
+            borderRadius: 8, textDecoration: "none", cursor: "pointer",
+          }}
+        >
+          <span style={{ fontSize: 13, color: "#93c5fd" }}>
+            📧 <strong style={{ color: "#60a5fa" }}>{data.emailCount} email{data.emailCount !== 1 ? "s" : ""}</strong> need your attention
+          </span>
+          <span style={{ fontSize: 12, color: "#60a5fa", fontWeight: 600 }}>Go to Inbox →</span>
+        </a>
+      )}
+
       {/* Body */}
       <div className="today-body">
         <Section

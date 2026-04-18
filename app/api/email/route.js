@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   listInbox,
+  listInboxThreads,
   getMessage,
   archiveMessage,
   archiveMessages,
@@ -20,12 +21,17 @@ export const dynamic = "force-dynamic";
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const maxResults = parseInt(searchParams.get("maxResults") || "50");
+    const maxResults = parseInt(searchParams.get("maxResults") || "30");
     const pageToken = searchParams.get("pageToken") || undefined;
     const query = searchParams.get("q") || undefined;
     const mailbox = searchParams.get("mailbox") || undefined;
+    const mode = searchParams.get("mode") || "messages";
 
-    console.log(`[email] listInbox mailbox=${mailbox}, resolved=${mailbox || "joseph (default)"}`);
+    if (mode === "threads") {
+      const result = await listInboxThreads({ maxResults, pageToken, query, mailbox });
+      return NextResponse.json({ ...result, _mailbox: mailbox || "joseph" });
+    }
+
     const result = await listInbox({ maxResults, pageToken, query, mailbox });
     return NextResponse.json({ ...result, _mailbox: mailbox || "joseph" });
   } catch (err) {
