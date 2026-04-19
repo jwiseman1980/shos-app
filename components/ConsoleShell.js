@@ -6,6 +6,8 @@ import TaskSidebar from "@/components/TaskSidebar";
 import MainPanel from "@/components/MainPanel";
 import OperatorStrip from "@/components/OperatorStrip";
 import DayPanel from "@/components/DayPanel";
+import BottomTabBar from "@/components/BottomTabBar";
+import HamburgerMenu from "@/components/HamburgerMenu";
 
 /**
  * ConsoleShell — the persistent app-wide operating surface.
@@ -18,7 +20,8 @@ import DayPanel from "@/components/DayPanel";
  */
 export default function ConsoleShell({ user, tasks, calendarEvents, emails, greeting, children }) {
   const pathname = usePathname();
-  const isDashboard = pathname === "/" || pathname === "";
+  // Feed is at /dashboard/today; root redirects there. Disable old MainPanel at /.
+  const isDashboard = false;
 
   // Trimmed user for Operator and MainPanel
   const currentUser = user ? { name: user.name, email: user.email } : null;
@@ -204,6 +207,12 @@ export default function ConsoleShell({ user, tasks, calendarEvents, emails, gree
           <line x1="3" y1="10" x2="21" y2="10"/>
         </svg>
       </button>
+
+      {/* Mobile: hamburger menu (replaces sidebar) */}
+      <HamburgerMenu user={user} />
+
+      {/* Mobile: bottom tab bar — always visible on small screens */}
+      <BottomTabBar />
     </div>
   );
 }

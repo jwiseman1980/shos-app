@@ -5,18 +5,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV_LINKS = [
-  { href: "/",              label: "Dashboard",     icon: "⊞" },
-  { href: "/dashboard/today", label: "Today",       icon: "◎", highlight: true },
-  { href: "/email",         label: "Inbox",          icon: "✉" },
-  { href: "/cs",            label: "CS Inbox",      icon: "☎", highlight: true },
-  { href: "/orders",        label: "Orders",        icon: "◈" },
-  { href: "/laser",         label: "Laser",         icon: "◉" },
-  { href: "/designs",       label: "Designs",       icon: "◇" },
-  { href: "/shipping",      label: "Shipping",      icon: "↗" },
-  { href: "/finance",       label: "Finance",       icon: "$" },
-  { href: "/anniversaries", label: "Anniversaries", icon: "♡" },
-  { href: "/families",      label: "Families",      icon: "⊛" },
-  { href: "/sops",          label: "SOPs",          icon: "≡" },
+  { href: "/dashboard/today", label: "Feed",         icon: "◎", highlight: true },
+  { href: "/pipelines",       label: "Pipelines",    icon: "⊞" },
+  { href: "/email",           label: "Inbox",        icon: "✉" },
+  { href: "/orders",          label: "Orders",       icon: "◈" },
+  { href: "/laser",           label: "Laser",        icon: "◉" },
+  { href: "/designs",         label: "Designs",      icon: "◇" },
+  { href: "/shipping",        label: "Shipping",     icon: "↗" },
+  { href: "/anniversaries",   label: "Anniversaries",icon: "♡" },
+  { href: "/finance",         label: "Finance",      icon: "$" },
+  { href: "/families",        label: "Families",     icon: "⊛" },
+  { href: "/gyst",            label: "Personal",     icon: "✧" },
+  { href: "/sops",            label: "SOPs",         icon: "≡" },
 ];
 
 // Group definitions: key, label, defaultExpanded
