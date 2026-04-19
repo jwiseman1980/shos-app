@@ -13,6 +13,13 @@ const PERSONAL_AREAS = [
     icon: "⊕",
   },
   {
+    area: "Bank Accounts",
+    description: "Connect USAA and other accounts. Automatic transaction sync — no more CSV imports.",
+    status: "live",
+    link: "/gyst/connect",
+    icon: "◎",
+  },
+  {
     area: "Fitness",
     description: "Workout log and weekly movement tracking.",
     status: "stub",
