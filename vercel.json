@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/squarespace-orders",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-finances",
+      "schedule": "0 7 * * *"
     }
   ]
 }
