@@ -39,6 +39,10 @@
     {
       "path": "/api/cron/sync-finances",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/sync-salesforce",
+      "schedule": "0 2 * * 0"
     }
   ]
 }
