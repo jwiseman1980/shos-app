@@ -35,6 +35,8 @@ export async function GET(request) {
   if (searchParams.get("priority")) filters.priority = searchParams.get("priority");
   if (searchParams.get("due_before")) filters.due_before = searchParams.get("due_before");
   if (searchParams.get("limit")) filters.limit = parseInt(searchParams.get("limit"));
+  if (searchParams.get("assigned_to")) filters.assigned_to = searchParams.get("assigned_to");
+  if (searchParams.get("source_type")) filters.source_type = searchParams.get("source_type");
 
   const result = await queryTasks(filters);
   try {

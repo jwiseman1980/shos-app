@@ -159,6 +159,7 @@ Available mutation endpoints:
 - POST /api/messages/draft-batch — create Gmail drafts for all eligible families with messages. Body: { heroIds?: string[] } (optional: specific heroes, omit for all eligible)
 - POST /api/orders — create a donated bracelet order. Body: { heroName, recipientName, recipientEmail?, quantity6?, quantity7?, source?, notes?, sku?, shippingName?, shippingAddress1?, shippingCity?, shippingState?, shippingPostal?, shippingCountry? }. Auto-triages: checks design availability (→ ready_to_laser) and burnout stock (→ ready_to_ship), otherwise → design_needed. Creates one order per recipient. Use app_query on /api/heroes?search=NAME to look up hero name and SKU first. Use supabase_query on contacts to look up recipient addresses.
 - PATCH /api/orders — advance a bracelet order item's production status. Body: { itemId, status, heroName? }. Valid statuses: not_started → design_needed → ready_to_laser → in_production → ready_to_ship → shipped. Use supabase_query on order_items (join orders via order_id) to find itemId first. Triggers Slack notifications and shipping email automatically.
+- POST /api/tasks/notify — send Slack DM + email to a task's assignee. Body: { task_id }. Use after updating an existing task's assignment if the assignee needs to be re-notified.
 
 Always confirm with the user before making bulk mutations (e.g., assigning 20 heroes at once). Single updates are fine without confirmation.`,
     input_schema: {
@@ -201,20 +202,55 @@ Always confirm with the user before making bulk mutations (e.g., assigning 20 he
   },
   {
     name: "create_task",
-    description: "Create a task tagged to a domain. Use role='operator' for operational work you'll handle, role='architect' for build/code work Joseph handles in Claude Code. The role field is a domain tag, not a separate agent.",
+    description: "Create a task tagged to a domain. Use role='operator' for operational work you'll handle, role='architect' for build/code work Joseph handles in Claude Code. The role field is a domain tag, not a separate agent. For tasks that need to be assigned to a team member with notification, use assign_task instead.",
     input_schema: {
       type: "object",
       properties: {
         title: { type: "string", description: "Task title — clear and actionable" },
         description: { type: "string", description: "Detailed description of what needs to be done" },
         priority: { type: "string", enum: ["critical", "high", "medium", "low"] },
-        role: { type: "string", enum: ["operator", "architect", "ed", "cos", "cfo", "coo", "comms", "dev", "family"], description: "Domain tag: use 'operator' for ops work, 'architect' for build work. Legacy values (ed, cos, etc.) are still valid for categorization." },
+        role: { type: "string", enum: ["operator", "architect", "ed", "cos", "cfo", "coo", "comms", "dev", "family"], description: "Domain tag: use 'operator' for ops work, 'architect' for build work." },
         due_date: { type: "string", description: "Due date in YYYY-MM-DD format" },
         domain: { type: "string", description: "Domain area: finance, operations, comms, governance, compliance, etc." },
         sop_ref: { type: "string", description: "Reference to SOP if task is SOP-driven (e.g. SOP-FIN-001)" },
+        source_type: { type: "string", enum: ["email", "order", "hero", "anniversary", "manual"], description: "What triggered this task" },
+        source_id: { type: "string", description: "ID of the source record (thread_id, order_id, hero_id, etc.)" },
         tags: { type: "array", items: { type: "string" }, description: "Tags for categorization" },
       },
       required: ["title", "role"],
+    },
+  },
+  {
+    name: "assign_task",
+    description: "Create a task and assign it to a team member, then send them a Slack DM + email notification. Use this when Joseph says 'assign X to [name]' or 'ask Chris to...'. Team: Chris Marti (anniversary outreach, volunteers), Kristin Hughes (photography, events), Ryan Santana (design). Source context: if assigning from an email thread, set source_type='email' and source_id=threadId; from an order, source_type='order' and source_id=orderId.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Task title — clear and actionable" },
+        assignee_name: { type: "string", description: "Team member's name (e.g. 'Chris', 'Kristin', 'Ryan'). Partial match — 'Chris' finds Chris Marti." },
+        assignee_email: { type: "string", description: "Team member's email — alternative to assignee_name" },
+        description: { type: "string", description: "Task details and context" },
+        priority: { type: "string", enum: ["critical", "high", "medium", "low"] },
+        due_date: { type: "string", description: "Due date YYYY-MM-DD" },
+        source_type: { type: "string", enum: ["email", "order", "hero", "anniversary", "manual"], description: "What triggered this task" },
+        source_id: { type: "string", description: "ID of the source record" },
+        domain: { type: "string", description: "Domain: operations, comms, design, etc." },
+        tags: { type: "array", items: { type: "string" } },
+      },
+      required: ["title"],
+    },
+  },
+  {
+    name: "list_tasks_by_assignee",
+    description: "List open tasks for a specific team member. Use when Joseph asks 'What's on Chris's plate?' or 'What is Kristin working on?' or 'What's my task list?'",
+    input_schema: {
+      type: "object",
+      properties: {
+        assignee_name: { type: "string", description: "Team member name (partial match OK — 'Chris' finds Chris Marti)" },
+        assignee_email: { type: "string", description: "Team member email — alternative to name" },
+        status: { type: "string", enum: ["todo", "in_progress", "blocked", "done", "cancelled"], description: "Filter by status — omit to show all open tasks" },
+        limit: { type: "number", description: "Max results (default 20)" },
+      },
     },
   },
   {
@@ -626,6 +662,95 @@ async function executeSfQuery(soql) {
   }
 }
 
+async function executeAssignTask(input) {
+  const { title, assignee_name, assignee_email, description, priority, due_date, source_type, source_id, domain, tags } = input;
+  if (!title) return "Error: title is required";
+  if (!assignee_name && !assignee_email) return "Error: provide assignee_name or assignee_email";
+
+  const sb = (await import("@/lib/supabase")).getServerClient();
+
+  let q = sb.from("users").select("id, name, email").eq("is_active", true);
+  if (assignee_email) {
+    q = q.ilike("email", assignee_email);
+  } else {
+    q = q.ilike("name", `%${assignee_name}%`);
+  }
+  const { data: users } = await q.limit(1);
+  if (!users?.length) {
+    return `No active user found matching "${assignee_name || assignee_email}". Check the users table — they may need to be added first (supabase_query table=users).`;
+  }
+  const assignee = users[0];
+
+  const taskResult = await createTask({
+    title, description, priority: priority || "medium",
+    role: "operator", due_date, domain, tags,
+    source_type, source_id,
+    assigned_to: assignee.id,
+  });
+
+  const idMatch = taskResult.match(/\(id: ([a-f0-9-]{36})\)/);
+  if (!idMatch) return `${taskResult}\n(Could not extract task ID for notification — notify manually via /api/tasks/notify)`;
+  const taskId = idMatch[1];
+
+  const base = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+  try {
+    const res = await fetch(`${base}/api/tasks/notify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": process.env.SHOS_API_KEY || "" },
+      body: JSON.stringify({ task_id: taskId }),
+    });
+    const notifyData = await res.json().catch(() => ({}));
+    return `${taskResult}\n${notifyData.message || "Notification attempted."}`;
+  } catch (e) {
+    return `${taskResult}\nNotification failed: ${e.message}`;
+  }
+}
+
+async function executeListTasksByAssignee(input) {
+  const { assignee_name, assignee_email, status, limit = 20 } = input;
+  if (!assignee_name && !assignee_email) return "Error: provide assignee_name or assignee_email";
+
+  const sb = (await import("@/lib/supabase")).getServerClient();
+
+  let q = sb.from("users").select("id, name, email").eq("is_active", true);
+  if (assignee_email) {
+    q = q.ilike("email", assignee_email);
+  } else {
+    q = q.ilike("name", `%${assignee_name}%`);
+  }
+  const { data: users } = await q.limit(1);
+  if (!users?.length) return `No user found matching "${assignee_name || assignee_email}"`;
+  const assignee = users[0];
+
+  let taskQ = sb.from("tasks")
+    .select("id, title, description, status, priority, due_date, source_type, source_id, created_at")
+    .eq("assigned_to", assignee.id)
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .limit(limit);
+
+  if (status) {
+    taskQ = taskQ.eq("status", status);
+  } else {
+    taskQ = taskQ.not("status", "in", '("done","cancelled")');
+  }
+
+  const { data: tasks, error } = await taskQ;
+  if (error) return `Failed to query tasks: ${error.message}`;
+  if (!tasks?.length) return `No open tasks for ${assignee.name}.`;
+
+  const lines = [`Tasks for ${assignee.name} (${tasks.length} open):`, ""];
+  for (const t of tasks) {
+    const due = t.due_date
+      ? ` · Due ${new Date(t.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+      : "";
+    const src = t.source_type ? ` [${t.source_type}]` : "";
+    lines.push(`• [${t.priority}] ${t.title}${due}${src} — ${t.status}`);
+    lines.push(`  id: ${t.id}`);
+    if (t.description) lines.push(`  ${t.description.slice(0, 120)}`);
+  }
+  return lines.join("\n");
+}
+
 async function handleToolCall(role, toolName, toolInput) {
   switch (toolName) {
     case "read_context_file":
@@ -652,6 +777,10 @@ async function handleToolCall(role, toolName, toolInput) {
       return await supabaseUpsert(toolInput);
     case "create_task":
       return await createTask(toolInput);
+    case "assign_task":
+      return await executeAssignTask(toolInput);
+    case "list_tasks_by_assignee":
+      return await executeListTasksByAssignee(toolInput);
     case "update_task":
       return await updateTask(toolInput);
     case "query_tasks":
@@ -882,11 +1011,28 @@ ${pageState.draftInProgress ? `\nDraft reply in progress (user is editing this n
 - At session close: update_context_file + log_closeout + follow-up tasks/calendar events.
 - Be direct, take action, report results. No fluff.
 
+## Team Members
+- **Joseph Wiseman** (joseph.wiseman@steel-hearts.org) — ED, operator, all domains [admin — sees all tasks]
+- **Chris Marti** (chris.marti@steel-hearts.org) — anniversary outreach, volunteer coordination
+- **Kristin Hughes** (kristin.hughes@steel-hearts.org) — photography, event support
+- **Ryan Santana** (ryan.santana@steel-hearts.org) — graphic design (bracelets, social media)
+
+When looking up a user's ID for direct Supabase assignment, use supabase_query on the users table filtered by name/email.
+
+## Task Assignment (The Operator IS the Task Manager)
+- **Assign work**: "Assign the Moffatt bracelet to Ryan" → use assign_task (creates task + sends Slack DM + email)
+- **See someone's plate**: "What's Chris working on?" → use list_tasks_by_assignee
+- **Update status**: "Mark that Terrie email done" → use update_task with status="done". Find the task ID first with query_tasks or list_tasks_by_assignee.
+- **Today's triage**: "What's on my plate?" → use query_tasks (no filters or limit=10) + show upcoming anniversaries
+- **Source context**: When assigning from an email, include source_type="email" and source_id=threadId. From an order, source_type="order". From a hero, source_type="hero".
+- **Anniversary tasks**: Auto-created by the daily cron (14-day lookahead). Default assignee: Chris Marti. Status "todo" → "done" when email is sent/scheduled.
+- **Post-assignment**: Operator notifies the assignee via Slack DM + email automatically. No need to also create a calendar event unless Joseph asks.
+
 ## Division of Labor
 OPERATOR handles (when the infrastructure exists in Supabase):
 - Email: query, read, archive, draft
 - Supabase: read any table (supabase_query), write/upsert any existing table (supabase_upsert)
-- Tasks: create, update, query
+- Tasks: create, assign, update, query (assign_task, create_task, update_task, query_tasks, list_tasks_by_assignee)
 - Calendar: create and update events
 - Engagement logging, session closeouts, Slack announcements
 - Data population: process incoming data (990s, contact lists, CSV pastes) and upsert into existing tables — even many rows at once

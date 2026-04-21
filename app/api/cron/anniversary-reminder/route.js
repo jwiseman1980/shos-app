@@ -13,6 +13,7 @@
 import { NextResponse } from "next/server";
 import { getServerClient } from "@/lib/supabase";
 import { postToSlack } from "@/lib/slack";
+import { createTask } from "@/lib/storage/supabase-tools";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -34,9 +35,9 @@ export async function GET(request) {
   const now = new Date();
   const currentYear = now.getFullYear();
 
-  // Build month/day targets for the next 7 days (including today)
+  // Build month/day targets for the next 14 days (including today)
   const targets = [];
-  for (let offset = 0; offset <= 7; offset++) {
+  for (let offset = 0; offset <= 14; offset++) {
     const d = new Date(now);
     d.setDate(d.getDate() + offset);
     targets.push({ month: d.getMonth() + 1, day: d.getDate(), offset });
@@ -97,6 +98,51 @@ export async function GET(request) {
   // Sort by days until anniversary
   needsAction.sort((a, b) => a.daysUntil - b.daysUntil);
 
+  // Auto-create tasks for heroes that don't already have an open anniversary task
+  const heroIdsNeedingAction = needsAction.map((h) => h.id);
+  const { data: existingTasks } = await sb
+    .from("tasks")
+    .select("source_id")
+    .eq("source_type", "anniversary")
+    .in("source_id", heroIdsNeedingAction)
+    .not("status", "in", '("done","cancelled")');
+
+  const alreadyHasTask = new Set((existingTasks || []).map((t) => t.source_id));
+
+  // Look up Chris Marti as default assignee (he handles anniversary outreach)
+  const { data: chrisRows } = await sb
+    .from("users")
+    .select("id, name, email")
+    .ilike("name", "%chris%marti%")
+    .eq("is_active", true)
+    .limit(1);
+  const chrisId = chrisRows?.[0]?.id || null;
+
+  const tasksCreated = [];
+  for (const h of needsAction) {
+    if (alreadyHasTask.has(h.id)) continue;
+    const heroName = [h.rank, h.first_name, h.last_name].filter(Boolean).join(" ") || h.name;
+    const dateStr = `${h.memorial_month}/${h.memorial_day}`;
+    const daysLabel = h.daysUntil === 0 ? "TODAY" : h.daysUntil === 1 ? "tomorrow" : `in ${h.daysUntil} days`;
+    await createTask({
+      title: `Send anniversary outreach — ${heroName} — ${dateStr}`,
+      description: `Anniversary is ${daysLabel}. Draft and send a remembrance email to the family.`,
+      priority: h.daysUntil <= 2 ? "high" : "medium",
+      role: "operator",
+      domain: "comms",
+      source_type: "anniversary",
+      source_id: h.id,
+      due_date: (() => {
+        const d = new Date(now);
+        d.setDate(d.getDate() + h.daysUntil);
+        return d.toISOString().split("T")[0];
+      })(),
+      assigned_to: chrisId,
+      tags: ["anniversary", "outreach"],
+    });
+    tasksCreated.push(heroName);
+  }
+
   // Build Slack alert
   const lines = [`🕯️ *Anniversary Reminder — Action Needed*`];
   lines.push(`${needsAction.length} hero${needsAction.length === 1 ? "" : "es"} with upcoming anniversaries have no family email sent for ${currentYear}:\n`);
@@ -114,6 +160,10 @@ export async function GET(request) {
     lines.push(`\n✅ Already handled: ${names}`);
   }
 
+  if (tasksCreated.length > 0) {
+    lines.push(`\n📋 Tasks auto-created for: ${tasksCreated.join(", ")}`);
+    if (chrisId) lines.push(`Assigned to Chris Marti.`);
+  }
   lines.push(`\nOpen /anniversaries to assign and draft emails.`);
 
   const message = lines.join("\n");
@@ -125,6 +175,7 @@ export async function GET(request) {
     upcoming: matched.length,
     needsAction: needsAction.length,
     alreadyHandled: alreadyHandled.length,
+    tasksCreated: tasksCreated.length,
     heroes: needsAction.map((h) => ({
       name: h.name || `${h.first_name} ${h.last_name}`,
       month: h.memorial_month,
