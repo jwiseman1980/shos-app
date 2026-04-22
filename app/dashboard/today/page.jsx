@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { getBrowserClient } from "@/lib/supabase";
 import "./today.css";
 
 // ---------------------------------------------------------------------------
@@ -335,7 +336,26 @@ function DesignBody({ item, onClose }) {
 function TaskBody({ item, onClose }) {
   const ctx = item.context || {};
   const [subtasks, setSubtasks] = useState(ctx.subtasks || []);
+  const [marking, setMarking] = useState(false);
+  const [marked, setMarked] = useState(false);
   const toggle = (id) => setSubtasks((prev) => prev.map((s) => (s.id === id ? { ...s, done: !s.done } : s)));
+
+  const handleMarkDone = useCallback(async () => {
+    if (!ctx.taskId || marking || marked) return;
+    setMarking(true);
+    try {
+      const res = await fetch(`/api/tasks/${ctx.taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "done" }),
+      });
+      if (res.ok) {
+        setMarked(true);
+        setTimeout(onClose, 600);
+      }
+    } catch {}
+    finally { setMarking(false); }
+  }, [ctx.taskId, marking, marked, onClose]);
 
   return (
     <div className="card-expand-body">
@@ -360,6 +380,11 @@ function TaskBody({ item, onClose }) {
         </div>
       )}
       <div className="action-row">
+        {ctx.taskId && (
+          <button className="btn-primary btn-send" style={{ background: "#22c55e" }} onClick={handleMarkDone} disabled={marking || marked}>
+            {marked ? "✓ Done" : marking ? "Saving..." : "Mark Done"}
+          </button>
+        )}
         <a href="/tasks" className="btn-secondary" style={{ textAlign: "center", textDecoration: "none", display: "block" }}>View Tasks</a>
         <button className="btn-secondary" onClick={onClose}>Close</button>
       </div>
@@ -683,6 +708,18 @@ export default function TodayPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Supabase realtime — refresh feed when any task changes
+  useEffect(() => {
+    const supabase = getBrowserClient();
+    const channel = supabase
+      .channel("feed-tasks-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () => {
+        load(true);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [load]);
 
   const actNow    = (data?.items || []).filter((i) => i.section === "TODAY");
   const thisWeek  = (data?.items || []).filter((i) => i.section === "WEEK");

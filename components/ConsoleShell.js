@@ -22,6 +22,8 @@ export default function ConsoleShell({ user, tasks, calendarEvents, emails, gree
   const pathname = usePathname();
   // Feed is at /dashboard/today; root redirects there. Disable old MainPanel at /.
   const isDashboard = false;
+  // Split-view mode: Feed left (60%) + Operator right (40%) on desktop >= 1024px
+  const isFeed = pathname === "/dashboard/today";
 
   // Trimmed user for Operator and MainPanel
   const currentUser = user ? { name: user.name, email: user.email } : null;
@@ -129,7 +131,7 @@ export default function ConsoleShell({ user, tasks, calendarEvents, emails, gree
   const activeTask = taskList.find((t) => t.id === activeTaskId);
 
   return (
-    <div className="console-layout">
+    <div className={`console-layout${isFeed ? " layout-feed" : ""}`}>
       {/* Task Sidebar — persistent left panel */}
       <TaskSidebar
         tasks={taskList}
@@ -170,24 +172,26 @@ export default function ConsoleShell({ user, tasks, calendarEvents, emails, gree
           )}
         </div>
 
-        {/* Drag handle */}
+        {/* Drag handle — hidden in feed split-view via CSS */}
         <div className="console-resizer" onMouseDown={handleResizerMouseDown} />
 
-        {/* Operator — persistent bottom strip */}
-        <div className="console-operator" style={{ height: operatorHeight }}>
+        {/* Operator — bottom strip normally; right panel on Feed desktop via CSS */}
+        <div className="console-operator" style={isFeed ? undefined : { height: operatorHeight }}>
           <OperatorStrip currentUser={currentUser} />
         </div>
       </div>
 
-      {/* Day Panel — persistent right-side calendar */}
-      <DayPanel
-        events={calendarEvents || []}
-        tasks={taskList}
-        collapsed={!rightPanelOpen}
-        onToggle={() => setRightPanelOpen((v) => !v)}
-        mobileOpen={mobileCalOpen}
-        onMobileClose={() => setMobileCalOpen(false)}
-      />
+      {/* Day Panel — hidden on Feed page (Operator takes that slot) */}
+      {!isFeed && (
+        <DayPanel
+          events={calendarEvents || []}
+          tasks={taskList}
+          collapsed={!rightPanelOpen}
+          onToggle={() => setRightPanelOpen((v) => !v)}
+          mobileOpen={mobileCalOpen}
+          onMobileClose={() => setMobileCalOpen(false)}
+        />
+      )}
 
       {/* Mobile calendar backdrop */}
       {mobileCalOpen && (

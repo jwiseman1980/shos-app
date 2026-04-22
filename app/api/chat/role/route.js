@@ -155,6 +155,8 @@ Available mutation endpoints:
 - PATCH /api/heroes/update — update anniversary status, assignment, notes, completion date. Body: { sfId, status, assignedToName, notes, completedDate, heroName }
 - POST /api/anniversaries/draft-email — create a Gmail draft for an anniversary email. Body: { heroName, branch, years, memorialDate, familyEmail, familyName, senderEmail, senderName, sfId }
 - POST /api/tasks — create a task. Body: { title, description, status, priority, role, domain, hero_id, due_date, tags }
+- PATCH /api/tasks/[id] — update a task by ID. Body: { status, priority, notes, title, description, due_date, assigned_to }. Setting status='done' removes it from the Feed instantly (realtime). Use supabase_query on tasks with title ilike filter to find the task ID when user says "mark X as done".
+- DELETE /api/tasks/[id] — permanently delete a task by ID.
 - POST /api/engagements — log an engagement. Body: { type, subject, description, outcome, follow_up_needed, follow_up_date }
 - POST /api/messages/draft-batch — create Gmail drafts for all eligible families with messages. Body: { heroIds?: string[] } (optional: specific heroes, omit for all eligible)
 - POST /api/orders — create a donated bracelet order. Body: { heroName, recipientName, recipientEmail?, quantity6?, quantity7?, source?, notes?, sku?, shippingName?, shippingAddress1?, shippingCity?, shippingState?, shippingPostal?, shippingCountry? }. Auto-triages: checks design availability (→ ready_to_laser) and burnout stock (→ ready_to_ship), otherwise → design_needed. Creates one order per recipient. Use app_query on /api/heroes?search=NAME to look up hero name and SKU first. Use supabase_query on contacts to look up recipient addresses.

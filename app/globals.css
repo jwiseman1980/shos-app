@@ -940,6 +940,35 @@ p {
   flex-direction: column;
 }
 
+/* ── Feed Split View — desktop >= 1024px ── */
+/* On /dashboard/today: Feed left (60%), Operator right (40%) */
+@media (min-width: 1024px) {
+  .layout-feed .console-main {
+    flex-direction: row;
+  }
+  .layout-feed .console-content {
+    flex: 3;
+    overflow-y: auto;
+    max-height: 100%;
+    border-right: 1px solid var(--border);
+  }
+  .layout-feed .console-resizer {
+    display: none;
+  }
+  .layout-feed .console-operator {
+    flex: 2;
+    height: auto !important;
+    border-top: none;
+    border-left: none;
+    overflow: hidden;
+  }
+  .layout-feed .operator-strip {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
 /* ── Day Panel (persistent right-side calendar) ── */
 .day-panel {
   width: 300px;
