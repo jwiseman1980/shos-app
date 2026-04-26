@@ -2,9 +2,9 @@
  * Anniversary Reminder Cron
  *
  * Runs daily at 9 AM UTC (5 AM ET). Finds heroes with anniversaries
- * in the next 7 days and checks whether a family email has been sent
- * (via anniversary_emails table) for the current year. Posts a Slack
- * alert for any that need action.
+ * in the next 7 days and skips heroes whose anniversary_status marks
+ * outreach as already handled (sent / scheduled / complete / skipped).
+ * Posts a Slack alert for any that still need action.
  *
  * Replaces the former Notion-based reminder that queried the
  * "Anniversary Remembrance Tracker" database (now offline).
@@ -33,7 +33,11 @@ export async function GET(request) {
 
   const sb = getServerClient();
   const now = new Date();
-  const currentYear = now.getFullYear();
+
+  // anniversary_status values that mean outreach is already handled —
+  // skip these heroes. The `anniversary_emails` table is unused (zero
+  // rows, no writers) so we read state directly off heroes.
+  const HANDLED_STATUSES = new Set(["sent", "scheduled", "complete", "skipped"]);
 
   // Build month/day targets for the next 14 days (including today)
   const targets = [];
@@ -73,24 +77,15 @@ export async function GET(request) {
     });
   }
 
-  // Check anniversary_emails for sent/scheduled entries this year
-  const heroIds = matched.map((h) => h.id);
-  const { data: sentRows } = await sb
-    .from("anniversary_emails")
-    .select("hero_id, status")
-    .in("hero_id", heroIds)
-    .eq("year", currentYear)
-    .in("status", ["sent", "scheduled"]);
-
-  const handledIds = new Set((sentRows || []).map((r) => r.hero_id));
-
-  const needsAction = matched.filter((h) => !handledIds.has(h.id));
-  const alreadyHandled = matched.filter((h) => handledIds.has(h.id));
+  // Use anniversary_status off the heroes row itself — that's the
+  // field the operator UI writes to (anniversary_emails was never wired up).
+  const needsAction = matched.filter((h) => !HANDLED_STATUSES.has(h.anniversary_status));
+  const alreadyHandled = matched.filter((h) => HANDLED_STATUSES.has(h.anniversary_status));
 
   if (needsAction.length === 0) {
     return NextResponse.json({
       success: true,
-      message: `All ${matched.length} upcoming anniversaries already handled for ${currentYear}`,
+      message: `All ${matched.length} upcoming anniversaries already handled`,
       matchedHeroes: matched.length,
     });
   }
