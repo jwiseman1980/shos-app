@@ -142,11 +142,25 @@ export default function TodayPage() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/dashboard/today");
-      if (res.ok) {
-        const data = await res.json();
-        setItems(data.items || []);
-      }
+      const settled = await Promise.allSettled([
+        fetch("/api/dashboard/today").then((r) => (r.ok ? r.json() : null)),
+        fetch("/api/triage/gmail").then((r) => (r.ok ? r.json() : null)),
+        fetch("/api/triage/slack").then((r) => (r.ok ? r.json() : null)),
+        fetch("/api/triage/personal").then((r) => (r.ok ? r.json() : null)),
+      ]);
+
+      const merged = settled.flatMap((s) =>
+        s.status === "fulfilled" && s.value?.items ? s.value.items : []
+      );
+
+      const seen = new Set();
+      const deduped = merged.filter((it) => {
+        if (!it?.id || seen.has(it.id)) return false;
+        seen.add(it.id);
+        return true;
+      });
+
+      setItems(deduped);
     } catch {} finally {
       setLoading(false);
     }
