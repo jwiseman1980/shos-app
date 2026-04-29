@@ -47,6 +47,10 @@
     {
       "path": "/api/cron/monthly-bookkeeper-report",
       "schedule": "0 9 1 * *"
+    },
+    {
+      "path": "/api/cron/triage-sync",
+      "schedule": "*/30 * * * *"
     }
   ]
 }
