@@ -15,6 +15,7 @@ export async function middleware(request) {
     pathname.startsWith("/api/sf-test") ||
     pathname.startsWith("/api/slack/events") ||
     pathname.startsWith("/api/webhooks/") ||
+    pathname.startsWith("/api/cron/") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/brand") ||
