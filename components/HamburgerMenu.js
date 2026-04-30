@@ -9,6 +9,7 @@ const NAV_SECTIONS = [
     label: "Operations",
     items: [
       { href: "/dashboard/today",  label: "Feed" },
+      { href: "/pipeline",         label: "Pipeline" },
       { href: "/pipelines",        label: "Pipelines" },
       { href: "/heroes/workflow",  label: "Hero Workflow" },
       { href: "/email",            label: "Inbox" },

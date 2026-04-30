@@ -16,8 +16,8 @@ const TABS = [
     matchPaths: ["/dashboard/today", "/"],
   },
   {
-    href: "/pipelines",
-    label: "Pipelines",
+    href: "/pipeline",
+    label: "Pipeline",
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="3" width="7" height="7" rx="1"/>
@@ -26,7 +26,7 @@ const TABS = [
         <rect x="14" y="14" width="7" height="7" rx="1"/>
       </svg>
     ),
-    matchPaths: ["/pipelines"],
+    matchPaths: ["/pipeline", "/pipelines"],
   },
   {
     href: "/operator",
