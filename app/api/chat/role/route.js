@@ -484,6 +484,125 @@ Always confirm with the user before making bulk mutations (e.g., assigning 20 he
       required: ["table", "records"],
     },
   },
+  // -------------------------------------------------------------------------
+  // Pipeline / workflow tools — first-class named actions for the operator chat
+  // -------------------------------------------------------------------------
+  {
+    name: "get_pipeline_status",
+    description: `Return the operator pipeline snapshot. Two views available:
+- 'unified' (default) — calls GET /api/pipeline. The 9-column lifecycle board (New Inquiries → Listed) merging hero workflow_stage + ShipStation. This is the 'where is each hero right now' view Joseph opens every morning.
+- 'multi' — calls GET /api/pipelines. Four-section view (orders, designs, anniversaries, heroes) with finer-grained columns per pipeline.
+Use this when the user asks 'what's in production', 'what's blocking X', or wants a status snapshot.`,
+    input_schema: {
+      type: "object",
+      properties: {
+        view: {
+          type: "string",
+          enum: ["unified", "multi"],
+          description: "Default 'unified' — the 9-column lifecycle board.",
+        },
+      },
+    },
+  },
+  {
+    name: "search_hero",
+    description: "Find a hero by name or SKU. Returns hero records with id, name, SKU, branch, rank. Use this before any hero operation to resolve the hero_id.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Hero name (full or partial) or SKU (e.g., 'Altman', 'USMC-LAWRENCE')." },
+        limit: { type: "number", description: "Max results (default 5)." },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "advance_hero_stage",
+    description: `Advance a hero through the 15-stage bracelet workflow on the heroes table (workflow_stage column). Calls PATCH /api/heroes/workflow.
+
+Stages, in order: inquiry → researching → hero_created → contacting_requestor → design_briefed → design_received → proof_sent → approved_production → lasering → photographing → letter_drafted → social_posted → shipped → listed → complete.
+
+Default is one-step-forward; the API rejects skipping or rewinding unless allowSkip/allowRewind is set. Use this for "advance Altman", "Shah's design just landed" (stage=design_received), "Mickey is on the laser now" (stage=lasering), etc. Use search_hero first if you only have a name.`,
+    input_schema: {
+      type: "object",
+      properties: {
+        hero_id:     { type: "string", description: "UUID of the hero." },
+        stage:       { type: "string", description: "Optional: target stage. Omit to advance one step." },
+        blockers:    { type: "string", description: "Optional: free-form note about what's blocking this hero. Pass empty string to clear." },
+        allowSkip:   { type: "boolean", description: "Allow jumping more than one stage forward. Default false." },
+        allowRewind: { type: "boolean", description: "Allow moving backwards. Default false." },
+      },
+      required: ["hero_id"],
+    },
+  },
+  {
+    name: "create_hero",
+    description: "Create a new hero record. Auto-generates the SKU from academy/branch + last name. Auto-sends a design request to Ryan via Slack.",
+    input_schema: {
+      type: "object",
+      properties: {
+        name:                  { type: "string", description: "Full name with rank (e.g., 'CPT John Smith')." },
+        last_name:             { type: "string", description: "Last name (used in SKU)." },
+        academy:               { type: "string", description: "USMA, USNA, USAFA, USCGA, USMMA — leave blank if not academy grad." },
+        branch:                { type: "string", description: "Branch prefix for SKU: USA, USN, USMC, USAF, USSF, USCG, FIRE." },
+        grad_year:             { type: "string", description: "Graduation year (4 digits) for academy SKU suffix." },
+        memorial_month:        { type: "number", description: "Month of memorial (1-12)." },
+        memorial_day:          { type: "number", description: "Day of memorial (1-31)." },
+        family_contact_name:   { type: "string", description: "Family contact's full name." },
+        family_contact_email:  { type: "string", description: "Family contact's email." },
+        design_notes:          { type: "string", description: "Notes for Ryan about the design." },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "create_order",
+    description: "Create a donated bracelet order. Auto-triages: if design exists → ready_to_laser, if blanks in stock → ready_to_ship, else → design_needed. One order per recipient. Use search_hero first to confirm the hero exists.",
+    input_schema: {
+      type: "object",
+      properties: {
+        heroName:        { type: "string", description: "Exact hero name from the heroes table." },
+        recipientName:   { type: "string", description: "Person receiving the bracelet." },
+        recipientEmail:  { type: "string" },
+        quantity6:       { type: "number", description: "Number of 6-inch bracelets." },
+        quantity7:       { type: "number", description: "Number of 7-inch bracelets." },
+        sku:             { type: "string", description: "Override SKU. Defaults to the hero's lineitem_sku." },
+        source:          { type: "string", description: "Where the order came from (event, email, walk-in)." },
+        notes:           { type: "string" },
+        shippingName:    { type: "string" },
+        shippingAddress1:{ type: "string" },
+        shippingCity:    { type: "string" },
+        shippingState:   { type: "string" },
+        shippingPostal:  { type: "string" },
+        shippingCountry: { type: "string", description: "Default 'US'." },
+      },
+      required: ["heroName", "recipientName"],
+    },
+  },
+  {
+    name: "update_order_status",
+    description: "Move an order_item through the production pipeline. Valid transitions: not_started → design_needed → ready_to_laser → in_production → ready_to_ship → shipped. Triggers Slack notifications and shipping email automatically. When user says 'mark Altman shipped' or 'move to laser', use get_pipeline_status or supabase_query (table=order_items) first to get the itemId.",
+    input_schema: {
+      type: "object",
+      properties: {
+        itemId:   { type: "string", description: "UUID of the order_item." },
+        status:   { type: "string", enum: ["not_started", "design_needed", "ready_to_laser", "in_production", "ready_to_ship", "shipped"], description: "Target production status." },
+        heroName: { type: "string", description: "Hero name for Slack notification context." },
+      },
+      required: ["itemId", "status"],
+    },
+  },
+  {
+    name: "push_to_shipstation",
+    description: "Push a Supabase order to ShipStation. Order must have at least one item in ready_to_ship status and a shipping address. Used after items are lasered + QC'd.",
+    input_schema: {
+      type: "object",
+      properties: {
+        orderId: { type: "string", description: "UUID of the parent order in Supabase." },
+      },
+      required: ["orderId"],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -753,6 +872,53 @@ async function executeListTasksByAssignee(input) {
   return lines.join("\n");
 }
 
+// ---------------------------------------------------------------------------
+// Pipeline / workflow tool executors
+// ---------------------------------------------------------------------------
+
+async function executeGetPipelineStatus(input) {
+  const view = input?.view || "unified";
+  const endpoint = view === "multi" ? "/api/pipelines" : "/api/pipeline";
+  return await executeAppQuery(endpoint);
+}
+
+async function executeSearchHero(input) {
+  const q = encodeURIComponent(input?.query || "");
+  const limit = input?.limit || 5;
+  return await executeAppQuery(`/api/heroes?search=${q}&limit=${limit}`);
+}
+
+async function executeAdvanceHeroStage(input) {
+  const { hero_id, stage, blockers, allowSkip, allowRewind } = input || {};
+  if (!hero_id) return "Error: hero_id is required";
+  const body = { hero_id };
+  if (stage !== undefined)       body.stage = stage;
+  if (blockers !== undefined)    body.blockers = blockers;
+  if (allowSkip !== undefined)   body.allowSkip = allowSkip;
+  if (allowRewind !== undefined) body.allowRewind = allowRewind;
+  return await executeAppMutation("/api/heroes/workflow", "PATCH", body);
+}
+
+async function executeCreateHero(input) {
+  return await executeAppMutation("/api/heroes/create", "POST", input);
+}
+
+async function executeCreateOrder(input) {
+  return await executeAppMutation("/api/orders", "POST", input);
+}
+
+async function executeUpdateOrderStatus(input) {
+  const { itemId, status, heroName } = input || {};
+  if (!itemId || !status) return "Error: itemId and status are required";
+  return await executeAppMutation("/api/orders", "PATCH", { itemId, status, heroName });
+}
+
+async function executePushToShipStation(input) {
+  const { orderId } = input || {};
+  if (!orderId) return "Error: orderId is required";
+  return await executeAppMutation("/api/orders/push-shipstation", "POST", { orderId });
+}
+
 async function handleToolCall(role, toolName, toolInput) {
   switch (toolName) {
     case "read_context_file":
@@ -927,6 +1093,20 @@ async function handleToolCall(role, toolName, toolInput) {
     case "navigate_to":
       // Navigation is handled by the stream layer — just acknowledge here
       return `Navigating to ${toolInput.path}`;
+    case "get_pipeline_status":
+      return await executeGetPipelineStatus(toolInput);
+    case "search_hero":
+      return await executeSearchHero(toolInput);
+    case "advance_hero_stage":
+      return await executeAdvanceHeroStage(toolInput);
+    case "create_hero":
+      return await executeCreateHero(toolInput);
+    case "create_order":
+      return await executeCreateOrder(toolInput);
+    case "update_order_status":
+      return await executeUpdateOrderStatus(toolInput);
+    case "push_to_shipstation":
+      return await executePushToShipStation(toolInput);
     default:
       return `Unknown tool: ${toolName}`;
   }
@@ -999,6 +1179,47 @@ ${pageState.emails?.length ? `Emails visible:\n${pageState.emails.map(e => `- [$
 ${pageState.openEmail ? `\nCurrently viewing email:\n- ID: ${pageState.openEmail.id}\n- From: ${pageState.openEmail.from}\n- To: ${pageState.openEmail.to}\n- Subject: ${pageState.openEmail.subject}\n- Reply-To: ${pageState.openEmail.replyTo || "same as from"}\n- Preview: ${pageState.openEmail.snippet || pageState.openEmail.body?.slice(0, 300) || ""}` : "No email open."}
 ${pageState.draftInProgress ? `\nDraft reply in progress (user is editing this now):\n- Replying to: ${pageState.draftInProgress.replyingTo}\n- Subject: ${pageState.draftInProgress.subject}\n- Current draft text: ${pageState.draftInProgress.text}\n\nWhen the user asks to modify the draft, output the COMPLETE revised draft text they can copy-paste to replace it.` : ""}
 ` : ""}
+
+## Bracelet Pipeline (the dashboard you're driving)
+The Operator Pipeline at /pipeline is the single 9-column board Joseph opens every morning. It's powered by the heroes.workflow_stage column — a 15-stage lifecycle that's the source of truth for "where is each hero right now." When Joseph speaks a command, prefer the named workflow tools below over generic app_mutation — they're tied to this state machine.
+
+**Hero workflow_stage (15 stages, in order):**
+inquiry → researching → hero_created → contacting_requestor → design_briefed → design_received → proof_sent → approved_production → lasering → photographing → letter_drafted → social_posted → shipped → listed → complete
+
+The 15 stages collapse into 9 operator columns on /pipeline:
+- New Inquiries (inquiry, researching)
+- In Contact (hero_created, contacting_requestor)
+- Design Requested (design_briefed)
+- Design Received (design_received)
+- Proof Sent (proof_sent)
+- In Production (approved_production, lasering, photographing, letter_drafted, social_posted)
+- Ready to Ship (ShipStation awaiting_shipment + ready_to_ship orders)
+- Shipped
+- Listed on Site
+
+**How to advance:**
+- "Altman is on the laser" → search_hero("Altman") → advance_hero_stage(hero_id, stage="lasering")
+- "Shah's design just landed" → advance_hero_stage(hero_id, stage="design_received")
+- "Owen Smith is published" → advance_hero_stage(hero_id, stage="listed")
+- Default advance_hero_stage (no stage) moves the hero one step forward. Pass allowSkip:true only if Joseph explicitly skips ahead. allowRewind:true for backwards moves.
+- Most stages auto-advance from existing routes (creating an order, uploading a design, marking shipped) — only invoke manually for stages that require human judgment (proof_sent, contacting_requestor, etc.).
+
+**Order production_status (separate from workflow_stage; lives on order_items):**
+not_started → design_needed → ready_to_laser → in_production → ready_to_ship → shipped
+- "Mark Altman shipped" → search_hero("Altman") → get_pipeline_status to find itemId → update_order_status(itemId, "shipped")
+- "Push DON-2026-004 to ShipStation" → look up orderId → push_to_shipstation(orderId)
+- Status changes auto-fire Slack DMs (Joseph / Ryan / Kristin), draft shipping emails, AND auto-advance the hero's workflow_stage (e.g. ready_to_laser advances the hero to approved_production).
+
+**Workflow toolset (use these by name):**
+- get_pipeline_status — what's in each column right now (default: unified 9-column view)
+- search_hero — find hero by name/SKU
+- advance_hero_stage — move a hero through the 15-stage workflow
+- create_hero — add a new hero (auto-generates SKU, pings Ryan, sets workflow_stage=hero_created)
+- create_order — donated bracelet order (auto-triages by design availability)
+- update_order_status — advance an order_item through production
+- push_to_shipstation — push a Supabase order to ShipStation (must have ready_to_ship items + address)
+
+When Joseph says something is done ("Altman shipped", "Shah's design is in"), execute the matching tool immediately. The dashboard is listening — it'll re-render the moment your tool returns. Acknowledge briefly: "Marked Altman shipped." not "I will now mark Altman as shipped."
 
 ## Core Rules
 - Supabase is primary DB. Use supabase_query for direct access, supabase_upsert to write records, app_query/app_mutation for API routes.
@@ -1302,6 +1523,15 @@ export async function POST(request) {
                 }
 
                 let result = await handleToolCall("operator", block.name, block.input);
+
+                // Broadcast pipeline-affecting tool calls so open dashboards can refresh
+                const PIPELINE_TOOLS = new Set([
+                  "advance_hero_stage", "create_hero", "create_order",
+                  "update_order_status", "push_to_shipstation",
+                ]);
+                if (PIPELINE_TOOLS.has(block.name)) {
+                  send({ type: "pipeline_change", tool: block.name, input: block.input });
+                }
 
                 // Truncate large tool results to avoid blowing rate limits
                 const resultStr = typeof result === "string" ? result : JSON.stringify(result);

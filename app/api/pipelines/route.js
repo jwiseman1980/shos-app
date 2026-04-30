@@ -49,16 +49,37 @@ const ANNIVERSARY_STAGE_MAP = {
 
 async function getOrdersPipeline() {
   const sb = getServerClient();
-  const SHIPPED = ["shipped", "delivered", "complete", "completed"];
+  // Only valid production_status enum values; "complete"/"completed" are
+  // legacy strings that aren't in the DB enum.
+  const TERMINAL = ["shipped", "delivered", "cancelled"];
 
   const { data, error } = await sb
     .from("order_items")
-    .select("id, sku, quantity, production_status, order_id, hero_name, notes")
-    .not("production_status", "in", `(${SHIPPED.map((s) => `"${s}"`).join(",")})`)
+    .select("id, lineitem_sku, quantity, production_status, order_id, hero_id, notes")
+    .not("production_status", "in", `(${TERMINAL.map((s) => `"${s}"`).join(",")})`)
     .order("created_at", { ascending: false })
     .limit(50);
 
-  if (error) return {};
+  if (error) {
+    console.warn("[pipelines] order_items query failed:", error.message);
+    return {};
+  }
+
+  // Resolve hero names + parent orders in batch
+  const heroIds = [...new Set((data || []).map((r) => r.hero_id).filter(Boolean))];
+  const orderIds = [...new Set((data || []).map((r) => r.order_id).filter(Boolean))];
+
+  const [heroesRes, ordersRes] = await Promise.all([
+    heroIds.length
+      ? sb.from("heroes").select("id, name").in("id", heroIds)
+      : Promise.resolve({ data: [] }),
+    orderIds.length
+      ? sb.from("orders").select("id, order_number, order_type, billing_email, shipping_address1, shipping_city").in("id", orderIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const heroMap = new Map((heroesRes.data || []).map((h) => [h.id, h]));
+  const orderMap = new Map((ordersRes.data || []).map((o) => [o.id, o]));
 
   const byStage = {
     "Intake": [],
@@ -72,11 +93,23 @@ async function getOrdersPipeline() {
   for (const row of data || []) {
     const stage = ORDER_STAGE_MAP[row.production_status] || "Intake";
     const statusLabel = (row.production_status || "").replace(/_/g, " ");
+    const ord = orderMap.get(row.order_id) || {};
+    const hero = row.hero_id ? heroMap.get(row.hero_id) : null;
+    const heroName = hero?.name || "";
     byStage[stage]?.push({
       id: `order-${row.id}`,
-      title: row.hero_name ? `${row.hero_name}` : `Order #${row.order_id || row.id}`,
-      subtitle: `${row.quantity || "?"} units · ${row.sku || ""}`,
-      brief: `${row.quantity || "?"} unit${(row.quantity || 1) !== 1 ? "s" : ""}${row.hero_name ? ` for ${row.hero_name}` : ""} — ${statusLabel}.${row.notes ? " " + row.notes : ""}`,
+      pipeline: "orders",
+      itemId: row.id,
+      heroId: row.hero_id || null,
+      heroName,
+      orderId: ord.id || row.order_id,
+      orderType: ord.order_type || null,
+      orderNumber: ord.order_number || null,
+      productionStatus: row.production_status,
+      hasShipAddress: Boolean(ord.shipping_address1 || ord.shipping_city),
+      title: heroName || `Order #${ord.order_number || row.order_id || row.id}`,
+      subtitle: `${row.quantity || "?"} units · ${row.lineitem_sku || ""}`,
+      brief: `${row.quantity || "?"} unit${(row.quantity || 1) !== 1 ? "s" : ""}${heroName ? ` for ${heroName}` : ""} — ${statusLabel}.${row.notes ? " " + row.notes : ""}`,
       actions: [
         { label: "View Order", href: `/orders` },
       ],
@@ -116,6 +149,9 @@ async function getDesignsPipeline() {
     const fullName = [hero.rank, hero.first_name, hero.last_name].filter(Boolean).join(" ") || hero.name;
     byStage[stage]?.push({
       id: `design-${hero.id}`,
+      pipeline: "designs",
+      heroId: hero.id,
+      designStatus: hero.design_status || "not_started",
       title: fullName,
       subtitle: hero.lineitem_sku || "",
       brief: hero.design_brief?.slice(0, 120) || `${hero.lineitem_sku || hero.name} needs a design brief.`,
@@ -139,7 +175,7 @@ async function getAnniversariesPipeline() {
   const { data, error } = await sb
     .from("heroes")
     .select(`
-      id, name, first_name, last_name, rank,
+      id, sf_id, name, first_name, last_name, rank,
       memorial_month, memorial_day, anniversary_status,
       family_contact:contacts!family_contact_id(first_name, last_name, email)
     `)
@@ -175,6 +211,10 @@ async function getAnniversariesPipeline() {
 
     byStage[stage]?.push({
       id: `anniversary-${hero.id}`,
+      pipeline: "anniversaries",
+      heroId: hero.id,
+      sfId: hero.sf_id,
+      anniversaryStatus: hero.anniversary_status || "not_started",
       title: fullName,
       subtitle: `${dateStr} · ${daysUntil === 0 ? "Today" : daysUntil === 1 ? "Tomorrow" : `${daysUntil}d away`}`,
       brief: familyName
@@ -216,6 +256,9 @@ async function getHeroesPipeline() {
     if (hero.active_listing) {
       byStage["Live"].push({
         id: `hero-live-${hero.id}`,
+        pipeline: "heroes",
+        heroId: hero.id,
+        lifecycleStage: "live",
         title: fullName,
         subtitle: hero.lineitem_sku || "",
         brief: `${fullName} is live with active listing.`,
@@ -224,6 +267,9 @@ async function getHeroesPipeline() {
     } else if (hero.has_graphic_design || DESIGN_DONE.has(hero.design_status)) {
       byStage["Design"].push({
         id: `hero-design-${hero.id}`,
+        pipeline: "heroes",
+        heroId: hero.id,
+        lifecycleStage: "design",
         title: fullName,
         subtitle: hero.lineitem_sku || "",
         brief: `Design complete — ready to publish as active listing.`,
@@ -232,6 +278,9 @@ async function getHeroesPipeline() {
     } else {
       byStage["Intake"].push({
         id: `hero-intake-${hero.id}`,
+        pipeline: "heroes",
+        heroId: hero.id,
+        lifecycleStage: "intake",
         title: fullName,
         subtitle: hero.lineitem_sku || "Needs SKU",
         brief: `In intake — needs design brief${!hero.lineitem_sku ? " and SKU" : ""}.`,

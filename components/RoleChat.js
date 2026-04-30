@@ -7,6 +7,23 @@ import useVoice from "@/hooks/useVoice";
 const COLOR = "#c4a237";
 const NAME = "Operator";
 
+// Friendlier verbs for the tool pills — e.g., "advance_hero_stage" → "Advancing hero"
+const TOOL_LABEL = {
+  advance_hero_stage:    { active: "Advancing hero",        done: "Hero advanced" },
+  create_hero:           { active: "Creating hero",         done: "Hero created" },
+  create_order:          { active: "Creating order",        done: "Order created" },
+  update_order_status:   { active: "Updating order",        done: "Order updated" },
+  push_to_shipstation:   { active: "Pushing to ShipStation", done: "Pushed to ShipStation" },
+  get_pipeline_status:   { active: "Reading pipeline",      done: "Pipeline read" },
+  search_hero:           { active: "Searching heroes",      done: "Hero search" },
+};
+
+function toolPillLabel(name, state) {
+  const map = TOOL_LABEL[name];
+  if (map) return map[state] || name.replace(/_/g, " ");
+  return name.replace(/_/g, " ");
+}
+
 const QUICK_ACTIONS = [
   { label: "Closeout session", text: "We're done. Update the operator context file with what we did, decisions made, and what's next. Then log the closeout record and create any follow-up tasks." },
   { label: "What's open?", text: "Query all open tasks. What needs my attention right now, sorted by urgency?" },
@@ -388,6 +405,12 @@ export default function RoleChat({ pathname, onClose, currentUser, bottomMode, o
                 router.push(event.path);
               }
               break;
+            case "pipeline_change":
+              // Broadcast so any open pipeline / production board can refresh now
+              window.dispatchEvent(new CustomEvent("shos:pipeline_change", {
+                detail: { tool: event.tool, input: event.input },
+              }));
+              break;
             case "text":
               fullText += event.delta;
               updateStreamMsg(streamId, { text: fullText });
@@ -523,12 +546,12 @@ export default function RoleChat({ pathname, onClose, currentUser, bottomMode, o
                       {msg.toolsActive?.map((t) => (
                         <span key={`active-${t}`} className="role-chat-tool-pill active" style={{ borderColor: COLOR }}>
                           <span className="role-chat-tool-spinner" style={{ borderTopColor: COLOR }} />
-                          {t.replace(/_/g, " ")}
+                          {toolPillLabel(t, "active")}…
                         </span>
                       ))}
                       {msg.toolsUsed?.map((t) => (
                         <span key={`done-${t}`} className="role-chat-tool-pill done">
-                          ✓ {t.replace(/_/g, " ")}
+                          ✓ {toolPillLabel(t, "done")}
                         </span>
                       ))}
                     </div>

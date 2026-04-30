@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { getBrowserClient } from "@/lib/supabase";
 import "./pipelines.css";
 
 // ---------------------------------------------------------------------------
-// Pipeline definitions (keep in sync with API route constants)
+// Pipeline definitions (keep in sync with /api/pipelines)
 // ---------------------------------------------------------------------------
 
 const ORDER_STAGES = ["Intake", "Design Check", "Ready to Laser", "In Production", "QC / Pack", "Shipped"];
@@ -13,59 +14,26 @@ const ANNIVERSARY_STAGES = ["Not Started", "Prep", "Drafted", "Sent", "Complete"
 const HERO_STAGES = ["Intake", "Design", "Live"];
 
 const PIPELINE_DEFS = [
-  {
-    key: "orders",
-    name: "Orders",
-    icon: "📦",
-    color: "#22c55e",
-    stages: ORDER_STAGES,
-    href: "/orders",
-  },
-  {
-    key: "designs",
-    name: "Designs",
-    icon: "🎨",
-    color: "#a855f7",
-    stages: DESIGN_STAGES,
-    href: "/designs",
-  },
-  {
-    key: "anniversaries",
-    name: "Anniversary Outreach",
-    icon: "🎖️",
-    color: "#3b82f6",
-    stages: ANNIVERSARY_STAGES,
-    href: "/anniversaries",
-  },
-  {
-    key: "heroes",
-    name: "Heroes",
-    icon: "⭐",
-    color: "#c4a237",
-    stages: HERO_STAGES,
-    href: "/heroes",
-  },
+  { key: "orders",        name: "Orders",                icon: "📦", color: "#22c55e", stages: ORDER_STAGES,       href: "/orders" },
+  { key: "designs",       name: "Designs",               icon: "🎨", color: "#a855f7", stages: DESIGN_STAGES,      href: "/designs" },
+  { key: "anniversaries", name: "Anniversary Outreach",  icon: "🎖️", color: "#3b82f6", stages: ANNIVERSARY_STAGES, href: "/anniversaries" },
+  { key: "heroes",        name: "Heroes",                icon: "⭐",  color: "#c4a237", stages: HERO_STAGES,        href: "/heroes" },
 ];
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function fmt(amount) {
-  if (amount == null) return "";
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(amount);
-}
-
-function fmtDate(dateStr) {
-  if (!dateStr) return "";
-  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
+// Next status per production stage (order_items.production_status enum)
+const ORDER_NEXT = {
+  not_started:    "design_needed",
+  design_needed:  "ready_to_laser",
+  ready_to_laser: "in_production",
+  in_production:  "ready_to_ship",
+  ready_to_ship:  "shipped",
+};
 
 // ---------------------------------------------------------------------------
 // Stage column
 // ---------------------------------------------------------------------------
 
-function StageColumn({ stage, items, color, onItemClick, expandedId }) {
+function StageColumn({ stage, items, color, onItemClick, onAdvance, onShip, expandedId, busyIds, justMovedIds }) {
   const count = items.length;
   return (
     <div className="stage-col">
@@ -80,7 +48,11 @@ function StageColumn({ stage, items, color, onItemClick, expandedId }) {
             item={item}
             color={color}
             expanded={expandedId === item.id}
+            busy={busyIds.has(item.id)}
+            justMoved={justMovedIds.has(item.id)}
             onClick={() => onItemClick(item.id)}
+            onAdvance={() => onAdvance(item)}
+            onShip={() => onShip(item)}
           />
         ))}
         {items.length === 0 && <div className="stage-empty">—</div>}
@@ -90,28 +62,62 @@ function StageColumn({ stage, items, color, onItemClick, expandedId }) {
 }
 
 // ---------------------------------------------------------------------------
-// Pipeline item card
+// Pipeline item card — with Advance / Push to ShipStation buttons
 // ---------------------------------------------------------------------------
 
-function PipelineItem({ item, color, expanded, onClick }) {
+function PipelineItem({ item, color, expanded, busy, justMoved, onClick, onAdvance, onShip }) {
+  const canAdvance = canItemAdvance(item);
+  const canShip = canItemShip(item);
+
   return (
     <div
-      className={`pipeline-item ${expanded ? "pi-expanded" : ""}`}
+      className={`pipeline-item ${expanded ? "pi-expanded" : ""} ${justMoved ? "pi-just-moved" : ""}`}
       style={{ "--pi-color": color }}
       onClick={onClick}
     >
       <div className="pi-title">{item.title}</div>
       {item.subtitle && <div className="pi-subtitle">{item.subtitle}</div>}
+      {(item.productionStatus || item.designStatus || item.anniversaryStatus || item.lifecycleStage) && (
+        <span className="pi-stage-pill">
+          {(item.productionStatus || item.designStatus || item.anniversaryStatus || item.lifecycleStage).replace(/_/g, " ")}
+        </span>
+      )}
       {expanded && item.brief && (
         <div className="pi-brief">
           <span className="operator-label-sm">Operator</span>
           {item.brief}
         </div>
       )}
+
+      {(canAdvance || canShip) && (
+        <div className="pi-action-row" onClick={(e) => e.stopPropagation()}>
+          {canAdvance && (
+            <button
+              className="pi-btn pi-btn-advance"
+              disabled={busy}
+              onClick={onAdvance}
+              title={advanceTitle(item)}
+            >
+              {busy ? "Moving…" : `Advance →`}
+            </button>
+          )}
+          {canShip && (
+            <button
+              className="pi-btn pi-btn-ship"
+              disabled={busy || !item.hasShipAddress}
+              onClick={onShip}
+              title={item.hasShipAddress ? "Push to ShipStation" : "No shipping address on file"}
+            >
+              {busy ? "Pushing…" : "🚀 Push to ShipStation"}
+            </button>
+          )}
+        </div>
+      )}
+
       {expanded && item.actions?.length > 0 && (
         <div className="pi-actions">
           {item.actions.map((action) => (
-            <a key={action.label} href={action.href} className="pi-action-btn">
+            <a key={action.label} href={action.href} className="pi-action-btn" onClick={(e) => e.stopPropagation()}>
               {action.label}
             </a>
           ))}
@@ -121,11 +127,47 @@ function PipelineItem({ item, color, expanded, onClick }) {
   );
 }
 
+function canItemAdvance(item) {
+  if (item.pipeline === "orders") {
+    return Boolean(ORDER_NEXT[item.productionStatus]);
+  }
+  if (item.pipeline === "designs" && item.heroId) {
+    return item.designStatus !== "complete";
+  }
+  if (item.pipeline === "anniversaries" && (item.heroId || item.sfId)) {
+    return item.anniversaryStatus !== "complete";
+  }
+  if (item.pipeline === "heroes" && item.heroId) {
+    return item.lifecycleStage !== "live";
+  }
+  return false;
+}
+
+function canItemShip(item) {
+  return (
+    item.pipeline === "orders" &&
+    item.orderType === "donated" &&
+    item.productionStatus === "ready_to_ship" &&
+    Boolean(item.orderId)
+  );
+}
+
+function advanceTitle(item) {
+  if (item.pipeline === "orders") {
+    const next = ORDER_NEXT[item.productionStatus];
+    return next ? `Move to ${next.replace(/_/g, " ")}` : "Already at final stage";
+  }
+  if (item.pipeline === "designs") return "Advance design status";
+  if (item.pipeline === "anniversaries") return "Advance anniversary status";
+  if (item.pipeline === "heroes") return "Advance hero lifecycle";
+  return "";
+}
+
 // ---------------------------------------------------------------------------
 // Pipeline section (collapsible)
 // ---------------------------------------------------------------------------
 
-function PipelineSection({ def, data, expandedId, onItemClick }) {
+function PipelineSection({ def, data, expandedId, onItemClick, onAdvance, onShip, busyIds, justMovedIds }) {
   const [collapsed, setCollapsed] = useState(false);
   const totalItems = data ? Object.values(data).reduce((sum, arr) => sum + arr.length, 0) : 0;
 
@@ -150,7 +192,11 @@ function PipelineSection({ def, data, expandedId, onItemClick }) {
               items={data?.[stage] || []}
               color={def.color}
               expandedId={expandedId}
+              busyIds={busyIds}
+              justMovedIds={justMovedIds}
               onItemClick={onItemClick}
+              onAdvance={onAdvance}
+              onShip={onShip}
             />
           ))}
         </div>
@@ -160,43 +206,198 @@ function PipelineSection({ def, data, expandedId, onItemClick }) {
 }
 
 // ---------------------------------------------------------------------------
-// Data fetcher
+// Main page
 // ---------------------------------------------------------------------------
 
 async function fetchPipelineData() {
-  const res = await fetch("/api/pipelines");
+  const res = await fetch("/api/pipelines", { cache: "no-store" });
   if (!res.ok) throw new Error(`Pipeline API failed: ${res.status}`);
   return res.json();
 }
-
-// ---------------------------------------------------------------------------
-// Main page
-// ---------------------------------------------------------------------------
 
 export default function PipelinesPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
+  const [busyIds, setBusyIds] = useState(() => new Set());
+  const [justMovedIds, setJustMovedIds] = useState(() => new Set());
+  const [live, setLive] = useState(false);
+  const justMovedTimers = useRef(new Map());
 
   const load = useCallback(async () => {
-    setLoading(true);
     try {
       const d = await fetchPipelineData();
       setData(d);
     } catch {
-      setData(null);
+      // Keep prior data on error rather than blanking out
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // Mark a card as "just moved" — pulses for 2.4s
+  const flashMoved = useCallback((itemId) => {
+    setJustMovedIds((prev) => {
+      const next = new Set(prev);
+      next.add(itemId);
+      return next;
+    });
+    if (justMovedTimers.current.has(itemId)) {
+      clearTimeout(justMovedTimers.current.get(itemId));
+    }
+    const t = setTimeout(() => {
+      setJustMovedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(itemId);
+        return next;
+      });
+      justMovedTimers.current.delete(itemId);
+    }, 2400);
+    justMovedTimers.current.set(itemId, t);
+  }, []);
+
+  const setBusy = useCallback((id, isBusy) => {
+    setBusyIds((prev) => {
+      const next = new Set(prev);
+      if (isBusy) next.add(id); else next.delete(id);
+      return next;
+    });
+  }, []);
+
+  // -------- Initial load + polling fallback --------
+  useEffect(() => {
+    load();
+    const poll = setInterval(load, 30_000);
+    return () => clearInterval(poll);
+  }, [load]);
+
+  // -------- Supabase Realtime: live updates from anywhere (chat, button, cron) --------
+  useEffect(() => {
+    let sb;
+    try {
+      sb = getBrowserClient();
+    } catch {
+      return; // No keys — fall back to polling
+    }
+
+    const debounced = (() => {
+      let t = null;
+      return (id) => {
+        if (id) flashMoved(id);
+        if (t) return;
+        t = setTimeout(() => { t = null; load(); }, 350);
+      };
+    })();
+
+    const channel = sb
+      .channel("pipelines-feed")
+      .on("postgres_changes", { event: "*", schema: "public", table: "heroes" }, (payload) => {
+        const id = payload.new?.id || payload.old?.id;
+        if (id) {
+          // Match the front-end ID convention
+          ["hero-intake-", "hero-design-", "hero-live-", "design-", "anniversary-"].forEach((p) => debounced(p + id));
+        } else {
+          debounced();
+        }
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "order_items" }, (payload) => {
+        const id = payload.new?.id || payload.old?.id;
+        debounced(id ? `order-${id}` : null);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => debounced())
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") setLive(true);
+        else if (status === "CHANNEL_ERROR" || status === "CLOSED") setLive(false);
+      });
+
+    return () => {
+      setLive(false);
+      sb.removeChannel(channel);
+    };
+  }, [load, flashMoved]);
+
+  // -------- Listen for chat-driven pipeline_change events --------
+  useEffect(() => {
+    function onChatPipelineChange() {
+      load();
+    }
+    window.addEventListener("shos:pipeline_change", onChatPipelineChange);
+    return () => window.removeEventListener("shos:pipeline_change", onChatPipelineChange);
+  }, [load]);
+
+  // -------- Item actions --------
+  const handleAdvance = useCallback(async (item) => {
+    setBusy(item.id, true);
+    try {
+      if (item.pipeline === "orders") {
+        const next = ORDER_NEXT[item.productionStatus];
+        if (!next) return;
+        await fetch("/api/orders", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ itemId: item.itemId, status: next, heroName: item.heroName }),
+        });
+      } else if (item.pipeline === "designs" && item.heroId) {
+        await fetch("/api/heroes/workflow", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hero_id: item.heroId, workflow: "design", direction: "next" }),
+        });
+      } else if (item.pipeline === "anniversaries" && item.heroId) {
+        await fetch("/api/heroes/workflow", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hero_id: item.heroId, workflow: "anniversary", direction: "next" }),
+        });
+      } else if (item.pipeline === "heroes" && item.heroId) {
+        await fetch("/api/heroes/workflow", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hero_id: item.heroId, workflow: "lifecycle", direction: "next" }),
+        });
+      }
+      flashMoved(item.id);
+      // Realtime should refresh on its own; load() is a safety net
+      await load();
+    } catch (e) {
+      console.error("Advance failed:", e);
+    } finally {
+      setBusy(item.id, false);
+    }
+  }, [flashMoved, load, setBusy]);
+
+  const handleShip = useCallback(async (item) => {
+    if (!item.orderId) return;
+    setBusy(item.id, true);
+    try {
+      const res = await fetch("/api/orders/push-shipstation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: item.orderId }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (j?.success) {
+        // Auto-advance to shipped after a successful push
+        await fetch("/api/orders", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ itemId: item.itemId, status: "shipped", heroName: item.heroName }),
+        });
+        flashMoved(item.id);
+      }
+      await load();
+    } catch (e) {
+      console.error("Push to ShipStation failed:", e);
+    } finally {
+      setBusy(item.id, false);
+    }
+  }, [flashMoved, load, setBusy]);
 
   const handleItemClick = useCallback((id) => {
     setExpandedId((prev) => (prev === id ? null : id));
   }, []);
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div className="pipelines-shell">
         <div className="pipelines-loading">
@@ -213,8 +414,11 @@ export default function PipelinesPage() {
         <div className="pipelines-datestr">
           {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
         </div>
-        <div className="pipelines-title">Pipelines</div>
-        <p className="pipelines-sub">All active workflows — tap any card for details</p>
+        <div className="pipelines-title">
+          Pipelines
+          {live && <span className="pipelines-live">Live</span>}
+        </div>
+        <p className="pipelines-sub">All active workflows — tap any card for details, or talk to the Operator.</p>
       </div>
 
       <div className="pipelines-body">
@@ -224,7 +428,11 @@ export default function PipelinesPage() {
             def={def}
             data={data?.[def.key]}
             expandedId={expandedId}
+            busyIds={busyIds}
+            justMovedIds={justMovedIds}
             onItemClick={handleItemClick}
+            onAdvance={handleAdvance}
+            onShip={handleShip}
           />
         ))}
 
