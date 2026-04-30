@@ -4,6 +4,7 @@ import PageShell from "@/components/PageShell";
 import DataCard from "@/components/DataCard";
 import StatBlock from "@/components/StatBlock";
 import AnniversaryTracker from "@/components/AnniversaryTracker";
+import PushToSlackButton from "@/components/PushToSlackButton";
 import { getAnniversariesByMonth } from "@/lib/data/heroes";
 import { getVolunteers } from "@/lib/data/volunteers";
 import { getMonthName, getCurrentMonth, getCurrentYear, getDayOfMonth, yearsSince } from "@/lib/dates";
@@ -157,6 +158,7 @@ export default async function AnniversariesPage({ searchParams }) {
     <PageShell
       title="Anniversary Email Tracker"
       subtitle={`${monthName} ${year} — ${totalThisMonth} remembrances this month`}
+      action={<PushToSlackButton />}
     >
       {/* Month Selector */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>

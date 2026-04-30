@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerClient } from "@/lib/supabase";
 import { sendSlackDm, buildAnniversaryAssignedMessage } from "@/lib/slack-actions";
+import { getSessionUser } from "@/lib/auth";
 
 /**
  * POST /api/anniversaries/push-tasks
@@ -11,12 +12,23 @@ import { sendSlackDm, buildAnniversaryAssignedMessage } from "@/lib/slack-action
  *   - If provided, pushes tasks for that volunteer only
  *   - If omitted, pushes tasks for ALL volunteers with pending assignments
  *
- * Auth: SHOS_API_KEY or CRON_SECRET
+ * Auth (any one of):
+ *   - SHOS_API_KEY header (cron / external)
+ *   - Logged-in admin or manager (Chris) via session cookie
  */
 export async function POST(request) {
   const apiKey = process.env.SHOS_API_KEY;
   const key = request.headers.get("x-api-key");
-  if (!apiKey || key !== apiKey) {
+  let allowed = Boolean(apiKey && key === apiKey);
+
+  if (!allowed) {
+    const user = await getSessionUser();
+    allowed = Boolean(
+      user && (user.isFounder || user.appRole === "admin" || user.appRole === "manager")
+    );
+  }
+
+  if (!allowed) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

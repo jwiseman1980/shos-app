@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyActionUrl, notifyWithDm, sendSlackDm, buildDesignQueueMessage, buildDesignUploadedMessage } from "@/lib/slack-actions";
+import { verifyActionUrl, notifyWithDm, sendSlackDm, buildDesignQueueMessage, buildDesignUploadedMessage, findDomainManagerEmail } from "@/lib/slack-actions";
 import { updateItemStatus } from "@/lib/data/orders";
 import { getServerClient } from "@/lib/supabase";
 import { getOrderDesignQueue } from "@/lib/data/designs";
@@ -52,6 +52,10 @@ export async function GET(request) {
 
     if (action === "view_design_queue") {
       return await handleViewDesignQueue();
+    }
+
+    if (action === "complete_task") {
+      return await handleCompleteTask(params);
     }
 
     return new Response(buildHtml("Unknown Action", `Action "${action}" is not recognized.`), {
@@ -288,13 +292,15 @@ async function handleMarkSent(params) {
     });
   }
 
-  // Notify ops + anniversary channel
+  // Notify ops + anniversary channel + Anniversary Emails domain manager (Chris)
   const anniversaryChannel = process.env.SLACK_ANNIVERSARY_CHANNEL;
   const opsChannel = process.env.SLACK_SOP_WEBHOOK;
   const msg = `✅ *${volunteer || "Volunteer"}* marked remembrance email sent for *${name || "Hero"}*`;
+  const managerEmail = await findDomainManagerEmail("Anniversary Emails");
   await Promise.all([
     opsChannel ? notifyWithDm(msg, null) : Promise.resolve(),
     anniversaryChannel ? (await import("@/lib/slack-actions")).postWebhook(anniversaryChannel, msg) : Promise.resolve(),
+    managerEmail ? sendSlackDm(managerEmail, msg) : Promise.resolve(),
   ]);
 
   return new Response(buildHtml(
@@ -332,12 +338,14 @@ async function handleMarkScheduled(params) {
     });
   }
 
-  // Notify ops + anniversary channel
+  // Notify ops + anniversary channel + Anniversary Emails domain manager (Chris)
   const anniversaryChannel = process.env.SLACK_ANNIVERSARY_CHANNEL;
   const msg = `📅 *${volunteer || "Volunteer"}* scheduled remembrance email for *${name || "Hero"}* — will send on the anniversary date`;
+  const managerEmail = await findDomainManagerEmail("Anniversary Emails");
   await Promise.all([
     notifyWithDm(msg, null),
     anniversaryChannel ? (await import("@/lib/slack-actions")).postWebhook(anniversaryChannel, msg) : Promise.resolve(),
+    managerEmail ? sendSlackDm(managerEmail, msg) : Promise.resolve(),
   ]);
 
   return new Response(buildHtml(
@@ -353,6 +361,50 @@ async function handleMarkScheduled(params) {
 // ---------------------------------------------------------------------------
 // Design Queue Actions (Ryan's Slack-first workflow)
 // ---------------------------------------------------------------------------
+
+async function handleCompleteTask(params) {
+  const { task: taskId, name } = params;
+  if (!taskId) {
+    return new Response(buildHtml("Missing Parameters", "Task ID is required."), {
+      status: 400,
+      headers: { "Content-Type": "text/html" },
+    });
+  }
+
+  const sb = getServerClient();
+  const { data, error } = await sb
+    .from("tasks")
+    .update({
+      status: "done",
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", taskId)
+    .select("id, title, assigned_to")
+    .single();
+
+  if (error) {
+    return new Response(buildHtml("Error", `Failed to mark task done: ${error.message}`), {
+      status: 500,
+      headers: { "Content-Type": "text/html" },
+    });
+  }
+
+  // Notify ops-hub so the assigner sees completion
+  try {
+    const opsMsg = `✅ Task done: *${data?.title || name || taskId}*`;
+    await notifyWithDm(opsMsg, null);
+  } catch {}
+
+  return new Response(buildHtml(
+    "Done",
+    `Task "${data?.title || name || taskId}" marked complete.`,
+    APP_URL + "/me",
+  ), {
+    status: 200,
+    headers: { "Content-Type": "text/html" },
+  });
+}
 
 async function handleUploadDesignPage(params) {
   const { sku, name } = params;
