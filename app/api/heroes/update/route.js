@@ -7,6 +7,7 @@ import {
   notifyWithChannelAndDm,
   postWebhook,
   notifyWithDm,
+  findDomainManagerEmail,
 } from "@/lib/slack-actions";
 
 /**
@@ -327,7 +328,13 @@ export async function PATCH(request) {
           heroRecord?.memorial_date,
         );
         const anniversaryChannel = process.env.SLACK_ANNIVERSARY_CHANNEL;
+        // Channel + ops broadcast
         await notifyWithChannelAndDm(msg, anniversaryChannel, null);
+        // Direct DM to the Anniversary Emails domain manager (Chris) so she sees progress
+        try {
+          const managerEmail = await findDomainManagerEmail("Anniversary Emails");
+          if (managerEmail) await sendSlackDm(managerEmail, msg);
+        } catch {}
       } catch {
         // Slack is best-effort
       }

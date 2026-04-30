@@ -104,15 +104,8 @@ export async function GET(request) {
 
   const alreadyHasTask = new Set((existingTasks || []).map((t) => t.source_id));
 
-  // Look up Chris Marti as default assignee (he handles anniversary outreach)
-  const { data: chrisRows } = await sb
-    .from("users")
-    .select("id, name, email")
-    .ilike("name", "%chris%marti%")
-    .eq("is_active", true)
-    .limit(1);
-  const chrisId = chrisRows?.[0]?.id || null;
-
+  // Per the new flow, Chris ASSIGNS volunteers — she is not the default assignee.
+  // Tasks are created unassigned; Chris assigns them via /anniversaries.
   const tasksCreated = [];
   for (const h of needsAction) {
     if (alreadyHasTask.has(h.id)) continue;
@@ -121,7 +114,7 @@ export async function GET(request) {
     const daysLabel = h.daysUntil === 0 ? "TODAY" : h.daysUntil === 1 ? "tomorrow" : `in ${h.daysUntil} days`;
     await createTask({
       title: `Send anniversary outreach — ${heroName} — ${dateStr}`,
-      description: `Anniversary is ${daysLabel}. Draft and send a remembrance email to the family.`,
+      description: `Anniversary is ${daysLabel}. Chris: assign a volunteer in /anniversaries.`,
       priority: h.daysUntil <= 2 ? "high" : "medium",
       role: "operator",
       domain: "comms",
@@ -132,13 +125,14 @@ export async function GET(request) {
         d.setDate(d.getDate() + h.daysUntil);
         return d.toISOString().split("T")[0];
       })(),
-      assigned_to: chrisId,
+      assigned_to: null,
       tags: ["anniversary", "outreach"],
     });
     tasksCreated.push(heroName);
   }
 
   // Build Slack alert
+  const currentYear = now.getFullYear();
   const lines = [`🕯️ *Anniversary Reminder — Action Needed*`];
   lines.push(`${needsAction.length} hero${needsAction.length === 1 ? "" : "es"} with upcoming anniversaries have no family email sent for ${currentYear}:\n`);
 
@@ -156,10 +150,10 @@ export async function GET(request) {
   }
 
   if (tasksCreated.length > 0) {
-    lines.push(`\n📋 Tasks auto-created for: ${tasksCreated.join(", ")}`);
-    if (chrisId) lines.push(`Assigned to Chris Marti.`);
+    lines.push(`\n📋 Tasks auto-created (unassigned) for: ${tasksCreated.join(", ")}`);
+    lines.push(`Chris: assign volunteers in /anniversaries — they get a Slack DM with a Create Draft button.`);
   }
-  lines.push(`\nOpen /anniversaries to assign and draft emails.`);
+  lines.push(`\nOpen /anniversaries to assign volunteers and trigger drafts.`);
 
   const message = lines.join("\n");
   await postToSlack("joseph", message).catch(() => {});
