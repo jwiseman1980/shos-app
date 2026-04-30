@@ -3,6 +3,7 @@ import { uploadDesignToStorage } from "@/lib/design-storage";
 import { uploadDesignSVG } from "@/lib/gdrive";
 import { sfUpdate } from "@/lib/salesforce";
 import { getServerClient } from "@/lib/supabase";
+import { tryAdvanceWorkflow } from "@/lib/hero-workflow";
 import { Readable } from "stream";
 
 /**
@@ -51,7 +52,7 @@ export async function POST(request) {
     const baseSku = sku.replace(/-[67]D?$/, "").replace(/-D$/, "");
     const sb = getServerClient();
     const designUrl = results.supabase?.url || results.drive?.webViewLink || "";
-    await sb
+    const { data: heroRow } = await sb
       .from("heroes")
       .update({
         bracelet_design_created: true,
@@ -59,7 +60,13 @@ export async function POST(request) {
         design_status: "Complete",
         design_brief: `Design uploaded: ${designUrl}`,
       })
-      .eq("lineitem_sku", baseSku);
+      .eq("lineitem_sku", baseSku)
+      .select("id")
+      .maybeSingle();
+
+    if (heroRow?.id) {
+      await tryAdvanceWorkflow(heroRow.id, "design_received");
+    }
 
     // 4. Update Salesforce if live
     if (heroId && process.env.SF_LIVE === "true") {

@@ -3,6 +3,7 @@ import { updateItemStatus, createDonatedOrder, getActiveOrderItems, getOrderStat
 import { createOrder } from "@/lib/shipstation";
 import { getServerClient } from "@/lib/supabase";
 import { createGmailDraft } from "@/lib/gmail";
+import { tryAdvanceWorkflow } from "@/lib/hero-workflow";
 import {
   buildDesignNeededMessage,
   buildReadyToLaserMessage,
@@ -10,6 +11,16 @@ import {
   buildShippedMessage,
   createActionUrl,
 } from "@/lib/slack-actions";
+
+// Map order_items.production_status → hero workflow stage that should be reached
+// once the item enters that production status. Used by the orders PATCH handler
+// to keep the hero pipeline in sync with production reality.
+const PRODUCTION_TO_WORKFLOW = {
+  ready_to_laser: "approved_production",
+  in_production:  "lasering",
+  ready_to_ship:  "photographing",
+  shipped:        "shipped",
+};
 
 const SLACK_WEBHOOK = process.env.SLACK_SOP_WEBHOOK;
 // Per-person DM webhooks — notifications go to BOTH ops hub AND the person's DM
@@ -205,6 +216,25 @@ export async function PATCH(request) {
     const result = await updateItemStatus(itemId, status);
 
     if (result.success) {
+      // Advance the hero pipeline alongside the order pipeline.
+      // tryAdvanceWorkflow is best-effort and never moves backwards.
+      const targetStage = PRODUCTION_TO_WORKFLOW[status];
+      if (targetStage) {
+        try {
+          const sb = getServerClient();
+          const { data: item } = await sb
+            .from("order_items")
+            .select("hero_id")
+            .eq("id", itemId)
+            .maybeSingle();
+          if (item?.hero_id) {
+            await tryAdvanceWorkflow(item.hero_id, targetStage);
+          }
+        } catch (wfErr) {
+          console.warn("[orders.PATCH] workflow advance failed:", wfErr.message);
+        }
+      }
+
       const name = heroName || "Order item";
       if (status === "ready_to_laser") {
         // Notify Joseph with download + action links

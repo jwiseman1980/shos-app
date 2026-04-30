@@ -164,6 +164,20 @@ export async function POST(request) {
     return NextResponse.json({ error: insErr.message }, { status: 500 });
   }
 
+  // Set initial workflow stage. Wrapped in try/catch so creation still
+  // succeeds if the workflow_stage column hasn't been migrated yet.
+  try {
+    await sb
+      .from("heroes")
+      .update({
+        workflow_stage: "hero_created",
+        workflow_updated_at: new Date().toISOString(),
+      })
+      .eq("id", hero.id);
+  } catch (wfErr) {
+    console.warn("[heroes/create] workflow_stage init failed:", wfErr.message);
+  }
+
   let designRequestSent = false;
   try {
     const url = new URL("/api/heroes/request-design", request.url);

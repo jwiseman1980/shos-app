@@ -8,14 +8,15 @@ const NAV_SECTIONS = [
   {
     label: "Operations",
     items: [
-      { href: "/dashboard/today", label: "Feed" },
-      { href: "/pipelines",       label: "Pipelines" },
-      { href: "/email",           label: "Inbox" },
-      { href: "/orders",          label: "Orders" },
-      { href: "/production",      label: "Production" },
-      { href: "/laser",           label: "Laser" },
-      { href: "/designs",         label: "Designs" },
-      { href: "/shipping",        label: "Shipping" },
+      { href: "/dashboard/today",  label: "Feed" },
+      { href: "/pipelines",        label: "Pipelines" },
+      { href: "/heroes/workflow",  label: "Hero Workflow" },
+      { href: "/email",            label: "Inbox" },
+      { href: "/orders",           label: "Orders" },
+      { href: "/production",       label: "Production" },
+      { href: "/laser",            label: "Laser" },
+      { href: "/designs",          label: "Designs" },
+      { href: "/shipping",         label: "Shipping" },
     ],
   },
   {

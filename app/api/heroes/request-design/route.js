@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerClient } from "@/lib/supabase";
 import { postToSlack } from "@/lib/slack";
+import { tryAdvanceWorkflow } from "@/lib/hero-workflow";
 
 const RYAN_SLACK_USER_ID = "U0AMW4VSX9P";
 
@@ -76,6 +77,10 @@ export async function POST(request) {
 
   if (updErr) {
     console.warn("[request-design] hero update failed:", updErr.message);
+  }
+
+  if (slackOk) {
+    await tryAdvanceWorkflow(hero_id, "design_briefed");
   }
 
   return NextResponse.json({
