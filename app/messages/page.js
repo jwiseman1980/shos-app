@@ -62,6 +62,10 @@ export default async function FamilyMessagesPage({ searchParams }) {
   const eligibleCount = matchedGroups.filter((g) => g.eligible).length;
   const heroesWithContact = matchedGroups.filter((g) => g.familyContactEmail).length;
   const draftsCreated = matchedGroups.filter((g) => g.sentMessages > 0).length;
+  const pendingMessages = stats.newMessages + stats.readyToSend;
+  const heroesWithPending = matchedGroups.filter(
+    (g) => (g.newMessages + g.readyToSendMessages) > 0
+  ).length;
 
   // Safe volunteer list (strip password hashes before passing to client)
   const safeVolunteers = volunteers
@@ -82,27 +86,30 @@ export default async function FamilyMessagesPage({ searchParams }) {
           accent="var(--gold)"
         />
         <StatBlock
-          label="Heroes with Messages"
-          value={stats.heroesWithMessages}
-          note={`${heroesWithContact} have family contact`}
+          label="Delivered"
+          value={stats.sentMessages}
+          note={stats.totalMessages > 0
+            ? `${Math.round((stats.sentMessages / stats.totalMessages) * 100)}% of total`
+            : "—"}
+          accent="var(--status-green)"
+        />
+        <StatBlock
+          label="Pending"
+          value={pendingMessages}
+          note={`${stats.newMessages} new, ${stats.readyToSend} ready`}
+          accent="var(--status-orange)"
+        />
+        <StatBlock
+          label="Heroes with Pending"
+          value={heroesWithPending}
+          note={`of ${stats.heroesWithMessages} with messages`}
           accent="var(--status-blue)"
         />
         <StatBlock
           label="Eligible (6+)"
           value={eligibleCount}
-          note="Ready for delivery"
+          note={`${heroesWithContact} have family contact`}
           accent="var(--status-green)"
-        />
-        <StatBlock
-          label="Sent"
-          value={stats.sentMessages}
-          accent="var(--status-green)"
-        />
-        <StatBlock
-          label="Drafts Created"
-          value={draftsCreated}
-          note={`${draftsCreated} heroes delivered`}
-          accent="var(--status-purple)"
         />
         <StatBlock
           label="Unmatched"

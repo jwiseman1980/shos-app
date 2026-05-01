@@ -161,6 +161,7 @@ function HeroGroup({ group, senderEmail, senderName, onStatusChange, savingMap, 
   const [expanded, setExpanded] = useState(false);
   const [draftState, setDraftState] = useState(null); // null | "creating" | { draftId } | { error }
   const [approveAllState, setApproveAllState] = useState(null); // null | "approving" | "done"
+  const [markDeliveredState, setMarkDeliveredState] = useState(null); // null | "marking" | "done"
   const [outreachState, setOutreachState] = useState(null); // null | "loading" | "sending" | { draftsCreated, eligible } | { error }
   const [outreachStats, setOutreachStats] = useState(null); // { customers, alreadyMessaged, eligible }
 
@@ -225,6 +226,42 @@ function HeroGroup({ group, senderEmail, senderName, onStatusChange, savingMap, 
       setOutreachState({ error: err.message });
     }
   }, [group.braceletId, group.braceletName, senderEmail, senderName, outreachState, outreachStats]);
+
+  // Mark all undelivered messages (New + Ready to Send) as Sent.
+  // For when a draft was emailed externally and needs to be reconciled.
+  const handleMarkDelivered = useCallback(async () => {
+    const undeliveredIds = group.messages
+      .filter((m) => m.status !== "Sent" && m.status !== "Held")
+      .map((m) => m.sfId);
+
+    if (undeliveredIds.length === 0) return;
+
+    const heroLabel = group.braceletName || group.braceletSku || "this hero";
+    if (!window.confirm(
+      `Mark ${undeliveredIds.length} message${undeliveredIds.length === 1 ? "" : "s"} for ${heroLabel} as Delivered? Use this when the family was emailed outside the system.`
+    )) {
+      return;
+    }
+
+    setMarkDeliveredState("marking");
+    try {
+      const res = await fetch("/api/messages/update", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sfIds: undeliveredIds, status: "Sent" }),
+      });
+      const data = await res.json();
+      if (data.success || data.mock) {
+        undeliveredIds.forEach((id) => onStatusChange(id, "Sent", true));
+        setMarkDeliveredState("done");
+        setTimeout(() => setMarkDeliveredState(null), 2500);
+      } else {
+        setMarkDeliveredState(null);
+      }
+    } catch {
+      setMarkDeliveredState(null);
+    }
+  }, [group.messages, group.braceletName, group.braceletSku, onStatusChange]);
 
   // Approve all "New" messages
   const handleApproveAll = useCallback(async () => {
@@ -471,6 +508,36 @@ function HeroGroup({ group, senderEmail, senderName, onStatusChange, savingMap, 
                   </button>
                 )}
 
+                {/* Mark Delivered — bulk reconcile messages already sent externally */}
+                {(newCount + readyCount) > 0 && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleMarkDelivered(); }}
+                    disabled={markDeliveredState === "marking"}
+                    style={{
+                      ...BTN_STYLE,
+                      padding: "5px 12px",
+                      fontSize: 11,
+                      background: markDeliveredState === "done"
+                        ? "var(--status-green)22"
+                        : "var(--status-purple)18",
+                      color: markDeliveredState === "done"
+                        ? "var(--status-green)"
+                        : "var(--status-purple)",
+                      border: markDeliveredState === "done"
+                        ? "1px solid var(--status-green)44"
+                        : "1px solid var(--status-purple)44",
+                      opacity: markDeliveredState === "marking" ? 0.5 : 1,
+                    }}
+                    title="Mark all undelivered messages for this hero as Sent. Use when the family was emailed outside the system."
+                  >
+                    {markDeliveredState === "marking"
+                      ? "Marking..."
+                      : markDeliveredState === "done"
+                      ? "✓ Marked Delivered"
+                      : `Mark Delivered (${newCount + readyCount})`}
+                  </button>
+                )}
+
                 {/* Request Messages — outreach to bracelet customers */}
                 {group.braceletId && (
                   <button
@@ -596,6 +663,9 @@ export default function MessageTracker({ heroGroups, volunteers }) {
   // Local message status overrides (optimistic updates)
   const [statusOverrides, setStatusOverrides] = useState({});
 
+  // Hero name search (client-side filter)
+  const [search, setSearch] = useState("");
+
   // Load sender from localStorage on mount
   useEffect(() => {
     try {
@@ -666,6 +736,17 @@ export default function MessageTracker({ heroGroups, volunteers }) {
       status: statusOverrides[msg.sfId] || msg.status || "New",
     })),
   }));
+
+  // Apply hero-name search
+  const searchTerm = search.trim().toLowerCase();
+  const visibleGroups = searchTerm
+    ? groupsWithOverrides.filter((g) => {
+        const name = (g.braceletName || "").toLowerCase();
+        const sku = (g.braceletSku || "").toLowerCase();
+        const fam = (g.familyContactName || "").toLowerCase();
+        return name.includes(searchTerm) || sku.includes(searchTerm) || fam.includes(searchTerm);
+      })
+    : groupsWithOverrides;
 
   if (!heroGroups || heroGroups.length === 0) {
     return (
@@ -805,6 +886,48 @@ export default function MessageTracker({ heroGroups, volunteers }) {
         </div>
       )}
 
+      {/* Hero name search */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10, marginBottom: 12,
+      }}>
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by hero name, SKU, or family contact..."
+          style={{
+            flex: 1,
+            background: "var(--card-bg)",
+            border: "1px solid var(--card-border)",
+            borderRadius: "var(--radius-md)",
+            color: "var(--text-bright)",
+            fontSize: 13,
+            padding: "8px 12px",
+          }}
+        />
+        {searchTerm && (
+          <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
+            {visibleGroups.length} of {groupsWithOverrides.length} heroes
+          </span>
+        )}
+        {searchTerm && (
+          <button
+            onClick={() => setSearch("")}
+            style={{
+              background: "transparent",
+              border: "1px solid var(--card-border)",
+              borderRadius: 4,
+              color: "var(--text-dim)",
+              fontSize: 11,
+              padding: "4px 10px",
+              cursor: "pointer",
+            }}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
       {/* Hero Groups Table */}
       <div style={{ overflowX: "auto" }}>
         <table className="data-table" style={{ width: "100%" }}>
@@ -819,17 +942,25 @@ export default function MessageTracker({ heroGroups, volunteers }) {
             </tr>
           </thead>
           <tbody>
-            {groupsWithOverrides.map((group) => (
-              <HeroGroup
-                key={group.braceletId || "unmatched"}
-                group={group}
-                senderEmail={senderEmail}
-                senderName={senderName}
-                onStatusChange={handleStatusChange}
-                savingMap={savingMap}
-                lastSavedMap={lastSavedMap}
-              />
-            ))}
+            {visibleGroups.length === 0 ? (
+              <tr>
+                <td colSpan={6} style={{ padding: "24px", textAlign: "center", color: "var(--text-dim)", fontSize: 13 }}>
+                  No heroes match &ldquo;{search}&rdquo;.
+                </td>
+              </tr>
+            ) : (
+              visibleGroups.map((group) => (
+                <HeroGroup
+                  key={group.braceletId || "unmatched"}
+                  group={group}
+                  senderEmail={senderEmail}
+                  senderName={senderName}
+                  onStatusChange={handleStatusChange}
+                  savingMap={savingMap}
+                  lastSavedMap={lastSavedMap}
+                />
+              ))
+            )}
           </tbody>
         </table>
       </div>
