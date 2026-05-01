@@ -5,7 +5,8 @@ import DataCard from "@/components/DataCard";
 import StatBlock from "@/components/StatBlock";
 import AnniversaryTracker from "@/components/AnniversaryTracker";
 import PushToSlackButton from "@/components/PushToSlackButton";
-import { getAnniversariesByMonth } from "@/lib/data/heroes";
+import AutoAssignButton from "@/components/AutoAssignButton";
+import { getAnniversariesByMonth, getAnniversariesNext } from "@/lib/data/heroes";
 import { getVolunteers } from "@/lib/data/volunteers";
 import { getMonthName, getCurrentMonth, getCurrentYear, getDayOfMonth, yearsSince } from "@/lib/dates";
 import { getSessionUser } from "@/lib/auth";
@@ -35,16 +36,20 @@ function normalizeStatus(status) {
 export default async function AnniversariesPage({ searchParams }) {
   const params = await searchParams;
   const currentMonth = getCurrentMonth();
+  const view = params?.view === "upcoming" ? "upcoming" : params?.view === "month" ? "month" : "upcoming";
   const selectedMonth = params?.month ? parseInt(params.month, 10) : currentMonth;
   const statusFilter = params?.status || null;
   const volunteerFilter = params?.volunteer || null;
+  const lookaheadDays = 30;
 
   const monthName = getMonthName(selectedMonth);
   const year = getCurrentYear();
   const isCurrentMonth = selectedMonth === currentMonth;
 
-  // Load data
-  const allHeroes = await getAnniversariesByMonth(selectedMonth);
+  // Load data based on view mode
+  const allHeroes = view === "upcoming"
+    ? await getAnniversariesNext(lookaheadDays)
+    : await getAnniversariesByMonth(selectedMonth);
   const volunteers = await getVolunteers();
   const currentUser = await getSessionUser();
 
@@ -63,6 +68,12 @@ export default async function AnniversariesPage({ searchParams }) {
   if (statusFilter) {
     if (statusFilter === "unassigned") {
       heroes = heroes.filter((h) => !h.anniversaryAssignedTo);
+    } else if (statusFilter === "assigned") {
+      heroes = heroes.filter(
+        (h) => h.anniversaryAssignedTo && !["sent", "scheduled"].includes(normalizeStatus(h.anniversaryStatus))
+      );
+    } else if (statusFilter === "completed") {
+      heroes = heroes.filter((h) => ["sent", "scheduled"].includes(normalizeStatus(h.anniversaryStatus)));
     } else if (statusFilter === "no_contact") {
       heroes = heroes.filter((h) => !h.familyContactId);
     } else {
@@ -73,9 +84,12 @@ export default async function AnniversariesPage({ searchParams }) {
     heroes = heroes.filter((h) => h.anniversaryAssignedTo === volunteerFilter);
   }
 
-  // Sort by day of month and add computed fields for client
+  // Sort + add computed fields
   const sorted = [...heroes]
     .sort((a, b) => {
+      if (view === "upcoming") {
+        return (a.daysUntil ?? 999) - (b.daysUntil ?? 999);
+      }
       return (getDayOfMonth(a.memorialDate) || a.anniversaryDay || 0) -
         (getDayOfMonth(b.memorialDate) || b.anniversaryDay || 0);
     })
@@ -85,65 +99,71 @@ export default async function AnniversariesPage({ searchParams }) {
         dayOfMonth: getDayOfMonth(hero.memorialDate) || hero.anniversaryDay || 0,
         years: yearsSince(hero.memorialDate),
         needsResearch: !hero.familyContactId,
+        anniversaryMonthName: hero.anniversaryMonth ? getMonthName(hero.anniversaryMonth) : null,
       };
     });
 
-  // Auto-create research tasks for heroes with no family contact
-  // Only creates if no existing open task for this hero+month
-  const researchHeroes = sorted.filter(
-    (h) => normalizeStatus(h.anniversaryStatus) === "research"
-  );
-  if (researchHeroes.length > 0) {
-    try {
-      const sb = getServerClient();
-      const heroIds = researchHeroes.map((h) => h.id).filter(Boolean);
+  // Auto-create research tasks for heroes with no family contact (month view only;
+  // upcoming view spans months and re-runs daily — keep the existing per-month behavior).
+  if (view === "month") {
+    const researchHeroes = sorted.filter(
+      (h) => normalizeStatus(h.anniversaryStatus) === "research"
+    );
+    if (researchHeroes.length > 0) {
+      try {
+        const sb = getServerClient();
+        const heroIds = researchHeroes.map((h) => h.id).filter(Boolean);
 
-      // Check which heroes already have open research tasks
-      const { data: existingTasks } = await sb
-        .from("tasks")
-        .select("hero_id")
-        .in("hero_id", heroIds)
-        .in("status", ["backlog", "todo", "in_progress"])
-        .eq("domain", "family");
+        const { data: existingTasks } = await sb
+          .from("tasks")
+          .select("hero_id")
+          .in("hero_id", heroIds)
+          .in("status", ["backlog", "todo", "in_progress"])
+          .eq("domain", "family");
 
-      const existingHeroIds = new Set((existingTasks || []).map((t) => t.hero_id));
+        const existingHeroIds = new Set((existingTasks || []).map((t) => t.hero_id));
 
-      // Create tasks for heroes that don't have one yet
-      const newTasks = researchHeroes
-        .filter((h) => h.id && !existingHeroIds.has(h.id))
-        .map((h) => ({
-          title: `Research family contact — ${h.name}`,
-          description: `No family contact on file for ${h.name}. Find contact info so the anniversary email can be sent. Memorial date: ${getMonthName(selectedMonth)} ${h.dayOfMonth}.`,
-          status: "todo",
-          priority: "high",
-          role: "ed",
-          domain: "family",
-          hero_id: h.id,
-          tags: ["anniversary", "research"],
-        }));
+        const newTasks = researchHeroes
+          .filter((h) => h.id && !existingHeroIds.has(h.id))
+          .map((h) => ({
+            title: `Research family contact — ${h.name}`,
+            description: `No family contact on file for ${h.name}. Find contact info so the anniversary email can be sent. Memorial date: ${getMonthName(selectedMonth)} ${h.dayOfMonth}.`,
+            status: "todo",
+            priority: "high",
+            role: "ed",
+            domain: "family",
+            hero_id: h.id,
+            tags: ["anniversary", "research"],
+          }));
 
-      if (newTasks.length > 0) {
-        await sb.from("tasks").insert(newTasks);
+        if (newTasks.length > 0) {
+          await sb.from("tasks").insert(newTasks);
+        }
+      } catch (taskErr) {
+        console.warn("[anniversaries] Auto-task creation failed:", taskErr.message);
       }
-    } catch (taskErr) {
-      console.warn("[anniversaries] Auto-task creation failed:", taskErr.message);
     }
   }
 
-  // Simple stats: Sent / Scheduled / Not Sent
-  const totalThisMonth = sorted.length;
-  const sentCount = sorted.filter((h) => normalizeStatus(h.anniversaryStatus) === "sent").length;
-  const scheduledCount = sorted.filter((h) => normalizeStatus(h.anniversaryStatus) === "scheduled").length;
-  const notSentCount = totalThisMonth - sentCount - scheduledCount;
-  const assignedCount = sorted.filter((h) => h.anniversaryAssignedTo).length;
-  const researchCount = sorted.filter((h) => h.needsResearch && normalizeStatus(h.anniversaryStatus) === "not_sent").length;
+  // Stats
+  const totalThisView = sorted.length;
+  const totalAll = allHeroes.length;
+  const sentCount = allHeroes.filter((h) => normalizeStatus(h.anniversaryStatus) === "sent").length;
+  const scheduledCount = allHeroes.filter((h) => normalizeStatus(h.anniversaryStatus) === "scheduled").length;
   const completedCount = sentCount + scheduledCount;
+  const assignedCount = allHeroes.filter(
+    (h) => h.anniversaryAssignedTo && !["sent", "scheduled"].includes(normalizeStatus(h.anniversaryStatus))
+  ).length;
+  const unassignedCount = allHeroes.filter((h) => !h.anniversaryAssignedTo).length;
+  const researchCount = allHeroes.filter(
+    (h) => !h.familyContactId && normalizeStatus(h.anniversaryStatus) !== "sent"
+  ).length;
 
   const today = new Date().getDate();
 
   // Build filter URL helper
   function filterUrl(overrides = {}) {
-    const p = { month: selectedMonth };
+    const p = { view, month: selectedMonth };
     if (statusFilter) p.status = statusFilter;
     if (volunteerFilter) p.volunteer = volunteerFilter;
     Object.assign(p, overrides);
@@ -154,61 +174,88 @@ export default async function AnniversariesPage({ searchParams }) {
     return `/anniversaries${qs ? "?" + qs : ""}`;
   }
 
+  const subtitle = view === "upcoming"
+    ? `Next ${lookaheadDays} days — ${totalAll} ${totalAll === 1 ? "remembrance" : "remembrances"}`
+    : `${monthName} ${year} — ${totalAll} remembrances this month`;
+
   return (
     <PageShell
       title="Anniversary Email Tracker"
-      subtitle={`${monthName} ${year} — ${totalThisMonth} remembrances this month`}
-      action={<PushToSlackButton />}
-    >
-      {/* Month Selector */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          Month:
+      subtitle={subtitle}
+      action={
+        <span style={{ display: "inline-flex", gap: 8, flexWrap: "wrap" }}>
+          {view === "upcoming" && unassignedCount > 0 && (
+            <AutoAssignButton days={lookaheadDays} />
+          )}
+          <PushToSlackButton />
         </span>
-        {MONTH_OPTIONS.map((m) => (
-          <Link
-            key={m.value}
-            href={filterUrl({ month: m.value, status: statusFilter, volunteer: volunteerFilter })}
-            className={m.value === selectedMonth ? "btn btn-primary" : "btn btn-ghost"}
-            style={{ padding: "4px 10px", fontSize: 12 }}
-          >
-            {m.label.slice(0, 3)}
-          </Link>
-        ))}
+      }
+    >
+      {/* View Mode Toggle */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          View:
+        </span>
+        <Link
+          href={filterUrl({ view: "upcoming", month: undefined })}
+          className={view === "upcoming" ? "btn btn-primary" : "btn btn-ghost"}
+          style={{ padding: "4px 12px", fontSize: 12 }}
+        >
+          Next {lookaheadDays} Days
+        </Link>
+        <Link
+          href={filterUrl({ view: "month", month: currentMonth })}
+          className={view === "month" ? "btn btn-primary" : "btn btn-ghost"}
+          style={{ padding: "4px 12px", fontSize: 12 }}
+        >
+          By Month
+        </Link>
       </div>
+
+      {/* Month Selector — only when in month view */}
+      {view === "month" && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            Month:
+          </span>
+          {MONTH_OPTIONS.map((m) => (
+            <Link
+              key={m.value}
+              href={filterUrl({ month: m.value })}
+              className={m.value === selectedMonth ? "btn btn-primary" : "btn btn-ghost"}
+              style={{ padding: "4px 10px", fontSize: 12 }}
+            >
+              {m.label.slice(0, 3)}
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* Summary Stats */}
       <div className="stat-grid">
         <StatBlock
           label="Total"
-          value={totalThisMonth}
-          note={isCurrentMonth ? "Current month" : monthName}
+          value={totalAll}
+          note={view === "upcoming" ? `In next ${lookaheadDays} days` : isCurrentMonth ? "Current month" : monthName}
           accent="var(--gold)"
         />
         <StatBlock
-          label="Sent"
-          value={sentCount}
-          note={totalThisMonth > 0 ? `${Math.round((completedCount / totalThisMonth) * 100)}% done` : "--"}
-          accent="var(--status-green)"
-        />
-        {scheduledCount > 0 && (
-          <StatBlock
-            label="Scheduled"
-            value={scheduledCount}
-            note="In Gmail, awaiting send"
-            accent="var(--status-blue)"
-          />
-        )}
-        <StatBlock
-          label="Not Sent"
-          value={notSentCount}
-          accent="var(--status-orange)"
+          label="Unassigned"
+          value={unassignedCount}
+          note={unassignedCount === 0 ? "All covered" : "Need a volunteer"}
+          accent={unassignedCount > 0 ? "var(--status-orange)" : "var(--status-green)"}
         />
         <StatBlock
           label="Assigned"
           value={assignedCount}
-          note={`${totalThisMonth - assignedCount} unassigned`}
+          note={`${emailVolunteers.length} volunteers eligible`}
           accent="var(--status-purple)"
+        />
+        <StatBlock
+          label="Completed"
+          value={completedCount}
+          note={totalAll > 0 ? `${Math.round((completedCount / totalAll) * 100)}% done` : "--"}
+          accent="var(--status-green)"
         />
         {researchCount > 0 && (
           <StatBlock
@@ -221,20 +268,20 @@ export default async function AnniversariesPage({ searchParams }) {
       </div>
 
       {/* Progress Bar */}
-      {totalThisMonth > 0 && (
+      {totalAll > 0 && (
         <div style={{ marginBottom: 24 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
             <span style={{ fontSize: 12, color: "var(--text-dim)" }}>
               Completion Progress
             </span>
             <span style={{ fontSize: 12, color: "var(--text-dim)" }}>
-              {completedCount}/{totalThisMonth}
+              {completedCount}/{totalAll}
             </span>
           </div>
           <div className="progress-bar">
             <div
               className="progress-fill"
-              style={{ width: `${Math.round((completedCount / totalThisMonth) * 100)}%` }}
+              style={{ width: `${Math.round((completedCount / totalAll) * 100)}%` }}
             />
           </div>
         </div>
@@ -242,7 +289,7 @@ export default async function AnniversariesPage({ searchParams }) {
 
       {/* Filters */}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
             Status:
           </span>
@@ -254,10 +301,9 @@ export default async function AnniversariesPage({ searchParams }) {
             All
           </Link>
           {[
-            { key: "not_sent", label: "Not Sent" },
-            { key: "scheduled", label: "Scheduled" },
-            { key: "sent", label: "Sent" },
             { key: "unassigned", label: "Unassigned" },
+            { key: "assigned", label: "Assigned" },
+            { key: "completed", label: "Completed" },
             { key: "no_contact", label: "No Contact" },
           ].map((s) => (
             <Link
@@ -272,7 +318,7 @@ export default async function AnniversariesPage({ searchParams }) {
         </div>
 
         {assignedVolunteers.length > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
               Volunteer:
             </span>
@@ -301,7 +347,7 @@ export default async function AnniversariesPage({ searchParams }) {
       {(statusFilter || volunteerFilter) && (
         <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 12, color: "var(--text-dim)" }}>
-            Showing {sorted.length} of {totalThisMonth} heroes
+            Showing {sorted.length} of {totalAll} heroes
           </span>
           <Link
             href={filterUrl({ status: null, volunteer: null })}
@@ -313,10 +359,18 @@ export default async function AnniversariesPage({ searchParams }) {
       )}
 
       {/* Interactive Hero Table */}
-      <DataCard title={`${monthName} Anniversary Calendar — ${sorted.length} ${sorted.length === 1 ? "hero" : "heroes"}`}>
-        {totalThisMonth === 0 ? (
+      <DataCard
+        title={
+          view === "upcoming"
+            ? `Upcoming Anniversaries — ${sorted.length} ${sorted.length === 1 ? "hero" : "heroes"}`
+            : `${monthName} Anniversary Calendar — ${sorted.length} ${sorted.length === 1 ? "hero" : "heroes"}`
+        }
+      >
+        {totalAll === 0 ? (
           <p style={{ color: "var(--text-dim)", fontSize: 13, padding: "20px 0", textAlign: "center" }}>
-            No heroes with anniversaries in {monthName}.
+            {view === "upcoming"
+              ? `No anniversaries in the next ${lookaheadDays} days.`
+              : `No heroes with anniversaries in ${monthName}.`}
           </p>
         ) : (
           <AnniversaryTracker
@@ -326,6 +380,7 @@ export default async function AnniversariesPage({ searchParams }) {
             volunteers={emailVolunteers}
             today={today}
             currentUser={currentUser}
+            viewMode={view}
           />
         )}
       </DataCard>
@@ -346,7 +401,7 @@ export default async function AnniversariesPage({ searchParams }) {
               1. Assign (App)
             </div>
             <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
-              Use the dropdown to assign a volunteer. They get a Slack DM with instructions.
+              Use the dropdown per row, or hit Auto-assign to distribute the unassigned list across all volunteers in one click.
             </div>
           </div>
           <div
@@ -362,7 +417,7 @@ export default async function AnniversariesPage({ searchParams }) {
               2. Draft & Send (Slack)
             </div>
             <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
-              Volunteers click "Create Draft" in their Slack DM, review in Gmail, then send or schedule.
+              Volunteers click Create Draft in their Slack DM, review in Gmail, then send or schedule.
             </div>
           </div>
           <div
@@ -378,7 +433,7 @@ export default async function AnniversariesPage({ searchParams }) {
               3. Mark Done (Slack)
             </div>
             <div style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.5 }}>
-              After sending, volunteers click "Sent" or "Scheduled" in Slack. Status updates here automatically.
+              After sending, volunteers click Sent or Scheduled in Slack. Status updates here automatically.
             </div>
           </div>
         </div>
