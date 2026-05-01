@@ -20,15 +20,19 @@ function statusLabel(status) {
   return "Not Sent";
 }
 
-function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onUpdate, currentUser }) {
+/**
+ * Shared row hook — keeps state and persistence identical between
+ * the desktop table row and the mobile card.
+ */
+function useHeroRowState(hero, onUpdate, currentUser, years) {
   const [status, setStatus] = useState(hero.anniversaryStatus || "Not Started");
   const [assignedTo, setAssignedTo] = useState(hero.anniversaryAssignedTo || "");
   const [notes, setNotes] = useState(hero.anniversaryNotes || "");
-  const [editingNotes, setEditingNotes] = useState(false);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [draftingEmail, setDraftingEmail] = useState(false);
   const [draftResult, setDraftResult] = useState(null);
+
   const save = useCallback(async (fields) => {
     setSaving(true);
     setLastSaved(null);
@@ -53,21 +57,19 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
     }
   }, [hero.sfId, onUpdate]);
 
-  const handleAssignChange = (e) => {
-    const newAssign = e.target.value;
-    setAssignedTo(newAssign);
-    save({ assignedToName: newAssign || null });
+  const handleAssignChange = (val) => {
+    setAssignedTo(val);
+    save({ assignedToName: val || null });
   };
 
-  const handleStatusChange = (e) => {
-    const newStatus = e.target.value;
-    setStatus(newStatus);
-    save({ status: newStatus });
+  const handleStatusChange = (val) => {
+    setStatus(val);
+    save({ status: val });
   };
 
-  const handleNotesSave = () => {
-    setEditingNotes(false);
-    save({ notes });
+  const handleNotesSave = (val) => {
+    setNotes(val);
+    save({ notes: val });
   };
 
   const handleDraftEmail = useCallback(async () => {
@@ -105,6 +107,23 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
     }
   }, [hero, years, currentUser, onUpdate]);
 
+  return {
+    status, assignedTo, notes, saving, lastSaved, draftingEmail, draftResult,
+    handleAssignChange, handleStatusChange, handleNotesSave, handleDraftEmail,
+  };
+}
+
+function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onUpdate, currentUser, viewMode, daysUntil, anniversaryMonthName }) {
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [draftLocalNotes, setDraftLocalNotes] = useState(hero.anniversaryNotes || "");
+  const {
+    status, assignedTo, notes, saving, lastSaved, draftingEmail, draftResult,
+    handleAssignChange, handleStatusChange, handleNotesSave, handleDraftEmail,
+  } = useHeroRowState(hero, onUpdate, currentUser, years);
+
+  // Keep local notes-edit buffer in sync with persisted notes
+  useEffect(() => { setDraftLocalNotes(notes); }, [notes]);
+
   const normStatus = normalizeStatus(status);
 
   return (
@@ -128,8 +147,33 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
           whiteSpace: "nowrap",
         }}
       >
-        {monthName.slice(0, 3)} {day}
-        {isToday && (
+        {viewMode === "upcoming"
+          ? `${(anniversaryMonthName || monthName).slice(0, 3)} ${day}`
+          : `${monthName.slice(0, 3)} ${day}`}
+        {viewMode === "upcoming" && daysUntil != null && (
+          <span
+            style={{
+              fontSize: 10,
+              marginLeft: 6,
+              fontWeight: 600,
+              color:
+                daysUntil === 0
+                  ? "var(--gold)"
+                  : daysUntil <= 7
+                  ? "var(--status-red)"
+                  : daysUntil <= 14
+                  ? "var(--status-orange)"
+                  : "var(--text-dim)",
+            }}
+          >
+            {daysUntil === 0
+              ? "TODAY"
+              : daysUntil === 1
+              ? "tomorrow"
+              : `${daysUntil}d`}
+          </span>
+        )}
+        {viewMode !== "upcoming" && isToday && (
           <span style={{ fontSize: 10, marginLeft: 6, color: "var(--gold)", fontWeight: 600 }}>
             TODAY
           </span>
@@ -158,7 +202,7 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
       <td>
         <select
           value={assignedTo}
-          onChange={handleAssignChange}
+          onChange={(e) => handleAssignChange(e.target.value)}
           style={{
             background: "var(--bg)",
             color: assignedTo ? "var(--text-bright)" : "var(--text-dim)",
@@ -184,7 +228,7 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <select
             value={statusLabel(status)}
-            onChange={handleStatusChange}
+            onChange={(e) => handleStatusChange(e.target.value)}
             style={{
               background: "var(--bg)",
               color:
@@ -218,10 +262,13 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
           <div style={{ display: "flex", gap: 4 }}>
             <input
               type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              value={draftLocalNotes}
+              onChange={(e) => setDraftLocalNotes(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") handleNotesSave();
+                if (e.key === "Enter") {
+                  setEditingNotes(false);
+                  handleNotesSave(draftLocalNotes);
+                }
                 if (e.key === "Escape") setEditingNotes(false);
               }}
               autoFocus
@@ -237,7 +284,7 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
               }}
             />
             <button
-              onClick={handleNotesSave}
+              onClick={() => { setEditingNotes(false); handleNotesSave(draftLocalNotes); }}
               style={{
                 background: "var(--gold)",
                 color: "#000",
@@ -318,6 +365,106 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
   );
 }
 
+function HeroCard({ hero, day, years, monthName, anniversaryMonthName, daysUntil, viewMode, volunteers, onUpdate, currentUser }) {
+  const {
+    status, assignedTo, notes, saving, lastSaved, draftingEmail, draftResult,
+    handleAssignChange, handleStatusChange, handleNotesSave, handleDraftEmail,
+  } = useHeroRowState(hero, onUpdate, currentUser, years);
+
+  const normStatus = normalizeStatus(status);
+  const dateLabel = `${(anniversaryMonthName || monthName).slice(0, 3)} ${day}`;
+  const daysLabel = daysUntil == null ? null
+    : daysUntil === 0 ? "TODAY"
+    : daysUntil === 1 ? "Tomorrow"
+    : `${daysUntil} days away`;
+  const daysColor = daysUntil === 0 ? "var(--gold)"
+    : daysUntil <= 7 ? "var(--status-red)"
+    : daysUntil <= 14 ? "var(--status-orange)"
+    : "var(--text-dim)";
+
+  return (
+    <div className="anniv-card">
+      <div className="anniv-card-header">
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="anniv-card-title">
+            {(hero.fullName || hero.name || "").replace(/\s*\(.*?\)\s*/, "")}
+          </div>
+          <div className="anniv-card-meta">
+            {[hero.serviceCode, years != null ? `${years} yrs` : null, hero.sku].filter(Boolean).join(" · ")}
+          </div>
+        </div>
+        <div className="anniv-card-date">
+          {dateLabel}
+          {viewMode === "upcoming" && daysLabel && (
+            <span className="anniv-card-days" style={{ color: daysColor }}>
+              {daysLabel}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <span className={`anniv-card-status-pill anniv-status-${normStatus}`}>
+          {statusLabel(status)}
+        </span>
+        {hero.familyContactId ? (
+          <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
+            Contact: {hero.familyContactName || "on file"}
+          </span>
+        ) : (
+          <span className="anniv-card-status-pill" style={{ background: "rgba(245, 158, 11, 0.12)", color: "var(--status-orange)" }}>
+            Research needed
+          </span>
+        )}
+        {saving && <span style={{ fontSize: 10, color: "var(--gold)" }}>saving…</span>}
+        {lastSaved === "saved" && <span style={{ fontSize: 10, color: "var(--status-green)" }}>saved</span>}
+      </div>
+
+      <div className="anniv-card-row">
+        <span className="anniv-card-label">Assign to</span>
+        <select
+          className="anniv-card-select"
+          value={assignedTo}
+          onChange={(e) => handleAssignChange(e.target.value)}
+        >
+          <option value="">Unassigned</option>
+          {volunteers.map((v) => (
+            <option key={v.name} value={v.name}>{v.name}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="anniv-card-row">
+        <span className="anniv-card-label">Status</span>
+        <select
+          className="anniv-card-select"
+          value={statusLabel(status)}
+          onChange={(e) => handleStatusChange(e.target.value)}
+        >
+          {STATUS_OPTIONS.map((o) => (
+            <option key={o} value={o}>{o}</option>
+          ))}
+        </select>
+      </div>
+
+      {hero.familyContactEmail && normStatus !== "sent" && (
+        <div className="anniv-card-actions">
+          <button
+            className="anniv-card-btn"
+            onClick={handleDraftEmail}
+            disabled={draftingEmail || draftResult === "drafted"}
+          >
+            {draftingEmail ? "Drafting…"
+              : draftResult === "drafted" ? "✓ Drafted"
+              : draftResult === "error" ? "Error — retry"
+              : "Draft email"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AnniversaryTracker({
   heroes,
   monthName,
@@ -325,6 +472,7 @@ export default function AnniversaryTracker({
   volunteers,
   today,
   currentUser,
+  viewMode = "month",
 }) {
   const [heroData, setHeroData] = useState(heroes);
 
@@ -356,7 +504,7 @@ export default function AnniversaryTracker({
   }
 
   return (
-    <div style={{ overflowX: "auto" }}>
+    <div>
       {/* Workflow note */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, padding: "8px 0" }}>
         <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
@@ -364,10 +512,34 @@ export default function AnniversaryTracker({
         </span>
       </div>
 
+      {/* Mobile: card list */}
+      <div className="anniv-card-list">
+        {heroData.map((hero) => {
+          const day = hero.anniversaryDay || hero.dayOfMonth;
+          return (
+            <HeroCard
+              key={`card-${hero.sfId}`}
+              hero={hero}
+              day={day}
+              years={hero.years}
+              monthName={monthName}
+              anniversaryMonthName={hero.anniversaryMonthName}
+              daysUntil={hero.daysUntil}
+              viewMode={viewMode}
+              volunteers={volunteers}
+              onUpdate={handleUpdate}
+              currentUser={currentUser}
+            />
+          );
+        })}
+      </div>
+
+      {/* Desktop: data table */}
+      <div className="anniv-table-wrap">
       <table className="data-table">
         <thead>
           <tr>
-            <th>Day</th>
+            <th>{viewMode === "upcoming" ? "Date" : "Day"}</th>
             <th>Hero</th>
             <th>Branch</th>
             <th>Years</th>
@@ -380,8 +552,10 @@ export default function AnniversaryTracker({
         <tbody>
           {heroData.map((hero) => {
             const day = hero.anniversaryDay || hero.dayOfMonth;
-            const isPast = isCurrentMonth && day < today;
-            const isToday = isCurrentMonth && day === today;
+            const isPast = viewMode === "upcoming" ? false : isCurrentMonth && day < today;
+            const isToday = viewMode === "upcoming"
+              ? hero.daysUntil === 0
+              : isCurrentMonth && day === today;
 
             return (
               <HeroRow
@@ -395,11 +569,15 @@ export default function AnniversaryTracker({
                 volunteers={volunteers}
                 onUpdate={handleUpdate}
                 currentUser={currentUser}
+                viewMode={viewMode}
+                daysUntil={hero.daysUntil}
+                anniversaryMonthName={hero.anniversaryMonthName}
               />
             );
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
