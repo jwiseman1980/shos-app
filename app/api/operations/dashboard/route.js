@@ -138,6 +138,7 @@ export async function GET() {
     const { data: inventoryRows } = await sb
       .from("heroes")
       .select("id, name, branch, lineitem_sku, on_hand_7in, on_hand_6in, total_on_hand")
+      .eq("active_listing", true)
       .gt("total_on_hand", 0)
       .order("total_on_hand", { ascending: false })
       .limit(25);
