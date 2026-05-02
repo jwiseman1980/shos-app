@@ -335,9 +335,16 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
               Research Needed
             </span>
           ) : (
-            <span style={{ fontSize: 11, color: "var(--text-dim)" }} title={hero.familyContactEmail || ""}>
-              {hero.familyContactName || "On file"}
-            </span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              <span style={{ fontSize: 11, color: "var(--text-dim)" }} title={hero.familyContactEmail || ""}>
+                {hero.familyContactName || "On file"}
+              </span>
+              {hero.familyContactRelationship && (
+                <span style={{ fontSize: 10, color: "var(--text-dim)", fontStyle: "italic" }}>
+                  {hero.familyContactRelationship}
+                </span>
+              )}
+            </div>
           )}
           {hero.familyContactEmail && normStatus !== "sent" && (
             <button
@@ -410,6 +417,11 @@ function HeroCard({ hero, day, years, monthName, anniversaryMonthName, daysUntil
         {hero.familyContactId ? (
           <span style={{ fontSize: 11, color: "var(--text-dim)" }}>
             Contact: {hero.familyContactName || "on file"}
+            {hero.familyContactRelationship && (
+              <span style={{ fontStyle: "italic", marginLeft: 4 }}>
+                ({hero.familyContactRelationship})
+              </span>
+            )}
           </span>
         ) : (
           <span className="anniv-card-status-pill" style={{ background: "rgba(245, 158, 11, 0.12)", color: "var(--status-orange)" }}>
