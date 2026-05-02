@@ -27,7 +27,7 @@ export async function POST(request) {
         id, sf_id, message, from_name, from_email, status, consent_to_share,
         hero:heroes!hero_id(
           id, name, lineitem_sku,
-          family_contact:contacts!family_contact_id(first_name, last_name, email)
+          family_contact:contacts_legacy!family_contact_id(first_name, last_name, email)
         )
       `)
       .in("status", ["ready_to_send", "new"]);

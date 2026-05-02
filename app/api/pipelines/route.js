@@ -177,7 +177,7 @@ async function getAnniversariesPipeline() {
     .select(`
       id, sf_id, name, first_name, last_name, rank,
       memorial_month, memorial_day, anniversary_status,
-      family_contact:contacts!family_contact_id(first_name, last_name, email)
+      family_contact:contacts_legacy!family_contact_id(first_name, last_name, email)
     `)
     .eq("active_listing", true)
     .not("memorial_month", "is", null)

@@ -654,7 +654,7 @@ async function getUpcomingAnniversaries() {
         id, name, first_name, last_name, rank,
         memorial_month, memorial_day, memorial_date,
         anniversary_status, lineitem_sku,
-        family_contact:contacts!family_contact_id(first_name, last_name, email)
+        family_contact:contacts_legacy!family_contact_id(first_name, last_name, email)
       `)
       .eq("active_listing", true)
       .not("memorial_month", "is", null)

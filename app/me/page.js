@@ -54,7 +54,7 @@ export default async function MyAssignmentsPage() {
         id, sf_id, name, rank, first_name, last_name, branch,
         memorial_date, memorial_month, memorial_day,
         anniversary_status, anniversary_notes, anniversary_completed_date,
-        family_contact:contacts!family_contact_id(first_name, last_name, email)
+        family_contact:contacts_legacy!family_contact_id(first_name, last_name, email)
       `)
       .eq("anniversary_assigned_to", userId)
       .eq("active_listing", true);
@@ -105,7 +105,7 @@ export default async function MyAssignmentsPage() {
         id, sf_id, name, rank, first_name, last_name, branch,
         memorial_date, memorial_month, memorial_day,
         anniversary_status, anniversary_assigned_to,
-        family_contact:contacts!family_contact_id(first_name, last_name, email)
+        family_contact:contacts_legacy!family_contact_id(first_name, last_name, email)
       `)
       .eq("active_listing", true)
       .eq("memorial_type", "individual")
