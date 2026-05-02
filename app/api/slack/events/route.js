@@ -76,7 +76,7 @@ async function handleMessage(event) {
       .select(`
         id, name, rank, branch, memorial_date, memorial_month, memorial_day,
         anniversary_status,
-        family_contact:contacts!family_contact_id(first_name, last_name, email)
+        family_contact:contacts_legacy!family_contact_id(first_name, last_name, email)
       `)
       .eq("anniversary_assigned_to", dbUser.id)
       .not("anniversary_status", "in", "(sent,scheduled)")

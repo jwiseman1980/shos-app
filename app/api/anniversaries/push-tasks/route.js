@@ -42,7 +42,7 @@ export async function POST(request) {
       .select(`
         id, name, rank, branch, memorial_date, memorial_month, memorial_day,
         anniversary_status, anniversary_assigned_to,
-        family_contact:contacts!family_contact_id(first_name, last_name, email),
+        family_contact:contacts_legacy!family_contact_id(first_name, last_name, email),
         assigned_user:users!anniversary_assigned_to(id, name, email)
       `)
       .not("anniversary_status", "in", "(sent,scheduled)")

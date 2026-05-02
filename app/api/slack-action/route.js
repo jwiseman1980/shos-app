@@ -168,7 +168,7 @@ async function handleCreateDraft(params) {
       .select(`
         id, sf_id, name, rank, branch, memorial_date, memorial_month, memorial_day,
         anniversary_assigned_to,
-        family_contact:contacts!family_contact_id(first_name, last_name, email),
+        family_contact:contacts_legacy!family_contact_id(first_name, last_name, email),
         assigned_user:users!anniversary_assigned_to(name, email)
       `)
       .eq("id", heroId)

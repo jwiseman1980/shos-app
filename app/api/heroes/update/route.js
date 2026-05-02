@@ -178,7 +178,7 @@ export async function PATCH(request) {
       .from("heroes")
       .select(`
         id, name, rank, first_name, last_name, memorial_date, memorial_month, memorial_day, family_contact_id,
-        family_contact:contacts!family_contact_id(id, first_name, last_name, email)
+        family_contact:contacts_legacy!family_contact_id(id, first_name, last_name, email)
       `)
       .eq("sf_id", sfId)
       .single();

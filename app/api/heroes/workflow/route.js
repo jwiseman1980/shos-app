@@ -25,7 +25,7 @@ export async function GET(request) {
       id, name, first_name, last_name, rank, lineitem_sku, branch,
       workflow_stage, workflow_updated_at, workflow_blockers,
       design_status, has_graphic_design, active_listing,
-      family_contact:contacts!family_contact_id(first_name, last_name, email)
+      family_contact:contacts_legacy!family_contact_id(first_name, last_name, email)
     `)
     .not("workflow_stage", "is", null)
     .order("workflow_updated_at", { ascending: false });
