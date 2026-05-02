@@ -45,6 +45,7 @@ export async function POST(request) {
         family_contact:contacts_legacy!family_contact_id(first_name, last_name, email),
         assigned_user:users!anniversary_assigned_to(id, name, email)
       `)
+      .eq("active_listing", true)
       .not("anniversary_status", "in", "(sent,scheduled)")
       .not("anniversary_assigned_to", "is", null)
       .order("memorial_month", { ascending: true })

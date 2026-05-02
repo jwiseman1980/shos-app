@@ -22,6 +22,7 @@ export async function GET() {
         .from("heroes")
         .select("id, anniversary_status")
         .eq("memorial_month", month)
+        .eq("active_listing", true)
         .catch(() => ({ data: [] })),
     ]);
 
