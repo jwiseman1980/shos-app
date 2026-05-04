@@ -20,6 +20,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 const CURSOR_KEY = "sf_contacts_last_sync";
+const FM_CURSOR_KEY = "sf_family_messages_last_sync";
 
 // USA-RIMER hero UUID in Supabase — hardcoded since it's a stable known ID
 const RIMER_HERO_ID = "5f776579-d76b-425b-944e-3efbf4a7302a";
@@ -43,12 +44,12 @@ function isAuthorized(request) {
 
 // ── Cursor state ───────────────────────────────────────────────────────────────
 
-async function getLastSyncTime(sb) {
+async function getCursor(sb, key) {
   try {
     const { data } = await sb
       .from("system_config")
       .select("value")
-      .eq("key", CURSOR_KEY)
+      .eq("key", key)
       .limit(1)
       .single();
     return data?.value ?? null;
@@ -57,15 +58,18 @@ async function getLastSyncTime(sb) {
   }
 }
 
-async function setLastSyncTime(sb, iso) {
+async function setCursor(sb, key, iso) {
   try {
     await sb
       .from("system_config")
-      .upsert({ key: CURSOR_KEY, value: iso }, { onConflict: "key" });
+      .upsert({ key, value: iso }, { onConflict: "key" });
   } catch (e) {
-    console.warn("[sf-sync] Could not persist cursor:", e.message);
+    console.warn(`[sf-sync] Could not persist cursor ${key}:`, e.message);
   }
 }
+
+const getLastSyncTime = (sb) => getCursor(sb, CURSOR_KEY);
+const setLastSyncTime = (sb, iso) => setCursor(sb, CURSOR_KEY, iso);
 
 // ── Contact upsert ─────────────────────────────────────────────────────────────
 
@@ -195,6 +199,101 @@ async function querySFAssociations() {
   return { records: [], roleField: null };
 }
 
+// ── Family Messages backup sync ────────────────────────────────────────────────
+//
+// The Squarespace orders cron is the primary path for inserting tribute
+// messages into family_messages. This step is a weekly safety net that pulls
+// any Family_Message__c records modified in Salesforce — covers messages
+// hand-entered in SF, edits to existing tribute records, and any orders the
+// real-time cron missed (API outage, schema drift, etc.).
+
+async function querySFFamilyMessages(lastSync) {
+  let soql = [
+    "SELECT Id, Message__c, From_Name__c, From_Email__c,",
+    "       Source__c, Item_Description__c, Order_ID__c, SKU__c,",
+    "       Submitted_Date__c, Status__c, Consent_to_Share__c,",
+    "       Wants_Memorial_Updates__c, Memorial_Bracelet__c",
+    "FROM Family_Message__c",
+  ].join(" ");
+
+  if (lastSync) {
+    const soqlDate = lastSync.replace(/\.\d+Z$/, "Z");
+    soql += ` WHERE LastModifiedDate >= ${soqlDate}`;
+  }
+
+  return sfQuery(soql);
+}
+
+async function syncFamilyMessages(sb, stats) {
+  const lastSync = await getCursor(sb, FM_CURSOR_KEY);
+  const runStart = new Date().toISOString();
+  console.log(`[sf-sync] Family messages — last sync: ${lastSync ?? "none (full sync)"}`);
+
+  let records = [];
+  try {
+    records = await querySFFamilyMessages(lastSync);
+  } catch (err) {
+    console.error("[sf-sync] Family_Message__c query failed:", err.message);
+    stats.errors.push(`Family_Message__c query: ${err.message}`);
+    return;
+  }
+
+  stats.family_messages_fetched = records.length;
+  console.log(`[sf-sync] Fetched ${records.length} family message(s)`);
+
+  const statusMap = {
+    "New": "new", "Ready to Send": "ready_to_send",
+    "Sent": "sent", "Held": "held", "Spam": "spam",
+  };
+
+  for (const r of records) {
+    try {
+      // Resolve hero_id via SF Memorial_Bracelet__c → heroes.sf_id
+      let heroId = null;
+      if (r.Memorial_Bracelet__c) {
+        const { data } = await sb
+          .from("heroes")
+          .select("id")
+          .eq("sf_id", r.Memorial_Bracelet__c)
+          .maybeSingle();
+        heroId = data?.id ?? null;
+      }
+
+      const { error } = await sb.from("family_messages").upsert(
+        {
+          sf_id: r.Id,
+          hero_id: heroId,
+          message: r.Message__c || null,
+          from_name: r.From_Name__c || null,
+          from_email: r.From_Email__c || null,
+          source: r.Source__c || null,
+          item_description: r.Item_Description__c || null,
+          order_ref: r.Order_ID__c || null,
+          sku: r.SKU__c || null,
+          submitted_date: r.Submitted_Date__c || null,
+          status: statusMap[r.Status__c] || "new",
+          consent_to_share: r.Consent_to_Share__c || false,
+          wants_memorial_updates: r.Wants_Memorial_Updates__c || false,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "sf_id" }
+      );
+
+      if (error) {
+        stats.family_messages_errors++;
+        stats.errors.push(`FM ${r.Id}: ${error.message}`);
+      } else {
+        stats.family_messages_synced++;
+      }
+    } catch (err) {
+      stats.family_messages_errors++;
+      stats.errors.push(`FM ${r.Id}: ${err.message}`);
+    }
+  }
+
+  await setCursor(sb, FM_CURSOR_KEY, runStart);
+}
+
 // ── Rimer family special case ──────────────────────────────────────────────────
 
 async function syncRimerFamily(sb) {
@@ -249,6 +348,9 @@ export async function GET(request) {
     associations_fetched: 0,
     associations_synced: 0,
     associations_errors: 0,
+    family_messages_fetched: 0,
+    family_messages_synced: 0,
+    family_messages_errors: 0,
     rimer_results: [],
     errors: [],
     synced_at: runStart,
@@ -341,6 +443,11 @@ export async function GET(request) {
   console.log("[sf-sync] Ensuring Rimer family associations...");
   stats.rimer_results = await syncRimerFamily(sb);
 
+  // ── Step 4: Family messages backup sync ──────────────────────────────────
+
+  console.log("[sf-sync] Syncing family messages from Salesforce...");
+  await syncFamilyMessages(sb, stats);
+
   // ── Advance cursor ─────────────────────────────────────────────────────────
 
   await setLastSyncTime(sb, runStart);
@@ -348,6 +455,7 @@ export async function GET(request) {
   console.log(
     `[sf-sync] Done — contacts: ${stats.contacts_synced}/${stats.contacts_fetched}, ` +
     `associations: ${stats.associations_synced}/${stats.associations_fetched}, ` +
+    `family_messages: ${stats.family_messages_synced}/${stats.family_messages_fetched}, ` +
     `errors: ${stats.errors.length}`
   );
 
