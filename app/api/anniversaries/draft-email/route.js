@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerClient } from "@/lib/supabase";
+import { isFamilyRelationship, describeRelationship } from "@/lib/relationships";
 
 /**
  * POST /api/anniversaries/draft-email
@@ -122,7 +123,7 @@ function buildEmail({ template, heroParts, familyFirst, senderName, senderEmail 
 export async function POST(request) {
   try {
     const body = await request.json();
-    const {
+    let {
       heroName,
       heroRank,
       heroFirstName,
@@ -130,17 +131,60 @@ export async function POST(request) {
       familyEmail,
       familyName,
       familyFirstName,
-      senderEmail,
-      senderName,
-      sfId,
-      templateChoice,
     } = body;
+    const { senderEmail, senderName, sfId, templateChoice } = body;
 
     if (!senderEmail || !senderEmail.endsWith("@steel-hearts.org")) {
       return NextResponse.json(
         { error: "senderEmail must be a @steel-hearts.org address" },
         { status: 400 }
       );
+    }
+
+    // Authoritative server-side lookup when sfId is provided.
+    // The family contact MUST resolve to a contacts_legacy row whose
+    // relationship array includes "Surviving Family" or "Extended Family" —
+    // otherwise the draft would go to a purchaser/supporter, not the family.
+    if (sfId) {
+      const sb = getServerClient();
+      const { data: hero, error: heroErr } = await sb
+        .from("heroes")
+        .select(`
+          sf_id, name, rank, first_name, last_name, memorial_date,
+          family_contact:contacts_legacy!family_contact_id(first_name, last_name, email, relationship)
+        `)
+        .eq("sf_id", sfId)
+        .maybeSingle();
+
+      if (heroErr) {
+        console.warn("[draft-email] hero lookup failed:", heroErr.message);
+      } else if (hero) {
+        if (!hero.family_contact) {
+          return NextResponse.json(
+            {
+              error: `Hero ${hero.name} has no family contact linked. Set family_contact_id (to a Surviving Family contact) before drafting.`,
+            },
+            { status: 400 }
+          );
+        }
+        if (!isFamilyRelationship(hero.family_contact.relationship)) {
+          return NextResponse.json(
+            {
+              error: `Family contact for ${hero.name} is not a surviving family member (relationship: ${describeRelationship(hero.family_contact.relationship)}). Repoint family_contact_id at a Surviving Family contact before drafting.`,
+            },
+            { status: 400 }
+          );
+        }
+
+        // Server data wins — never trust caller for recipient identity.
+        heroName = [hero.rank, hero.first_name, hero.last_name].filter(Boolean).join(" ") || hero.name;
+        heroRank = hero.rank || heroRank;
+        heroFirstName = hero.first_name || heroFirstName;
+        memorialDate = hero.memorial_date || memorialDate;
+        familyEmail = hero.family_contact.email;
+        familyName = `${hero.family_contact.first_name || ""} ${hero.family_contact.last_name || ""}`.trim();
+        familyFirstName = hero.family_contact.first_name || familyFirstName;
+      }
     }
 
     if (!familyEmail) {

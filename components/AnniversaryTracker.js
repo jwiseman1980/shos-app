@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import StatusBadge from "@/components/StatusBadge";
+import { isFamilyRelationship } from "@/lib/relationships";
 
 const STATUS_OPTIONS = ["Not Sent", "Scheduled", "Sent"];
 
@@ -347,24 +348,41 @@ function HeroRow({ hero, day, years, isPast, isToday, monthName, volunteers, onU
             </div>
           )}
           {hero.familyContactEmail && normStatus !== "sent" && (
-            <button
-              onClick={handleDraftEmail}
-              disabled={draftingEmail || draftResult === "drafted"}
-              title={`Draft anniversary email to ${hero.familyContactEmail}`}
-              style={{
-                fontSize: 10,
-                fontWeight: 600,
-                padding: "3px 8px",
-                borderRadius: "var(--radius-sm)",
-                border: "1px solid var(--gold)",
-                background: draftResult === "drafted" ? "rgba(34,197,94,0.15)" : "rgba(196,162,55,0.08)",
-                color: draftResult === "drafted" ? "var(--status-green)" : draftResult === "error" ? "var(--status-red)" : "var(--gold)",
-                cursor: draftingEmail ? "wait" : "pointer",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {draftingEmail ? "Drafting…" : draftResult === "drafted" ? "✓ Drafted" : draftResult === "error" ? "Error" : draftResult === "offline" ? "Offline" : "Draft Email"}
-            </button>
+            isFamilyRelationship(hero.familyContactRelationship) ? (
+              <button
+                onClick={handleDraftEmail}
+                disabled={draftingEmail || draftResult === "drafted"}
+                title={`Draft anniversary email to ${hero.familyContactEmail}`}
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: "3px 8px",
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid var(--gold)",
+                  background: draftResult === "drafted" ? "rgba(34,197,94,0.15)" : "rgba(196,162,55,0.08)",
+                  color: draftResult === "drafted" ? "var(--status-green)" : draftResult === "error" ? "var(--status-red)" : "var(--gold)",
+                  cursor: draftingEmail ? "wait" : "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {draftingEmail ? "Drafting…" : draftResult === "drafted" ? "✓ Drafted" : draftResult === "error" ? "Error" : draftResult === "offline" ? "Offline" : "Draft Email"}
+              </button>
+            ) : (
+              <span
+                title="Linked contact is not Surviving/Extended Family — repoint family_contact_id before drafting"
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: "3px 8px",
+                  borderRadius: "var(--radius-sm)",
+                  background: "rgba(245, 158, 11, 0.12)",
+                  color: "var(--status-orange)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Wrong contact
+              </span>
+            )
           )}
         </div>
       </td>
@@ -460,18 +478,36 @@ function HeroCard({ hero, day, years, monthName, anniversaryMonthName, daysUntil
       </div>
 
       {hero.familyContactEmail && normStatus !== "sent" && (
-        <div className="anniv-card-actions">
-          <button
-            className="anniv-card-btn"
-            onClick={handleDraftEmail}
-            disabled={draftingEmail || draftResult === "drafted"}
-          >
-            {draftingEmail ? "Drafting…"
-              : draftResult === "drafted" ? "✓ Drafted"
-              : draftResult === "error" ? "Error — retry"
-              : "Draft email"}
-          </button>
-        </div>
+        isFamilyRelationship(hero.familyContactRelationship) ? (
+          <div className="anniv-card-actions">
+            <button
+              className="anniv-card-btn"
+              onClick={handleDraftEmail}
+              disabled={draftingEmail || draftResult === "drafted"}
+            >
+              {draftingEmail ? "Drafting…"
+                : draftResult === "drafted" ? "✓ Drafted"
+                : draftResult === "error" ? "Error — retry"
+                : "Draft email"}
+            </button>
+          </div>
+        ) : (
+          <div className="anniv-card-actions">
+            <span
+              title="Linked contact is not Surviving/Extended Family — repoint family_contact_id before drafting"
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                padding: "6px 10px",
+                borderRadius: "var(--radius-sm)",
+                background: "rgba(245, 158, 11, 0.12)",
+                color: "var(--status-orange)",
+              }}
+            >
+              Wrong contact — needs research
+            </span>
+          </div>
+        )
       )}
     </div>
   );

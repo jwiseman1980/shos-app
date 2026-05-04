@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { isFamilyRelationship } from "@/lib/relationships";
 
 /**
  * AnniversaryDetail — expanded view for anniversary email tasks.
@@ -19,6 +20,7 @@ export default function AnniversaryDetail({ task, onComplete, onBack }) {
 
   const status = (task.anniversaryStatus || "not_started").toLowerCase().replace(/\s+/g, "_");
   const needsResearch = !task.familyContactEmail;
+  const wrongContact = !!task.familyContactEmail && !isFamilyRelationship(task.familyContactRelationship);
   const isDrafted = status === "email_drafted" || status === "in_progress" || !!draftResult;
   const isSent = status === "email_sent" || status === "sent" || status === "complete" || status === "completed";
 
@@ -158,13 +160,23 @@ export default function AnniversaryDetail({ task, onComplete, onBack }) {
             <div style={{ color: "var(--text-dim)", marginTop: 2 }}>
               {task.familyContactEmail}
             </div>
+            {Array.isArray(task.familyContactRelationship) && task.familyContactRelationship.length > 0 && (
+              <div style={{ color: wrongContact ? "var(--status-orange)" : "var(--text-dim)", marginTop: 4, fontStyle: "italic", fontSize: 12 }}>
+                {task.familyContactRelationship.join(", ")}
+              </div>
+            )}
+            {wrongContact && (
+              <div style={{ marginTop: 8, fontSize: 12, color: "var(--status-orange)" }}>
+                Linked contact is not Surviving/Extended Family. Repoint <code>family_contact_id</code> at a family member before drafting.
+              </div>
+            )}
           </div>
         )}
       </div>
 
       {/* Action buttons */}
       <div style={{ display: "flex", gap: 8, margin: "16px 0" }}>
-        {!needsResearch && !isSent && (
+        {!needsResearch && !wrongContact && !isSent && (
           <button
             onClick={handleDraftEmail}
             disabled={drafting}
