@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import DataCard from "@/components/DataCard";
+import { isFamilyRelationship } from "@/lib/relationships";
 
 const PRIORITY_COLOR = {
   critical: "var(--status-red)",
@@ -185,6 +186,7 @@ function AnniversaryRow({ hero, onStatusChange, onUnclaim }) {
 
   const isDrafted = status === "email_drafted" || status === "in_progress";
   const isSent = ["sent", "email_sent", "scheduled", "complete", "completed"].includes(status);
+  const wrongContact = !!hero.familyContactEmail && !isFamilyRelationship(hero.familyContactRelationship);
 
   return (
     <div
@@ -210,6 +212,11 @@ function AnniversaryRow({ hero, onStatusChange, onUnclaim }) {
                 {" "}· No family contact on file
               </span>
             )}
+            {!hero.needsResearch && wrongContact && (
+              <span style={{ color: "var(--status-orange)", fontWeight: 600 }} title="Linked contact's relationship is not Surviving/Extended Family">
+                {" "}· Wrong contact (not family)
+              </span>
+            )}
           </div>
         </div>
         <span
@@ -231,7 +238,7 @@ function AnniversaryRow({ hero, onStatusChange, onUnclaim }) {
 
       {!isSent && (
         <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
-          {!hero.needsResearch && !isDrafted && (
+          {!hero.needsResearch && !wrongContact && !isDrafted && (
             <button
               onClick={draftEmail}
               disabled={busy}
