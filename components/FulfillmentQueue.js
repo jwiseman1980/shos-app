@@ -5,16 +5,6 @@ import { useState, useMemo } from "react";
 const STATUS_META = {
   awaiting_shipment: { label: "Ready to Ship", color: "#10b981" },
   on_hold:           { label: "On Hold",       color: "#ef4444" },
-  in_progress:       { label: "In Progress",   color: "#94a3b8" },
-};
-
-const SOURCE_META = {
-  squarespace: { label: "Squarespace" },
-  shipstation: { label: "ShipStation" },
-  manual:      { label: "Manual"      },
-  wholesale:   { label: "Wholesale"   },
-  donated:     { label: "Donated"     },
-  drmf:        { label: "DRMF"        },
 };
 
 function ageDays(date) {
@@ -33,15 +23,13 @@ export default function FulfillmentQueue({ orders = [] }) {
   const [sortKey, setSortKey] = useState("date");
   const [sortDir, setSortDir] = useState("asc"); // oldest first by default
   const [statusFilter, setStatusFilter] = useState("");
-  const [sourceFilter, setSourceFilter] = useState("");
 
   const filtered = useMemo(() => {
-    return orders.filter(o => {
+    return orders.filter((o) => {
       if (statusFilter && o.status !== statusFilter) return false;
-      if (sourceFilter && o.source !== sourceFilter) return false;
       return true;
     });
-  }, [orders, statusFilter, sourceFilter]);
+  }, [orders, statusFilter]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -54,7 +42,6 @@ export default function FulfillmentQueue({ orders = [] }) {
         case "order":    av = a.orderNumber || ""; bv = b.orderNumber || ""; break;
         case "customer": av = (a.customer || "").toLowerCase(); bv = (b.customer || "").toLowerCase(); break;
         case "status":   av = a.status || ""; bv = b.status || ""; break;
-        case "source":   av = a.source || ""; bv = b.source || ""; break;
         case "qty":      av = a.totalQty || 0; bv = b.totalQty || 0; break;
         default:         av = 0; bv = 0;
       }
@@ -74,7 +61,8 @@ export default function FulfillmentQueue({ orders = [] }) {
     }
   }
 
-  const sources = useMemo(() => [...new Set(orders.map(o => o.source).filter(Boolean))], [orders]);
+  const awaitingCount = orders.filter((o) => o.status === "awaiting_shipment").length;
+  const onHoldCount   = orders.filter((o) => o.status === "on_hold").length;
 
   return (
     <div>
@@ -92,32 +80,10 @@ export default function FulfillmentQueue({ orders = [] }) {
             style={selectStyle}
           >
             <option value="">All ({orders.length})</option>
-            <option value="awaiting_shipment">
-              Ready to Ship ({orders.filter(o => o.status === "awaiting_shipment").length})
-            </option>
-            <option value="in_progress">
-              In Progress ({orders.filter(o => o.status === "in_progress").length})
-            </option>
-            {orders.some(o => o.status === "on_hold") && (
-              <option value="on_hold">
-                On Hold ({orders.filter(o => o.status === "on_hold").length})
-              </option>
+            <option value="awaiting_shipment">Ready to Ship ({awaitingCount})</option>
+            {onHoldCount > 0 && (
+              <option value="on_hold">On Hold ({onHoldCount})</option>
             )}
-          </select>
-        </label>
-        <label style={{ fontSize: 11, color: "var(--text-dim)" }}>
-          Source:&nbsp;
-          <select
-            value={sourceFilter}
-            onChange={(e) => setSourceFilter(e.target.value)}
-            style={selectStyle}
-          >
-            <option value="">All</option>
-            {sources.map(s => {
-              const meta = SOURCE_META[s];
-              const count = orders.filter(o => o.source === s).length;
-              return <option key={s} value={s}>{meta?.label || s} ({count})</option>;
-            })}
           </select>
         </label>
         <span style={{ fontSize: 11, color: "var(--text-dim)", marginLeft: "auto" }}>
@@ -145,14 +111,12 @@ export default function FulfillmentQueue({ orders = [] }) {
                 <SortHeader label="Qty" k="qty" sortKey={sortKey} sortDir={sortDir} onSort={setSort} align="right" />
                 <SortHeader label="Date" k="date" sortKey={sortKey} sortDir={sortDir} onSort={setSort} />
                 <SortHeader label="Status" k="status" sortKey={sortKey} sortDir={sortDir} onSort={setSort} />
-                <SortHeader label="Source" k="source" sortKey={sortKey} sortDir={sortDir} onSort={setSort} />
               </tr>
             </thead>
             <tbody>
               {sorted.map((o) => {
                 const days = ageDays(o.orderDate);
                 const statusMeta = STATUS_META[o.status] || { label: o.status, color: "#64748b" };
-                const sourceMeta = SOURCE_META[o.source] || { label: o.source };
                 return (
                   <tr key={o.key} style={{ borderBottom: "1px solid var(--card-border)" }}>
                     <td style={{ ...tdStyle, fontWeight: 600, color: "var(--text-bright)" }}>
@@ -167,8 +131,7 @@ export default function FulfillmentQueue({ orders = [] }) {
                     <td style={tdStyle}>
                       {o.items.slice(0, 3).map((it, i) => (
                         <div key={i} style={{ fontSize: 11, color: "var(--text-dim)", lineHeight: 1.4 }}>
-                          {it.hero || it.sku} × {it.qty}
-                          {it.size ? ` [${it.size}]` : ""}
+                          {it.name || it.sku} × {it.qty}
                         </div>
                       ))}
                       {o.items.length > 3 && (
@@ -200,13 +163,6 @@ export default function FulfillmentQueue({ orders = [] }) {
                         whiteSpace: "nowrap",
                       }}>
                         {statusMeta.label}
-                      </span>
-                    </td>
-                    <td style={tdStyle}>
-                      <span style={{
-                        fontSize: 10, fontWeight: 600, color: "var(--text-dim)",
-                      }}>
-                        {sourceMeta.label}
                       </span>
                     </td>
                   </tr>
