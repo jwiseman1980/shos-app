@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { href: "/pipelines",       label: "Pipelines",    icon: "⊞" },
   { href: "/email",           label: "Inbox",        icon: "✉" },
   { href: "/orders",          label: "Orders",       icon: "◈" },
+  { href: "/fulfillment",     label: "Fulfillment",  icon: "▸" },
   { href: "/laser",           label: "Laser",        icon: "◉" },
   { href: "/designs",         label: "Designs",      icon: "◇" },
   { href: "/shipping",        label: "Shipping",     icon: "↗" },
@@ -59,6 +60,7 @@ export default function TaskSidebar({
           "/laser": d.ordersToLaser || 0,
           "/designs": d.ordersNeedDesign || 0,
           "/anniversaries": d.anniversariesPending || 0,
+          "/fulfillment": d.totalActiveOrders || 0,
         })
       )
       .catch(() => {});

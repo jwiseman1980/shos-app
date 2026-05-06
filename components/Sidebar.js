@@ -69,6 +69,7 @@ const NAV_ROLES = [
       { href: "/production", label: "Production" },
       { href: "/bracelets", label: "Bracelets" },
       { href: "/orders", label: "Orders" },
+      { href: "/fulfillment", label: "Fulfillment Queue" },
       { href: "/designs", label: "Designs" },
       { href: "/laser", label: "Laser" },
       { href: "/shipping", label: "Shipping" },
